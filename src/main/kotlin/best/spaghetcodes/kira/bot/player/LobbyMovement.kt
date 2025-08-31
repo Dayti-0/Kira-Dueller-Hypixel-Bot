@@ -5,6 +5,7 @@ import best.spaghetcodes.kira.bot.StateManager
 import best.spaghetcodes.kira.utils.RandomUtils
 import best.spaghetcodes.kira.utils.TimeUtils
 import best.spaghetcodes.kira.utils.WorldUtils
+import net.minecraft.util.MathHelper
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
 import java.util.Timer
@@ -12,6 +13,7 @@ import java.util.Timer
 object LobbyMovement {
 
     private var tickYawChange = 0f
+    private var initialYaw: Float? = null
     private var intervals: ArrayList<Timer?> = ArrayList()
 
     fun sumo() {
@@ -23,9 +25,44 @@ object LobbyMovement {
         sumo1()
     }
 
+    fun generic() {
+        if (kira.mc.thePlayer != null) {
+            Movement.startForward()
+            Movement.startSprinting()
+            initialYaw = kira.mc.thePlayer.rotationYaw
+
+            intervals.add(TimeUtils.setInterval(
+                fun () {
+                    if (RandomUtils.randomBool()) {
+                        Movement.singleJump(RandomUtils.randomIntInRange(120, 200))
+                    } else {
+                        if (Movement.jumping()) {
+                            Movement.stopJumping()
+                        } else {
+                            Movement.startJumping()
+                        }
+                    }
+                },
+                RandomUtils.randomIntInRange(400, 800),
+                RandomUtils.randomIntInRange(900, 1800)
+            ))
+
+            intervals.add(TimeUtils.setInterval(
+                fun () {
+                    if (WorldUtils.airInFront(kira.mc.thePlayer, 4f)) {
+                        tickYawChange = RandomUtils.randomDoubleInRange(-13.0, 13.0).toFloat()
+                    }
+                },
+                0,
+                RandomUtils.randomIntInRange(50, 100)
+            ))
+        }
+    }
+
     fun stop() {
         Movement.clearAll()
         tickYawChange = 0f
+        initialYaw = null
         intervals.forEach { it?.cancel() }
     }
 
@@ -75,7 +112,17 @@ object LobbyMovement {
     @Suppress("UNUSED_PARAMETER")
     fun onTick(event: ClientTickEvent) {
         if (kira.bot?.toggled() == true && tickYawChange != 0f && kira.mc.thePlayer != null && StateManager.state != StateManager.States.PLAYING) {
-            kira.mc.thePlayer.rotationYaw += tickYawChange
+            val player = kira.mc.thePlayer
+            player.rotationYaw += tickYawChange
+            initialYaw?.let {
+                val diff = MathHelper.wrapAngleTo180_float(player.rotationYaw - it)
+                if (diff > 90f) {
+                    player.rotationYaw = it + 90f
+                } else if (diff < -90f) {
+                    player.rotationYaw = it - 90f
+                }
+            }
+            tickYawChange = 0f
         }
     }
 }
