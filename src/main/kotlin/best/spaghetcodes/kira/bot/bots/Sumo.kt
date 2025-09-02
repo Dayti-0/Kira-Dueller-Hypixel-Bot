@@ -1,6 +1,7 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Mouse
@@ -149,12 +150,17 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                 && !isHitselecting && approaching
                 && distance <= prefireFastApproachDist && distance > attackStartDist)
 
-        if (inAttackLatch || inPrefire) {
-            val latch = if (inPrefire) prefireLatchMs else attackLatchMs
-            keepACUntil = now + latch
-            Mouse.startLeftAC()
+        val cfg = kira.config
+        if (cfg?.enableCPS == true) {
+            if (inAttackLatch || inPrefire) {
+                val latch = if (inPrefire) prefireLatchMs else attackLatchMs
+                keepACUntil = now + latch
+                Mouse.startLeftAC()
+            } else {
+                if (now >= keepACUntil && !isHitselecting) Mouse.stopLeftAC()
+            }
         } else {
-            if (now >= keepACUntil && !isHitselecting) Mouse.stopLeftAC()
+            Mouse.stopLeftAC()
         }
 
         // ---- Éviter le vide : ne JAMAIS avancer quand c'est "air" devant ----

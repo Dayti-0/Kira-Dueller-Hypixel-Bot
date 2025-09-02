@@ -1,6 +1,7 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.features.Gap
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Potion
@@ -276,7 +277,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
         // Tracking / auto-clic : jamais pendant une conso ou l’ouverture
         if (distance < 150) Mouse.startTracking() else Mouse.stopTracking()
-        if (!isConsuming() && !openingPhase && distance < 10) {
+        val cfg = kira.config
+        if (cfg?.enableCPS == true && !isConsuming() && !openingPhase && distance < 10) {
             if (player.heldItem != null && player.heldItem.unlocalizedName.lowercase().contains("sword")) {
                 if (!lockLeftAC) Mouse.startLeftAC()
             }

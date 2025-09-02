@@ -2,6 +2,8 @@ package best.spaghetcodes.kira.bot
 
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.player.*
+import best.spaghetcodes.kira.bot.bots.Combo
+import best.spaghetcodes.kira.bot.bots.Sumo
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.utils.*
 import com.google.gson.JsonArray
@@ -255,6 +257,13 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         registerPacketListener()
         if (toggled) {
             onTick()
+
+            val cfg = kira.config
+            if (cfg?.enableCPS == true) {
+                if (this !is Sumo && this !is Combo) Mouse.startLeftAC()
+            } else {
+                if (this !is Sumo && this !is Combo) Mouse.stopLeftAC()
+            }
 
             if (StateManager.state != StateManager.States.PLAYING) {
                 ticksSinceGameStart++
