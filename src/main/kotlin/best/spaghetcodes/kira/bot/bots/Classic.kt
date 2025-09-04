@@ -11,6 +11,7 @@ import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
 import best.spaghetcodes.kira.utils.ChatUtils
+import best.spaghetcodes.kira.utils.Extensions.getVelocity
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import kotlin.math.abs
@@ -51,6 +52,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val singleJumpMinDist = 2.8f
     private val bowSlowThreshold = 0.06
     private val bowSlowFramesNeeded = 3
+    private val stationaryThreshold = 0.03
 
     // --- Rod : fenêtres & timings ---
     private val rodCloseMin = 2.2f
@@ -163,14 +165,19 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             if (opp != null && !Mouse.isUsingProjectile()) {
                 val d = EntityUtils.getDistanceNoY(mc.thePlayer, opp)
                 if (d >= openShotMinDist && shotsFired < maxArrows) {
-                    val now = System.currentTimeMillis()
-                    bowHardLockUntil = now + RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
-                    pendingProjectileUntil = now + 60L
-                    actionLockUntil = now + (fullDrawMsMax + 200)
-                    projectileKind = KIND_BOW
-                    val tunedD = if (d in 9.0f..18.5f) d * 0.92f else d
-                    useBow(tunedD) { shotsFired++ }
-                    projectileGraceUntil = bowHardLockUntil + 120
+                    val oppSpeed = opp.getVelocity().lengthVector()
+                    if (oppSpeed < stationaryThreshold) {
+                        val now = System.currentTimeMillis()
+                        bowHardLockUntil = now + RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
+                        pendingProjectileUntil = now + 60L
+                        actionLockUntil = now + (fullDrawMsMax + 200)
+                        projectileKind = KIND_BOW
+                        val tunedD = if (d in 9.0f..18.5f) d * 0.92f else d
+                        useBow(tunedD) { shotsFired++ }
+                        projectileGraceUntil = bowHardLockUntil + 120
+                    } else {
+                        Inventory.setInvItem("sword")
+                    }
                 }
             }
         }, RandomUtils.randomIntInRange(350, 650))
@@ -493,14 +500,19 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             if ((EntityUtils.entityFacingAway(p, opp) && distance in 3.5f..30f) ||
                 (distance in 28.0f..33.0f && !EntityUtils.entityFacingAway(p, opp))) {
                 if (distance > 10f && shotsFired < maxArrows) {
-                    val tunedD = if (distance in 9.0f..18.5f) distance * 0.92f else distance
-                    bowHardLockUntil = now + RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
-                    pendingProjectileUntil = now + 60L
-                    actionLockUntil = now + (fullDrawMsMax + 100)
-                    projectileKind = KIND_BOW
-                    useBow(tunedD) { shotsFired++ }
-                    projectileGraceUntil = bowHardLockUntil + 120
-                    return
+                    val oppSpeed = opp.getVelocity().lengthVector()
+                    if (oppSpeed < stationaryThreshold) {
+                        val tunedD = if (distance in 9.0f..18.5f) distance * 0.92f else distance
+                        bowHardLockUntil = now + RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
+                        pendingProjectileUntil = now + 60L
+                        actionLockUntil = now + (fullDrawMsMax + 100)
+                        projectileKind = KIND_BOW
+                        useBow(tunedD) { shotsFired++ }
+                        projectileGraceUntil = bowHardLockUntil + 120
+                        return
+                    } else {
+                        Inventory.setInvItem("sword")
+                    }
                 }
             }
         }

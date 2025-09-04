@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
+import best.spaghetcodes.kira.utils.Extensions.getVelocity
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 
@@ -28,6 +29,7 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority, Bow {
     private var tapping = false
     private var lastKitSwitch = 0L
     private val kitSwitchCooldown = 3000L
+    private val stationaryThreshold = 0.03
 
     override fun onGameStart() {
         Mouse.startTracking()
@@ -97,9 +99,14 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority, Bow {
         if ((now - lastKitSwitch) > kitSwitchCooldown) {
             when {
                 distance > 8f -> {
-                    // Essayer arc/proj à longue distance
+                    // Essayer arc/proj à longue distance uniquement si l'adversaire est immobile
                     if (distance > 5f) {
-                        useBow(distance)
+                        val oppSpeed = opp.getVelocity().lengthVector()
+                        if (oppSpeed < stationaryThreshold) {
+                            useBow(distance)
+                        } else {
+                            Inventory.setInvItem("sword")
+                        }
                         lastKitSwitch = now
                     } else {
                         if (!Inventory.setInvItem("rod")) {

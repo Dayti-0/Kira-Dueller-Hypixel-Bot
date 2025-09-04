@@ -10,6 +10,7 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
+import best.spaghetcodes.kira.utils.Extensions.getVelocity
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import kotlin.math.abs
@@ -51,6 +52,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val stillFramesNeeded = 10
     private val bowSlowThreshold = 0.06
     private val bowSlowFramesNeeded = 3
+    private val stationaryThreshold = 0.03
     private var oppLastX = 0.0
     private var oppLastZ = 0.0
     private var stillFrames = 0
@@ -736,15 +738,20 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                     pendingProjectileUntil = now + 60L
                     actionLockUntil = now + (lock + 120)
                     projectileKind = KIND_BOW
-                    useBow(tunedD) {
-                        shotsFired++
-                        openVolleyFired++
-                        lastShotAt = System.currentTimeMillis()
+                    val oppSpeed = opp.getVelocity().lengthVector()
+                    if (oppSpeed < stationaryThreshold) {
+                        useBow(tunedD) {
+                            shotsFired++
+                            openVolleyFired++
+                            lastShotAt = System.currentTimeMillis()
+                        }
+                        projectileGraceUntil = bowHardLockUntil + 120
+                        postBowNoRodUntil = now + lock + 380L
+                        prevDistance = distance
+                        return
+                    } else {
+                        Inventory.setInvItem("sword")
                     }
-                    projectileGraceUntil = bowHardLockUntil + 120
-                    postBowNoRodUntil = now + lock + 380L
-                    prevDistance = distance
-                    return
                 }
             }
 
@@ -768,14 +775,19 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                     pendingProjectileUntil = now + 50L
                     actionLockUntil = now + (lock + 100)
                     projectileKind = KIND_BOW
-                    useBow(tunedD) {
-                        shotsFired++
-                        lastReactiveShotAt = System.currentTimeMillis()
+                    val oppSpeed = opp.getVelocity().lengthVector()
+                    if (oppSpeed < stationaryThreshold) {
+                        useBow(tunedD) {
+                            shotsFired++
+                            lastReactiveShotAt = System.currentTimeMillis()
+                        }
+                        projectileGraceUntil = bowHardLockUntil + 100
+                        postBowNoRodUntil = now + lock + 320L
+                        prevDistance = distance
+                        return
+                    } else {
+                        Inventory.setInvItem("sword")
                     }
-                    projectileGraceUntil = bowHardLockUntil + 100
-                    postBowNoRodUntil = now + lock + 320L
-                    prevDistance = distance
-                    return
                 }
             }
 
@@ -795,11 +807,16 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                         pendingProjectileUntil = now + 60L
                         actionLockUntil = now + (lock + 120)
                         projectileKind = KIND_BOW
-                        useBow(tunedD) { shotsFired++ }
-                        projectileGraceUntil = bowHardLockUntil + 120
-                        postBowNoRodUntil = now + lock + 320L
-                        prevDistance = distance
-                        return
+                        val oppSpeed = opp.getVelocity().lengthVector()
+                        if (oppSpeed < stationaryThreshold) {
+                            useBow(tunedD) { shotsFired++ }
+                            projectileGraceUntil = bowHardLockUntil + 120
+                            postBowNoRodUntil = now + lock + 320L
+                            prevDistance = distance
+                            return
+                        } else {
+                            Inventory.setInvItem("sword")
+                        }
                     }
                 }
             }

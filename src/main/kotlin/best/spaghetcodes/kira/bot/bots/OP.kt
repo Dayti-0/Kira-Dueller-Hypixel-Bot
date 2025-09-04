@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
+import best.spaghetcodes.kira.utils.Extensions.getVelocity
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import java.util.Random
@@ -42,6 +43,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
     override var lastGap = 0L
 
     var tapping = false
+    private val stationaryThreshold = 0.03
 
     override fun onGameStart() {
         Mouse.startTracking()                 // tracking ON
@@ -176,8 +178,16 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
                 } else if ((EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!) && distance in 3.5f..30f) ||
                            (distance in 28.0f..33.0f && !EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))) {
                     if (distance > 10f && shotsFired < maxArrows && System.currentTimeMillis() - lastPotion > 5000) {
-                        clear = true
-                        useBow(distance) { shotsFired++ }
+                        val oppSpeed = opponent()!!.getVelocity().lengthVector()
+                        if (oppSpeed < stationaryThreshold) {
+                            clear = true
+                            useBow(distance) { shotsFired++ }
+                        } else {
+                            clear = false
+                            Inventory.setInvItem("sword")
+                            if (WorldUtils.leftOrRightToPoint(mc.thePlayer, Vec3(0.0, 0.0, 0.0))) movePriority[0] += 4
+                            else movePriority[1] += 4
+                        }
                     } else {
                         clear = false
                         if (WorldUtils.leftOrRightToPoint(mc.thePlayer, Vec3(0.0, 0.0, 0.0))) movePriority[0] += 4
