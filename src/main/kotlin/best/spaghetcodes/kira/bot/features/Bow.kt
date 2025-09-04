@@ -9,6 +9,20 @@ import best.spaghetcodes.kira.kira
 import net.minecraft.client.Minecraft
 import java.util.Timer
 
+// Timers used during bow usage so they can be cancelled if needed
+var bowReleaseTimer: Timer? = null
+var bowFinalTimer: Timer? = null
+var bowPollTimer: Timer? = null
+
+fun cancelBowTimers() {
+    bowReleaseTimer?.cancel()
+    bowFinalTimer?.cancel()
+    bowPollTimer?.cancel()
+    bowReleaseTimer = null
+    bowFinalTimer = null
+    bowPollTimer = null
+}
+
 /**
  * Arc (Hypixel Classic/OP)
  * Deux voies :
@@ -43,16 +57,19 @@ interface Bow {
 
             Mouse.rClickDown()
 
-            val releaseTimer = TimeUtils.setTimeout({
+            bowReleaseTimer = TimeUtils.setTimeout({
                 Mouse.rClickUp()
             }, hold)
 
             var pollTimer: Timer? = null
-            val finalTimer = TimeUtils.setTimeout({
+            bowFinalTimer = TimeUtils.setTimeout({
                 pollTimer?.cancel()
                 Mouse.setUsingProjectile(false)
                 Inventory.setInvItem("sword")
                 afterShot()
+                bowReleaseTimer = null
+                bowFinalTimer = null
+                bowPollTimer = null
             }, hold + RandomUtils.randomIntInRange(90, 150))
 
             pollTimer = TimeUtils.setInterval({
@@ -62,15 +79,19 @@ interface Bow {
                     val dist = EntityUtils.getDistanceNoY(player, opp)
                     if (dist <= 5f) {
                         Mouse.rClickUp()
-                        releaseTimer?.cancel()
-                        finalTimer?.cancel()
-                        pollTimer?.cancel()
+                        bowReleaseTimer?.cancel()
+                        bowFinalTimer?.cancel()
+                        bowPollTimer?.cancel()
                         Mouse.setUsingProjectile(false)
                         Inventory.setInvItem("sword")
                         afterShot()
+                        bowReleaseTimer = null
+                        bowFinalTimer = null
+                        bowPollTimer = null
                     }
                 }
             }, 0, 50)
+            bowPollTimer = pollTimer
         }, preDelay)
     }
 
@@ -90,16 +111,19 @@ interface Bow {
         Inventory.setInvItem("bow")
         Mouse.rClickDown()
 
-        val releaseTimer = TimeUtils.setTimeout({
+        bowReleaseTimer = TimeUtils.setTimeout({
             Mouse.rClickUp()
         }, hold)
 
         var pollTimer: Timer? = null
-        val finalTimer = TimeUtils.setTimeout({
+        bowFinalTimer = TimeUtils.setTimeout({
             pollTimer?.cancel()
             Mouse.setUsingProjectile(false)
             Inventory.setInvItem("sword")
             afterShot()
+            bowReleaseTimer = null
+            bowFinalTimer = null
+            bowPollTimer = null
         }, hold + RandomUtils.randomIntInRange(90, 150))
 
         pollTimer = TimeUtils.setInterval({
@@ -109,14 +133,18 @@ interface Bow {
                 val dist = EntityUtils.getDistanceNoY(player, opp)
                 if (dist <= 5f) {
                     Mouse.rClickUp()
-                    releaseTimer?.cancel()
-                    finalTimer?.cancel()
-                    pollTimer?.cancel()
+                    bowReleaseTimer?.cancel()
+                    bowFinalTimer?.cancel()
+                    bowPollTimer?.cancel()
                     Mouse.setUsingProjectile(false)
                     Inventory.setInvItem("sword")
                     afterShot()
+                    bowReleaseTimer = null
+                    bowFinalTimer = null
+                    bowPollTimer = null
                 }
             }
         }, 0, 50)
+        bowPollTimer = pollTimer
     }
 }
