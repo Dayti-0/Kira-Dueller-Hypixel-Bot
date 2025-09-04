@@ -38,7 +38,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val bowMinUseDist = 9.0f            // ne pas initier un tir < 9 blocs
 
     // Ouverture contrôlée (1–2 flèches max, espacées)
-    private var openVolleyMax = 1
+    private var openVolleyMax = 2
     private var openVolleyFired = 0
     private var openWindowUntil = 0L
     private var openStartDelayUntil = 0L
@@ -199,7 +199,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         actionLockUntil = 0L
         projectileKind = KIND_NONE
 
-        openVolleyMax = RandomUtils.randomIntInRange(1, 2)
+        openVolleyMax = 2
         openVolleyFired = 0
         openWindowUntil = System.currentTimeMillis() + 4500L
         openStartDelayUntil = System.currentTimeMillis() + RandomUtils.randomIntInRange(700, 1100)
@@ -738,20 +738,15 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                     pendingProjectileUntil = now + 60L
                     actionLockUntil = now + (lock + 120)
                     projectileKind = KIND_BOW
-                    val oppSpeed = opp.getVelocity().lengthVector()
-                    if (oppSpeed < stationaryThreshold) {
-                        useBow(tunedD) {
-                            shotsFired++
-                            openVolleyFired++
-                            lastShotAt = System.currentTimeMillis()
-                        }
-                        projectileGraceUntil = bowHardLockUntil + 120
-                        postBowNoRodUntil = now + lock + 380L
-                        prevDistance = distance
-                        return
-                    } else {
-                        Inventory.setInvItem("sword")
+                    useBow(tunedD) {
+                        shotsFired++
+                        openVolleyFired++
+                        lastShotAt = System.currentTimeMillis()
                     }
+                    projectileGraceUntil = bowHardLockUntil + 120
+                    postBowNoRodUntil = now + lock + 380L
+                    prevDistance = distance
+                    return
                 }
             }
 
