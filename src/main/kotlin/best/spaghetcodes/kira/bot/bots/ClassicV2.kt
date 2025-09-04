@@ -32,7 +32,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     // =====================  ARC  =====================
     private val fullDrawMsMin = 820
     private val fullDrawMsMax = 980
-    private val bowCancelCloseDist = 8.0f
+    private val bowCancelCloseDist = 5.0f
     private val bowMinUseDist = 9.0f            // ne pas initier un tir < 9 blocs
 
     // Ouverture contrôlée (1–2 flèches max, espacées)
@@ -720,22 +720,24 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 left > reserve &&
                 (now - lastShotAt) >= RandomUtils.randomIntInRange(openSpacingMin.toInt(), openSpacingMax.toInt())) {
 
-                val tunedD = adjustedAimDistance(distance)
-                val lock = chargeMsFor(distance, opening = true)
-                startupJumping = false // stop sauts de début au 1er draw
-                bowHardLockUntil = now + lock
-                pendingProjectileUntil = now + 60L
-                actionLockUntil = now + (lock + 120)
-                projectileKind = KIND_BOW
-                useBow(tunedD) {
-                    shotsFired++
-                    openVolleyFired++
-                    lastShotAt = System.currentTimeMillis()
+                if (distance > bowCancelCloseDist + 1) {
+                    val tunedD = adjustedAimDistance(distance)
+                    val lock = chargeMsFor(distance, opening = true)
+                    startupJumping = false // stop sauts de début au 1er draw
+                    bowHardLockUntil = now + lock
+                    pendingProjectileUntil = now + 60L
+                    actionLockUntil = now + (lock + 120)
+                    projectileKind = KIND_BOW
+                    useBow(tunedD) {
+                        shotsFired++
+                        openVolleyFired++
+                        lastShotAt = System.currentTimeMillis()
+                    }
+                    projectileGraceUntil = bowHardLockUntil + 120
+                    postBowNoRodUntil = now + lock + 380L
+                    prevDistance = distance
+                    return
                 }
-                projectileGraceUntil = bowHardLockUntil + 120
-                postBowNoRodUntil = now + lock + 380L
-                prevDistance = distance
-                return
             }
 
             // Réactif si l’ennemi slow-bow/immobile — et seulement assez loin
@@ -750,21 +752,23 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 WorldUtils.blockInFront(p, distance, 0.5f) == Blocks.air &&
                 left > reserve) {
 
-                val tunedD = adjustedAimDistance(distance)
-                val lock = chargeMsFor(distance, opening = false)
-                startupJumping = false
-                bowHardLockUntil = now + lock
-                pendingProjectileUntil = now + 50L
-                actionLockUntil = now + (lock + 100)
-                projectileKind = KIND_BOW
-                useBow(tunedD) {
-                    shotsFired++
-                    lastReactiveShotAt = System.currentTimeMillis()
+                if (distance > bowCancelCloseDist + 1) {
+                    val tunedD = adjustedAimDistance(distance)
+                    val lock = chargeMsFor(distance, opening = false)
+                    startupJumping = false
+                    bowHardLockUntil = now + lock
+                    pendingProjectileUntil = now + 50L
+                    actionLockUntil = now + (lock + 100)
+                    projectileKind = KIND_BOW
+                    useBow(tunedD) {
+                        shotsFired++
+                        lastReactiveShotAt = System.currentTimeMillis()
+                    }
+                    projectileGraceUntil = bowHardLockUntil + 100
+                    postBowNoRodUntil = now + lock + 320L
+                    prevDistance = distance
+                    return
                 }
-                projectileGraceUntil = bowHardLockUntil + 100
-                postBowNoRodUntil = now + lock + 320L
-                prevDistance = distance
-                return
             }
 
             // Opportuniste (dos / très loin)
@@ -775,18 +779,20 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 if ((away && distance in 3.5f..30f) ||
                     (!away && distance in 28.0f..33.0f)) {
 
-                    val tunedD = adjustedAimDistance(distance)
-                    val lock = chargeMsFor(distance, opening = false)
-                    startupJumping = false
-                    bowHardLockUntil = now + lock
-                    pendingProjectileUntil = now + 60L
-                    actionLockUntil = now + (lock + 120)
-                    projectileKind = KIND_BOW
-                    useBow(tunedD) { shotsFired++ }
-                    projectileGraceUntil = bowHardLockUntil + 120
-                    postBowNoRodUntil = now + lock + 320L
-                    prevDistance = distance
-                    return
+                    if (distance > bowCancelCloseDist + 1) {
+                        val tunedD = adjustedAimDistance(distance)
+                        val lock = chargeMsFor(distance, opening = false)
+                        startupJumping = false
+                        bowHardLockUntil = now + lock
+                        pendingProjectileUntil = now + 60L
+                        actionLockUntil = now + (lock + 120)
+                        projectileKind = KIND_BOW
+                        useBow(tunedD) { shotsFired++ }
+                        projectileGraceUntil = bowHardLockUntil + 120
+                        postBowNoRodUntil = now + lock + 320L
+                        prevDistance = distance
+                        return
+                    }
                 }
             }
         }
