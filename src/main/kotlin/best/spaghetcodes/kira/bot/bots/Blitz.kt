@@ -97,30 +97,17 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority, Bow {
 
         // Gestion d’objets/kits (Blitz)
         if ((now - lastKitSwitch) > kitSwitchCooldown) {
+            val oppSpeed = opp.getVelocity().lengthVector()
             when {
-                distance > 8f -> {
-                    // Essayer arc/proj à longue distance uniquement si l'adversaire est immobile
-                    if (distance > 5f) {
-                        val oppSpeed = opp.getVelocity().lengthVector()
-                        if (oppSpeed < stationaryThreshold) {
-                            useBow(distance)
-                        } else {
-                            Inventory.setInvItem("sword")
-                        }
-                        lastKitSwitch = now
-                    } else {
-                        if (!Inventory.setInvItem("rod")) {
-                            Inventory.setInvItem("sword")
-                        }
-                        lastKitSwitch = now
-                    }
+                distance >= 5f && oppSpeed < stationaryThreshold -> {
+                    useBowImmediateFull()
+                    lastKitSwitch = now
                 }
-                distance < 3f -> {
-                    // S'assurer d'avoir l'épée au cac
-                    if (p.heldItem?.unlocalizedName?.lowercase()?.contains("sword") != true) {
+                distance < 5f -> {
+                    if (distance < 3f || !Inventory.setInvItem("rod")) {
                         Inventory.setInvItem("sword")
-                        lastKitSwitch = now
                     }
+                    lastKitSwitch = now
                 }
                 else -> {
                     // Distance moyenne : objets spéciaux/potions si présents
