@@ -2,6 +2,7 @@ package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.features.Bow
+import best.spaghetcodes.kira.bot.features.cancelBowTimers
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Rod
 import best.spaghetcodes.kira.bot.player.Combat
@@ -325,10 +326,13 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         if (projectileActive && Mouse.rClickDown) {
             if (projectileKind == KIND_BOW && distance < bowCancelCloseDist) {
                 Mouse.rClickUp()
+                Inventory.setInvItem("sword")
+                cancelBowTimers()
                 bowHardLockUntil = 0L
                 projectileGraceUntil = 0L
                 pendingProjectileUntil = 0L
                 actionLockUntil = 0L
+                Mouse.setUsingProjectile(false)
                 projectileKind = KIND_NONE
             }
         }
