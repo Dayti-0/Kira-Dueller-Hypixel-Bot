@@ -520,7 +520,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         // =================  PARADE ÉPÉE (long range)  ================
         val holdingSword = p.heldItem != null && p.heldItem.unlocalizedName.lowercase().contains("sword")
         val isStillNow = stillFrames >= stillFramesNeeded
-        if (now - gameStartAt < 2000 && isStillNow && openVolleyMax < 3) {
+        if (now - gameStartAt < 5000 && isStillNow && openVolleyMax < 3) {
             // Adversaire immobile durant les premières secondes : augmenter la salve d'ouverture
             openVolleyMax = RandomUtils.randomIntInRange(3, 4)
         }
