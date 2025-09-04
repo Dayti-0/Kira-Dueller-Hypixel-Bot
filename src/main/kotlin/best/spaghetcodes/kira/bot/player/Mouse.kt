@@ -135,7 +135,7 @@ object Mouse {
         }
     }
 
-    private fun rClickDown() {
+    fun rClickDown() {
         if (kira.bot?.toggled() == true) {
             rClickDown = true
             KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindUseItem.keyCode, true)

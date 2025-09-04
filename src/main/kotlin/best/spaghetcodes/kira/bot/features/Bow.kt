@@ -4,7 +4,10 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.utils.RandomUtils
 import best.spaghetcodes.kira.utils.TimeUtils
+import best.spaghetcodes.kira.utils.EntityUtils
+import best.spaghetcodes.kira.kira
 import net.minecraft.client.Minecraft
+import java.util.Timer
 
 /**
  * Arc (Hypixel Classic/OP)
@@ -38,15 +41,36 @@ interface Bow {
                 Inventory.setInvItem("bow")
             }
 
-            // Maintien pour un tir full-charge
-            Mouse.rClick(hold)
+            Mouse.rClickDown()
 
-            // Laisser la release, puis retour épée
-            TimeUtils.setTimeout({
+            val releaseTimer = TimeUtils.setTimeout({
+                Mouse.rClickUp()
+            }, hold)
+
+            var pollTimer: Timer? = null
+            val finalTimer = TimeUtils.setTimeout({
+                pollTimer?.cancel()
                 Mouse.setUsingProjectile(false)
                 Inventory.setInvItem("sword")
                 afterShot()
             }, hold + RandomUtils.randomIntInRange(90, 150))
+
+            pollTimer = TimeUtils.setInterval({
+                val player = Minecraft.getMinecraft().thePlayer
+                val opp = kira.bot?.opponent()
+                if (player != null && opp != null) {
+                    val dist = EntityUtils.getDistanceNoY(player, opp)
+                    if (dist <= 5f) {
+                        Mouse.rClickUp()
+                        releaseTimer?.cancel()
+                        finalTimer?.cancel()
+                        pollTimer?.cancel()
+                        Mouse.setUsingProjectile(false)
+                        Inventory.setInvItem("sword")
+                        afterShot()
+                    }
+                }
+            }, 0, 50)
         }, preDelay)
     }
 
@@ -64,13 +88,35 @@ interface Bow {
 
         // Switch instant + clic droit immédiat
         Inventory.setInvItem("bow")
-        Mouse.rClick(hold)
+        Mouse.rClickDown()
 
-        // Release + retour épée
-        TimeUtils.setTimeout({
+        val releaseTimer = TimeUtils.setTimeout({
+            Mouse.rClickUp()
+        }, hold)
+
+        var pollTimer: Timer? = null
+        val finalTimer = TimeUtils.setTimeout({
+            pollTimer?.cancel()
             Mouse.setUsingProjectile(false)
             Inventory.setInvItem("sword")
             afterShot()
         }, hold + RandomUtils.randomIntInRange(90, 150))
+
+        pollTimer = TimeUtils.setInterval({
+            val player = Minecraft.getMinecraft().thePlayer
+            val opp = kira.bot?.opponent()
+            if (player != null && opp != null) {
+                val dist = EntityUtils.getDistanceNoY(player, opp)
+                if (dist <= 5f) {
+                    Mouse.rClickUp()
+                    releaseTimer?.cancel()
+                    finalTimer?.cancel()
+                    pollTimer?.cancel()
+                    Mouse.setUsingProjectile(false)
+                    Inventory.setInvItem("sword")
+                    afterShot()
+                }
+            }
+        }, 0, 50)
     }
 }
