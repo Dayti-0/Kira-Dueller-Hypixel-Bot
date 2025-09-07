@@ -339,37 +339,6 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             leftACActive = false
         }
 
-        if (leftACActive &&
-            distance > lastOpponentDistance &&
-            distance > 6f &&
-            pearls > 0 &&
-            now - lastPearl > 11000 && // 11s cooldown
-            !isConsuming()
-        ) {
-            lastPearl = now
-            Mouse.stopLeftAC()
-            leftACActive = false
-            lockLeftAC = true
-            TimeUtils.setTimeout({
-                if (Inventory.setInvItem("pearl")) {
-                    pearls--
-                    Mouse.setUsingProjectile(true)
-                    TimeUtils.setTimeout({
-                        Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
-                        TimeUtils.setTimeout({
-                            Mouse.setUsingProjectile(false)
-                            Inventory.setInvItem("sword")
-                            TimeUtils.setTimeout({
-                                lockLeftAC = false
-                            }, RandomUtils.randomIntInRange(200, 300))
-                        }, RandomUtils.randomIntInRange(250, 300))
-                    }, RandomUtils.randomIntInRange(300, 600))
-                } else {
-                    lockLeftAC = false
-                }
-            }, RandomUtils.randomIntInRange(250, 500))
-        }
-
         lastOpponentDistance = distance
 
         // Sauts > 8 blocs
@@ -462,6 +431,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (!isConsuming() &&
             player.motionY > 0.15 &&
             !player.onGround &&
+            now - gameStartAt > 240_000L &&
             pearls > 0 &&
             now - lastPearl > 11000 // 11s cooldown
         ) {
@@ -501,7 +471,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (!isConsuming() &&
             !openingPhase &&
             distance > 24f &&
-            now - gameStartAt > 180_000L &&
+            now - gameStartAt > 240_000L &&
             EntityUtils.entityFacingAway(target, player) &&
             !Mouse.isRunningAway() &&
             now - lastPearl > 11000 && // 11s cooldown
