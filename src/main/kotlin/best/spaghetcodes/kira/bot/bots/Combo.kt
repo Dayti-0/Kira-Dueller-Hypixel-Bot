@@ -35,12 +35,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private var lockLeftAC = false
 
     // ---- cycles déterministes (aucun check d'effet) ----
-    // Strength : 2 doses, 2e à +296 s après le début de la 1re
+    // Strength : 2 doses, 2e à +294 s après le début de la 1re
     private var strengthDosesUsed = 0
     override var lastPotion = 0L
     private var strengthCycleStarted = false
     private var nextStrengthAt = 0L
-    private val strengthPeriodMs = 296_000L
+    private val strengthPeriodMs = 294_000L
 
     // Gapples : toutes les 26 s, indéfiniment
     override var lastGap = 0L
