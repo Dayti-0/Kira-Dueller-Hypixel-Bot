@@ -45,7 +45,10 @@ class kira {
     @Suppress("UNUSED_PARAMETER")
     fun init(event: FMLInitializationEvent) {
         config = Config()
-        config?.preload()
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            config?.writeData()
+        })
 
         ConfigCommand().register()
         KeyBindings.register()

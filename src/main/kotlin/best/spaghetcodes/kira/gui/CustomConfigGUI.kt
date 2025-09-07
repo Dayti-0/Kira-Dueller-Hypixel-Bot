@@ -54,6 +54,7 @@ class CustomConfigGUI : GuiScreen() {
         super.onGuiClosed()
         Keyboard.enableRepeatEvents(false)
         focus = Tf.NONE
+        saveConfig()
     }
 
     override fun handleMouseInput() {
@@ -381,13 +382,16 @@ class CustomConfigGUI : GuiScreen() {
     }
 
     private fun saveAndClose() {
+        ChatUtils.info("Configuration saved!")
+        mc.displayGuiScreen(null)
+    }
+
+    private fun saveConfig() {
         kira.config?.let {
             it.startMessage = startMsgBuf
             it.ggMessage = ggMsgBuf
             it.writeData()
         }
-        ChatUtils.info("Configuration saved!")
-        mc.displayGuiScreen(null)
     }
 
     override fun doesGuiPauseGame(): Boolean = false
