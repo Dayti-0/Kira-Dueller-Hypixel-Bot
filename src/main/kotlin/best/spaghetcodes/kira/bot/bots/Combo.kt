@@ -422,27 +422,39 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             now - lastPearl > 5000 &&
             pearls > 0
         ) {
-            lastPearl = now
-            Mouse.stopLeftAC()
-            lockLeftAC = true
-            TimeUtils.setTimeout({
-                if (Inventory.setInvItem("pearl")) {
-                    pearls--
-                    Mouse.setUsingProjectile(true)
-                    TimeUtils.setTimeout({
-                        Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
+            fun pearlRoutine() {
+                lastPearl = System.currentTimeMillis()
+                Mouse.stopLeftAC()
+                lockLeftAC = true
+                TimeUtils.setTimeout({
+                    if (Inventory.setInvItem("pearl")) {
+                        pearls--
+                        Mouse.setUsingProjectile(true)
                         TimeUtils.setTimeout({
-                            Mouse.setUsingProjectile(false)
-                            Inventory.setInvItem("sword")
+                            Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
                             TimeUtils.setTimeout({
-                                lockLeftAC = false
-                            }, RandomUtils.randomIntInRange(200, 300))
-                        }, RandomUtils.randomIntInRange(250, 300))
-                    }, RandomUtils.randomIntInRange(300, 600))
-                } else {
-                    lockLeftAC = false
-                }
-            }, RandomUtils.randomIntInRange(250, 500))
+                                Mouse.setUsingProjectile(false)
+                                Inventory.setInvItem("sword")
+                                TimeUtils.setTimeout({
+                                    lockLeftAC = false
+                                }, RandomUtils.randomIntInRange(200, 300))
+                            }, RandomUtils.randomIntInRange(250, 300))
+                        }, RandomUtils.randomIntInRange(300, 600))
+                    } else {
+                        lockLeftAC = false
+                    }
+                }, RandomUtils.randomIntInRange(250, 500))
+            }
+            val timeUntilGap = nextGapAt - now
+            if (timeUntilGap <= 10_000) {
+                val pre = RandomUtils.randomIntInRange(110, 160)
+                val hold = 2100
+                eatGap(pre, hold, distance, player, target)
+                val delay = pre + hold + RandomUtils.randomIntInRange(40, 80)
+                TimeUtils.setTimeout({ pearlRoutine() }, delay)
+            } else {
+                pearlRoutine()
+            }
         }
 
         // Strafes “Classic-like”
