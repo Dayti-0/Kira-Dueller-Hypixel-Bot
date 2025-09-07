@@ -59,6 +59,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     // Ressources diverses
     private var pearls = 5
     private var lastPearl = 0L
+    private var gameStartAt = 0L
 
     // Ouverture
     private var openingPhase = true
@@ -279,6 +280,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         Mouse.stopLeftAC()
         Mouse.rClickUp()
         Inventory.setInvItem("sword")
+
+        gameStartAt = System.currentTimeMillis()
 
         openingPhase = true
         openingScheduled = false
@@ -537,7 +540,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         // Quick pearl (safe hors conso, 11s cooldown)
         if (!isConsuming() &&
             !openingPhase &&
-            distance > 18f &&
+            distance > 24f &&
+            now - gameStartAt > 180_000L &&
             EntityUtils.entityFacingAway(target, player) &&
             !Mouse.isRunningAway() &&
             now - lastPearl > 11000 && // 11s cooldown
