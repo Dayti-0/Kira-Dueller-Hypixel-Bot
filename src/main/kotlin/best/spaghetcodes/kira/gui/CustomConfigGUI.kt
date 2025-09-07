@@ -292,9 +292,15 @@ class CustomConfigGUI : GuiScreen() {
         drawString(fontRendererObj, "§lCOMBAT SETTINGS", x, y - scroll, primaryColor); y += 25
 
         val cfg = kira.config ?: return y
+
         toggle("Enable Kira Hits", x, y, { cfg.enableHits }, { cfg.enableHits = it }); y += 20
         number("Min CPS", x, y, { cfg.minCPS }, { cfg.minCPS = it }, 15, 25, 1); y += 20
         number("Max CPS", x, y, { cfg.maxCPS }, { cfg.maxCPS = it }, 19, 25, 1); y += 24
+
+
+        number("Min CPS", x, y, { cfg.minCPS }, { cfg.minCPS = it }, 0, 25, 1); y += 20
+        number("Max CPS", x, y, { cfg.maxCPS }, { cfg.maxCPS = it }, 0, 25, 1); y += 24
+
         number("Horizontal Look Speed", x, y, { cfg.lookSpeedHorizontal }, { cfg.lookSpeedHorizontal = it }, 1, 50, 1); y += 20
         number("Vertical Look Speed", x, y, { cfg.lookSpeedVertical }, { cfg.lookSpeedVertical = it }, 1, 50, 1); y += 20
         decimal("Look Randomization", x, y, { cfg.lookRand }, { cfg.lookRand = it }, 0f, 2f, 0.05f); y += 24

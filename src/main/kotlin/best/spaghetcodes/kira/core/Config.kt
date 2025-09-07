@@ -52,9 +52,12 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     var enableHits = true
 
     @Property(type = PropertyType.NUMBER, name = "Min CPS", description = "The minimum CPS that the bot will be clicking at.", category = "Combat", min = 1, max = 25, increment = 1)
+
+    @Property(type = PropertyType.NUMBER, name = "Min CPS", description = "The minimum CPS that the bot will be clicking at.", category = "Combat", min = 0, max = 25, increment = 1)
+
     var minCPS = 15
 
-    @Property(type = PropertyType.NUMBER, name = "Max CPS", description = "The maximum CPS that the bot will be clicking at.", category = "Combat", min = 1, max = 25, increment = 1)
+    @Property(type = PropertyType.NUMBER, name = "Max CPS", description = "The maximum CPS that the bot will be clicking at.", category = "Combat", min = 0, max = 25, increment = 1)
     var maxCPS = 19
 
     @Property(type = PropertyType.NUMBER, name = "Horizontal Look Speed", description = "Horizontal look speed.", category = "Combat", min = 1, max = 50, increment = 1)
