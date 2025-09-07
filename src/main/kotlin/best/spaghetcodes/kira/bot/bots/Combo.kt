@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.EntityUtils
 import best.spaghetcodes.kira.utils.RandomUtils
 import best.spaghetcodes.kira.utils.TimeUtils
@@ -287,7 +288,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (distance < 150) Mouse.startTracking() else Mouse.stopTracking()
         if (!isConsuming() && !openingPhase && distance < 10) {
             if (player.heldItem != null && player.heldItem.unlocalizedName.lowercase().contains("sword")) {
-                if (!lockLeftAC) Mouse.startLeftAC()
+                if (!lockLeftAC && kira.config?.enableHits == true) Mouse.startLeftAC()
             }
         } else {
             Mouse.stopLeftAC()

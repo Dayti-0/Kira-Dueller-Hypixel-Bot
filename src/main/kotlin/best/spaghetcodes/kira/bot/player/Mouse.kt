@@ -76,8 +76,12 @@ object Mouse {
     }
 
     fun startLeftAC() {
-        if (kira.bot?.toggled() == true) {
-            leftAC = true
+        if (kira.bot?.toggled() == true && kira.config?.enableHits == true) {
+            val minCps = kira.config?.minCPS ?: 0
+            val maxCps = kira.config?.maxCPS ?: 0
+            if (minCps > 0 && maxCps > 0) {
+                leftAC = true
+            }
         }
     }
 
