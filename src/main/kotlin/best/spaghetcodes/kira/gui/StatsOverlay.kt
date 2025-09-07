@@ -12,7 +12,7 @@ class StatsOverlay {
     private val df = DecimalFormat("#.##")
 
     @SubscribeEvent
-    fun onRender(event: RenderGameOverlayEvent.Text) {
+    fun onRender(@Suppress("UNUSED_PARAMETER") event: RenderGameOverlayEvent.Text) {
         if (kira.config?.showStatsOverlay == false) return
 
         val mc = kira.mc
