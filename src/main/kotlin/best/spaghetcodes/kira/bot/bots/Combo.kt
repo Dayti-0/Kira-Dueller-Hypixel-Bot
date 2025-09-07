@@ -201,7 +201,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     }
 
     private fun startOpening(player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
-        val prePot = RandomUtils.randomIntInRange(110, 160)
+        val prePot = RandomUtils.randomIntInRange(0, 10)
         val holdPot = 2100
 
         // 1) Potion d’ouverture
@@ -213,7 +213,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             if (isConsuming() || !hasStrength) {
                 TimeUtils.setTimeout({ chainGap() }, 40)
             } else {
-                val preGap = RandomUtils.randomIntInRange(110, 160)
+                val preGap = RandomUtils.randomIntInRange(0, 10)
                 val holdGap = 2100
                 eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
@@ -246,7 +246,13 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         gameStartAt = System.currentTimeMillis()
 
         openingPhase = true
-        openingScheduled = false
+        openingScheduled = true
+
+        TimeUtils.setTimeout({
+            val player = mc.thePlayer ?: return@setTimeout
+            val target = opponent() ?: return@setTimeout
+            startOpening(player, target)
+        }, 0)
 
         strengthDosesUsed = 0
         lastPotion = 0L
