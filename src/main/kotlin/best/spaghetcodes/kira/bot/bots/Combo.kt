@@ -216,24 +216,23 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private fun startOpening(player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
         val preGap = RandomUtils.randomIntInRange(110, 160)
         val holdGap = 2100
-        val prePot = RandomUtils.randomIntInRange(110, 160)
-        val holdPot = 2100
 
         // 1) Gap d’ouverture
         eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
-        // 2) Potion après la gap
-        val delayToPot = preGap + holdGap + RandomUtils.randomIntInRange(40, 80)
-        TimeUtils.setTimeout({
-            fun chainPotion() {
-                if (isConsuming()) {
-                    TimeUtils.setTimeout({ chainPotion() }, 40)
-                } else {
-                    drinkStrength(prePot, holdPot, /*returnSword=*/true)
+        val prePot = RandomUtils.randomIntInRange(110, 160)
+        val holdPot = 2100
 
-                    // 3) Pearl dès la potion confirmée
-                    val delayToPearl = prePot + holdPot + RandomUtils.randomIntInRange(40, 80)
-                    TimeUtils.setTimeout({
+        // 2) Potion après la gap
+        fun chainPotion() {
+            if (isConsuming()) {
+                TimeUtils.setTimeout({ chainPotion() }, 40)
+            } else {
+                drinkStrength(prePot, holdPot, /*returnSword=*/false)
+
+                // 3) Pearl dès la potion confirmée
+                val delayToPearl = prePot + holdPot + RandomUtils.randomIntInRange(40, 80)
+                TimeUtils.setTimeout({
                         fun chainPearl() {
                             if (isConsuming() || !player.isPotionActive(MCPotion.damageBoost)) {
                                 TimeUtils.setTimeout({ chainPearl() }, 40)
@@ -267,8 +266,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                     }, delayToPearl)
                 }
             }
-            chainPotion()
-        }, delayToPot)
+        }
+        chainPotion()
     }
 
     // ------------------- Lifecycle -------------------
