@@ -172,7 +172,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             preMs, holdMs, /*returnSword=*/true
         )
         if (ok) {
-            TimeUtils.setTimeout({
+            fun confirmGap() {
                 val hasAbsorption = player.isPotionActive(MCPotion.absorption)
                 var gapsAfter = 0
                 for (stack in player.inventory.mainInventory) {
@@ -180,22 +180,26 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                         gapsAfter += stack.stackSize
                     }
                 }
-                val eaten = gapsAfter < gapsBefore && (hadAbsorption || hasAbsorption)
-                if (eaten) {
-                    lastGap = System.currentTimeMillis()
-                    if (!gapCycleStarted) gapCycleStarted = true
-                    nextGapAt = lastGap + gapPeriodMs
-                } else {
-                    eatGap(0, 2600, EntityUtils.getDistanceNoY(player, target), player, target)
+                val countDecreased = gapsAfter < gapsBefore
+                val eaten = countDecreased && (hadAbsorption || hasAbsorption)
+                when {
+                    eaten -> {
+                        lastGap = System.currentTimeMillis()
+                        if (!gapCycleStarted) gapCycleStarted = true
+                        nextGapAt = lastGap + gapPeriodMs
+                    }
+                    hasAbsorption || countDecreased -> {
+                        TimeUtils.setTimeout({ confirmGap() }, RandomUtils.randomIntInRange(150, 200))
+                    }
+                    else -> {
+                        eatGap(0, 2600, EntityUtils.getDistanceNoY(player, target), player, target)
+                    }
                 }
-            }, preMs + holdMs + 150)
+            }
+            TimeUtils.setTimeout({ confirmGap() }, preMs + holdMs + 150)
         } else {
             // Fallback minimal : on essaie via helper (sélection interne) SANS tenir un 2e clic par-dessus
             useGap(distance, distance < 2f, EntityUtils.entityFacingAway(player, target))
-            // On recale quand même le cycle, et le watchdog rattrapera si la conso n'est pas partie
-            lastGap = System.currentTimeMillis()
-            if (!gapCycleStarted) gapCycleStarted = true
-            nextGapAt = lastGap + gapPeriodMs
         }
         return ok
     }
