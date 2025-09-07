@@ -35,8 +35,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     // ---- état combat / clic ----
     private var tapping = false
     private var lockLeftAC = false
+
+    private var lockLeftACSince = 0L
+
     private var leftACActive = false
     private var lastOpponentDistance = 0f
+
 
     // ---- cycles déterministes (aucun check d'effet) ----
     // Strength : 2 doses, 2e à +294 s après le début de la 1re
@@ -92,15 +96,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         val now = System.currentTimeMillis()
         consumingUntil = now + holdMs + 150
         lockLeftAC = true
+        lockLeftACSince = now
         Mouse.stopLeftAC()
         TimeUtils.setTimeout({
             if (returnSword) {
                 Inventory.setInvItem("sword")
                 TimeUtils.setTimeout({
                     lockLeftAC = false
+                    lockLeftACSince = 0L
                 }, RandomUtils.randomIntInRange(120, 200))
             } else {
                 lockLeftAC = false
+                lockLeftACSince = 0L
             }
         }, holdMs + 140)
     }
@@ -260,6 +267,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         closeStrafeToggleAt = 0L
 
         lockLeftAC = false
+        lockLeftACSince = 0L
         tapping = false
     }
 
@@ -270,6 +278,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             Combat.stopRandomStrafe()
             tapping = false
             lockLeftAC = false
+            lockLeftACSince = 0L
 
             strengthDosesUsed = 0
             lastPotion = 0L
@@ -299,6 +308,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
         val distance = EntityUtils.getDistanceNoY(player, target)
         val now = System.currentTimeMillis()
+
+        // Fail-safe : unlock left AC if stuck too long
+        if (lockLeftAC && now - lockLeftACSince > 3000) {
+            lockLeftAC = false
+            lockLeftACSince = 0L
+            if (!isConsuming() && !openingPhase && distance < 10) {
+                val held = player.heldItem
+                if (held != null && held.unlocalizedName.lowercase().contains("sword") && kira.config?.enableHits == true) {
+                    Mouse.startLeftAC()
+                }
+            }
+        }
 
         // Toujours sprinter
         if (!player.isSprinting) Movement.startSprinting()
@@ -394,6 +415,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                 if (player.inventory.armorItemInSlot(i) == null) {
                     Mouse.stopLeftAC()
                     lockLeftAC = true
+                    lockLeftACSince = now
                     if ((armor[i] ?: 0) > 0) {
                         TimeUtils.setTimeout({
                             val a = Inventory.setInvItem(ArmorEnum.values()[i].name.lowercase())
@@ -406,13 +428,22 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                                         Inventory.setInvItem("sword")
                                         TimeUtils.setTimeout({
                                             lockLeftAC = false
+                                            lockLeftACSince = 0L
                                         }, RandomUtils.randomIntInRange(200, 300))
                                     }, r + RandomUtils.randomIntInRange(100, 150))
                                 }, RandomUtils.randomIntInRange(200, 400))
                             } else {
-                                lockLeftAC = false
+                                TimeUtils.setTimeout({
+                                    lockLeftAC = false
+                                    lockLeftACSince = 0L
+                                }, RandomUtils.randomIntInRange(100, 150))
                             }
                         }, RandomUtils.randomIntInRange(250, 500))
+                    } else {
+                        TimeUtils.setTimeout({
+                            lockLeftAC = false
+                            lockLeftACSince = 0L
+                        }, RandomUtils.randomIntInRange(200, 300))
                     }
                 }
             }
@@ -436,6 +467,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             lastPearl = now
             Mouse.stopLeftAC()
             lockLeftAC = true
+            lockLeftACSince = now
             TimeUtils.setTimeout({
                 if (Inventory.setInvItem("pearl")) {
                     pearls--
@@ -445,11 +477,21 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                         TimeUtils.setTimeout({
                             Mouse.setUsingProjectile(false)
                             Inventory.setInvItem("sword")
+
+                            TimeUtils.setTimeout({
+                                lockLeftAC = false
+                                lockLeftACSince = 0L
+                            }, RandomUtils.randomIntInRange(200, 300))
+
                             TimeUtils.setTimeout({ lockLeftAC = false }, RandomUtils.randomIntInRange(200, 300))
+
                         }, RandomUtils.randomIntInRange(250, 300))
                     }, RandomUtils.randomIntInRange(80, 120))
                 } else {
-                    lockLeftAC = false
+                    TimeUtils.setTimeout({
+                        lockLeftAC = false
+                        lockLeftACSince = 0L
+                    }, RandomUtils.randomIntInRange(200, 300))
                 }
             }, RandomUtils.randomIntInRange(50, 100))
         }
