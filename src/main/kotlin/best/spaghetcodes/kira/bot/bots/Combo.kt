@@ -267,7 +267,6 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                     }, delayToPearl)
                 }
             }
-        }
         chainPotion()
     }
 
