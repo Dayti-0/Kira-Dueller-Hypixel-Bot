@@ -35,6 +35,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     // ---- état combat / clic ----
     private var tapping = false
     private var lockLeftAC = false
+    private var leftACActive = false
+    private var lastOpponentDistance = 0f
 
     // ---- cycles déterministes (aucun check d'effet) ----
     // Strength : 2 doses, 2e à +294 s après le début de la 1re
@@ -303,13 +305,51 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
         // Tracking / auto-clic : jamais pendant une conso ou l’ouverture
         if (distance < 150) Mouse.startTracking() else Mouse.stopTracking()
-        if (!isConsuming() && !openingPhase && distance < 10) {
-            if (player.heldItem != null && player.heldItem.unlocalizedName.lowercase().contains("sword")) {
-                if (!lockLeftAC && kira.config?.enableHits == true) Mouse.startLeftAC()
-            }
+        val shouldAttack = !isConsuming() && !openingPhase && distance < 10 &&
+            player.heldItem != null &&
+            player.heldItem.unlocalizedName.lowercase().contains("sword") &&
+            !lockLeftAC &&
+            kira.config?.enableHits == true
+        if (shouldAttack) {
+            Mouse.startLeftAC()
+            leftACActive = true
         } else {
             Mouse.stopLeftAC()
+            leftACActive = false
         }
+
+        if (leftACActive &&
+            distance > lastOpponentDistance &&
+            distance > 6f &&
+            pearls > 0 &&
+            now - lastPearl > 5000 &&
+            !isConsuming()
+        ) {
+            lastPearl = now
+            Mouse.stopLeftAC()
+            leftACActive = false
+            lockLeftAC = true
+            TimeUtils.setTimeout({
+                if (Inventory.setInvItem("pearl")) {
+                    pearls--
+                    Mouse.setUsingProjectile(true)
+                    TimeUtils.setTimeout({
+                        Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
+                        TimeUtils.setTimeout({
+                            Mouse.setUsingProjectile(false)
+                            Inventory.setInvItem("sword")
+                            TimeUtils.setTimeout({
+                                lockLeftAC = false
+                            }, RandomUtils.randomIntInRange(200, 300))
+                        }, RandomUtils.randomIntInRange(250, 300))
+                    }, RandomUtils.randomIntInRange(300, 600))
+                } else {
+                    lockLeftAC = false
+                }
+            }, RandomUtils.randomIntInRange(250, 500))
+        }
+
+        lastOpponentDistance = distance
 
         // Sauts > 8 blocs
         if (distance > 8f && player.onGround && now - lastFarJumpAt >= 540L) {
