@@ -165,6 +165,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                 gapsBefore += stack.stackSize
             }
         }
+        val hadAbsorption = player.isPotionActive(MCPotion.absorption)
         val ok = equipAndHoldRightClick(
             { equipAny("gap", "gapple", "apple", "golden_apple") },
             { isHoldingGap() },
@@ -179,7 +180,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                         gapsAfter += stack.stackSize
                     }
                 }
-                if (hasAbsorption || gapsAfter < gapsBefore) {
+                val eaten = gapsAfter < gapsBefore && (hadAbsorption || hasAbsorption)
+                if (eaten) {
                     lastGap = System.currentTimeMillis()
                     if (!gapCycleStarted) gapCycleStarted = true
                     nextGapAt = lastGap + gapPeriodMs
