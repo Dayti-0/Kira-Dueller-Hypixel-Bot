@@ -207,8 +207,7 @@ class CustomConfigGUI : GuiScreen() {
         y: Int,
         buf: String,
         isFocused: Boolean,
-        onFocus: () -> Unit,
-        setBuf: (String) -> Unit
+        onFocus: () -> Unit
     ): Int {
         val fieldY = y - scroll
         drawString(fontRendererObj, label, x, fieldY, -1)
@@ -267,8 +266,7 @@ class CustomConfigGUI : GuiScreen() {
             y = y,
             buf = startMsgBuf,
             isFocused = (focus == Tf.START_MSG),
-            onFocus = { focus = Tf.START_MSG },
-            setBuf = { s: String -> startMsgBuf = s }
+            onFocus = { focus = Tf.START_MSG }
         )
         number("Start Message Delay (ms)", x, y, { cfg.startMessageDelay }, { cfg.startMessageDelay = it }, 50, 1000, 50); y += 24
 
@@ -279,8 +277,7 @@ class CustomConfigGUI : GuiScreen() {
             y = y,
             buf = ggMsgBuf,
             isFocused = (focus == Tf.GG_MSG),
-            onFocus = { focus = Tf.GG_MSG },
-            setBuf = { s: String -> ggMsgBuf = s }
+            onFocus = { focus = Tf.GG_MSG }
         )
         number("AutoGG Delay (ms)", x, y, { cfg.ggDelay }, { cfg.ggDelay = it }, 50, 1000, 50); y += 20
 
