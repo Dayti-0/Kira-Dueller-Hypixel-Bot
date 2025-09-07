@@ -127,6 +127,8 @@ object Mouse {
                 val minCPS = kira.config?.minCPS ?: 10
                 val maxCPS = kira.config?.maxCPS ?: 14
 
+                if (minCPS <= 0 || maxCPS <= 0) return
+
                 if (System.currentTimeMillis() >= lastLeftClick + (1000 / RandomUtils.randomIntInRange(minCPS, maxCPS))) {
                     leftClick()
                     lastLeftClick = System.currentTimeMillis()
