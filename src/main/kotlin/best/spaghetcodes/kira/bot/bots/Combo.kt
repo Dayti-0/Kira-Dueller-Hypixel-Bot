@@ -20,6 +20,35 @@ import net.minecraft.util.Vec3
 
 class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
+    // ---- State ----
+    private var gameStartAt = 0L
+    private var openingPhase = true
+    private var openingScheduled = false
+    private var strengthDosesUsed = 0
+    override var lastPotion = 0L
+    private var strengthCycleStarted = false
+    private var nextStrengthAt = 0L
+    override var lastGap = 0L
+    private var gapCycleStarted = false
+    private var nextGapAt = 0L
+    private var pearls = 5
+    private var lastPearl = 0L
+    private var consumingUntil = 0L
+    private var lastFarJumpAt = 0L
+    private var strafeDir = 1
+    private var closeStrafeToggleAt = 0L
+    private var lockLeftAC = false
+    private var lockLeftACSince = 0L
+    private var tapping = false
+    private var leftACActive = false
+    private var lastOpponentDistance = 0f
+    private val strengthPeriodMs = 294_000L
+    private val gapPeriodMs = 26_000L
+    private fun isConsuming(): Boolean = System.currentTimeMillis() < consumingUntil
+
+    enum class ArmorEnum { BOOTS, LEGGINGS, CHESTPLATE, HELMET }
+    private var armor = hashMapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1)
+
     override fun getName(): String = "Combo"
 
     init {
@@ -31,51 +60,6 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             )
         )
     }
-
-    // ---- état combat / clic ----
-    private var tapping = false
-    private var lockLeftAC = false
-
-    private var lockLeftACSince = 0L
-
-    private var leftACActive = false
-    private var lastOpponentDistance = 0f
-
-
-    // ---- cycles déterministes (aucun check d'effet) ----
-    // Strength : 2 doses, 2e à +294 s après le début de la 1re
-    private var strengthDosesUsed = 0
-    override var lastPotion = 0L
-    private var strengthCycleStarted = false
-    private var nextStrengthAt = 0L
-    private val strengthPeriodMs = 294_000L
-
-    // Gapples : toutes les 26 s, indéfiniment
-    override var lastGap = 0L
-    private var gapCycleStarted = false
-    private var nextGapAt = 0L
-    private val gapPeriodMs = 26_000L
-
-    // Ressources diverses
-    private var pearls = 5
-    private var lastPearl = 0L
-    private var gameStartAt = 0L
-
-    // Ouverture
-    private var openingPhase = true
-    private var openingScheduled = false
-
-    // Verrou conso (empêche interruptions pendant ~2s)
-    private var consumingUntil = 0L
-    private fun isConsuming(): Boolean = System.currentTimeMillis() < consumingUntil
-
-    // Sauts / strafes
-    private var lastFarJumpAt = 0L
-    private var strafeDir = 1
-    private var closeStrafeToggleAt = 0L
-
-    enum class ArmorEnum { BOOTS, LEGGINGS, CHESTPLATE, HELMET }
-    private var armor = hashMapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1)
 
     // ------------------- Helpers item -------------------
     private fun equipAny(vararg keys: String): Boolean {
