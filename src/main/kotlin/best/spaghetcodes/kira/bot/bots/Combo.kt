@@ -126,23 +126,40 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
     // ------------------- Ouverture : potion -> gap (séquencé) -------------------
     private fun drinkStrength(preMs: Int, holdMs: Int, returnSword: Boolean): Boolean {
+        val player = mc.thePlayer ?: return false
+        var potsBefore = 0
+        for (stack in player.inventory.mainInventory) {
+            if (stack != null && stack.item == Items.potionitem) {
+                potsBefore += stack.stackSize
+            }
+        }
         val ok = equipAndHoldRightClick(
             { equipAny("potion", "strength", "str") },
             { isHoldingPotion() },
             preMs, holdMs, returnSword
         )
         if (ok) {
-            // Horodatage au démarrage (après pré-délai ; ~équiv au début du hold)
             TimeUtils.setTimeout({
-                lastPotion = System.currentTimeMillis()
-                strengthDosesUsed += 1
-                if (!strengthCycleStarted) {
-                    strengthCycleStarted = true
-                    nextStrengthAt = lastPotion + strengthPeriodMs
-                } else {
-                    nextStrengthAt = 0L
+                var potsAfter = 0
+                for (stack in player.inventory.mainInventory) {
+                    if (stack != null && stack.item == Items.potionitem) {
+                        potsAfter += stack.stackSize
+                    }
                 }
-            }, preMs + 5)
+                val hasStrength = player.isPotionActive(MCPotion.damageBoost)
+                if (hasStrength || potsAfter < potsBefore) {
+                    lastPotion = System.currentTimeMillis()
+                    strengthDosesUsed += 1
+                    if (!strengthCycleStarted) {
+                        strengthCycleStarted = true
+                        nextStrengthAt = lastPotion + strengthPeriodMs
+                    } else {
+                        nextStrengthAt = 0L
+                    }
+                } else {
+                    drinkStrength(0, 2600, returnSword)
+                }
+            }, preMs + holdMs + 150)
         }
         return ok
     }
