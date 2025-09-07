@@ -291,8 +291,8 @@ class CustomConfigGUI : GuiScreen() {
         val cfg = kira.config ?: return y
 
         toggle("Enable Kira Hits", x, y, { cfg.enableHits }, { cfg.enableHits = it }); y += 20
-        number("Min CPS", x, y, { cfg.minCPS }, { cfg.minCPS = it }, 1, 25, 1); y += 20
-        number("Max CPS", x, y, { cfg.maxCPS }, { cfg.maxCPS = it }, 1, 25, 1); y += 24
+        number("Min CPS", x, y, { cfg.minCPS }, { cfg.minCPS = it }, 0, 25, 1); y += 20
+        number("Max CPS", x, y, { cfg.maxCPS }, { cfg.maxCPS = it }, 0, 25, 1); y += 24
 
         number("Horizontal Look Speed", x, y, { cfg.lookSpeedHorizontal }, { cfg.lookSpeedHorizontal = it }, 1, 50, 1); y += 20
         number("Vertical Look Speed", x, y, { cfg.lookSpeedVertical }, { cfg.lookSpeedVertical = it }, 1, 50, 1); y += 20

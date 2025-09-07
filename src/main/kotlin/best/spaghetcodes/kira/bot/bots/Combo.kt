@@ -306,10 +306,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             Movement.singleJump(RandomUtils.randomIntInRange(100, 150))
         }
 
-        // Avance/stop
-        if (distance < 0.8f) {
-            Movement.stopForward()
-        } else if (!tapping) {
+        // Avance en continu (sauf pendant un wTap)
+        if (!tapping) {
             Movement.startForward()
         }
 
