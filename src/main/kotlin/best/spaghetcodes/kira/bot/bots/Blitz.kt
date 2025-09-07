@@ -54,7 +54,6 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
     }
 
     override fun onAttack() {
-        val distance = EntityUtils.getDistanceNoY(mc.thePlayer, opponent())
         ChatUtils.info("W-Tap 100")
         Combat.wTap(100)
         tapping = true
