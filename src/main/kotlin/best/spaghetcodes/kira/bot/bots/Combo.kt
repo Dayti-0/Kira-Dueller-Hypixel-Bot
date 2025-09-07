@@ -306,7 +306,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         }
 
         // Avance/stop
-        if (distance < 1.5f || (distance < 2.4f && combo >= 1)) {
+        if (distance < 0.8f) {
             Movement.stopForward()
         } else if (!tapping) {
             Movement.startForward()
