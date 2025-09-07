@@ -187,14 +187,14 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         return ok
     }
 
-    private fun startOpening(distance: Float, player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
+    private fun startOpening(player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
         val prePot = RandomUtils.randomIntInRange(110, 160)
         val holdPot = 2100
         val preGap = RandomUtils.randomIntInRange(110, 160)
         val holdGap = 2100
 
         // 1) Potion d’ouverture (ne pas forcer retour épée ici, on enchaîne la gap juste après)
-        val potOk = drinkStrength(prePot, holdPot, /*returnSword=*/false)
+        drinkStrength(prePot, holdPot, /*returnSword=*/false)
 
         // 2) Gap juste après la fin de la boisson (préPot + holdPot + petite marge)
         val delayToGap = prePot + holdPot + RandomUtils.randomIntInRange(40, 80)
@@ -321,7 +321,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         // Ouverture
         if (openingPhase && !openingScheduled) {
             openingScheduled = true
-            startOpening(distance, player, target)
+            startOpening(player, target)
         }
 
         // Potion #2 à +296s (aucun check d'effet)
