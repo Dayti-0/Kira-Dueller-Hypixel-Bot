@@ -134,7 +134,7 @@ Combat:
 ### ⚔️ Gestion intelligente des objets
 - **Épée 🗡️** — *parade automatique* pour bloquer les flèches adverses  
 - **Arc & canne à pêche 🎯** — pression et contrôle de distance  
-- **Enderpearl 🌀** — repositionnement/téléportation tactique  
+- **Enderpearl 🌀** — repositionnement/téléportation tactique (délai de 11 s entre utilisations)
 - **Pomme dorée 🍏** — activation au bon timing pour la régénération
 
 ---
