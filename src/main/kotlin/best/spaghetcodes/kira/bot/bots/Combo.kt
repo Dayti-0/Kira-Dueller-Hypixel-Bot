@@ -205,14 +205,14 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         // 1) Gap d’ouverture
         eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
-        val prePot = RandomUtils.randomIntInRange(110, 160)
-        val holdPot = 2100
-
-        // 2) Potion après la gap
+        // 2) Potion seulement une fois la gap confirmée
         fun chainPotion() {
-            if (isConsuming()) {
+            val hasAbsorption = player.isPotionActive(MCPotion.absorption)
+            if (isConsuming() || !hasAbsorption) {
                 TimeUtils.setTimeout({ chainPotion() }, 40)
             } else {
+                val prePot = RandomUtils.randomIntInRange(110, 160)
+                val holdPot = 2100
                 drinkStrength(prePot, holdPot, /*returnSword=*/false)
 
                 // 3) Pearl dès la potion confirmée
@@ -249,18 +249,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                         }
                         chainPearl()
                     }, delayToPearl)
-                }
             }
+        }
         chainPotion()
     }
 
     // ------------------- Lifecycle -------------------
     override fun onGameStart() {
+        Mouse.rClickUp()
         Movement.startSprinting()
         Movement.startForward()
         Mouse.startTracking()
         Mouse.stopLeftAC()
-        Mouse.rClickUp()
         Inventory.setInvItem("sword")
 
         gameStartAt = System.currentTimeMillis()
