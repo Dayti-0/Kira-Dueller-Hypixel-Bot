@@ -370,6 +370,33 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             }
         }
 
+        // Emergency pearl to break combo when launched upward
+        if (!isConsuming() &&
+            player.motionY > 0.15 &&
+            !player.onGround &&
+            pearls > 0
+        ) {
+            lastPearl = now
+            Mouse.stopLeftAC()
+            lockLeftAC = true
+            TimeUtils.setTimeout({
+                if (Inventory.setInvItem("pearl")) {
+                    pearls--
+                    Mouse.setUsingProjectile(true)
+                    TimeUtils.setTimeout({
+                        Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
+                        TimeUtils.setTimeout({
+                            Mouse.setUsingProjectile(false)
+                            Inventory.setInvItem("sword")
+                            TimeUtils.setTimeout({ lockLeftAC = false }, RandomUtils.randomIntInRange(200, 300))
+                        }, RandomUtils.randomIntInRange(250, 300))
+                    }, RandomUtils.randomIntInRange(80, 120))
+                } else {
+                    lockLeftAC = false
+                }
+            }, RandomUtils.randomIntInRange(50, 100))
+        }
+
         // Quick pearl (safe hors conso)
         if (!isConsuming() &&
             distance > 18f &&
