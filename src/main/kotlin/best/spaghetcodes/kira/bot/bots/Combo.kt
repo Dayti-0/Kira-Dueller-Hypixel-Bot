@@ -193,18 +193,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         val preGap = RandomUtils.randomIntInRange(110, 160)
         val holdGap = 2100
 
-        // 1) Potion d’ouverture (ne pas forcer retour épée ici, on enchaîne la gap juste après)
-        drinkStrength(prePot, holdPot, /*returnSword=*/false)
+        // 1) Gap d’ouverture
+        eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
-        // 2) Gap juste après la fin de la boisson (préPot + holdPot + petite marge)
-        val delayToGap = prePot + holdPot + RandomUtils.randomIntInRange(40, 80)
+        // 2) Potion juste après la fin de la gap (préGap + holdGap + petite marge)
+        val delayToGap = preGap + holdGap + RandomUtils.randomIntInRange(40, 80)
         TimeUtils.setTimeout({
             // si une autre action a prolongé la conso, on attend la libération
             fun tryChain() {
                 if (isConsuming()) {
                     TimeUtils.setTimeout({ tryChain() }, 40)
                 } else {
-                    eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
+                    drinkStrength(prePot, holdPot, /*returnSword=*/true)
                     openingPhase = false
                 }
             }
