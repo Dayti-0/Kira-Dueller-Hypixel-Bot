@@ -62,13 +62,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
     // Sauts / strafes
     private var lastFarJumpAt = 0L
-    private var lastStrafeSwitch = 0L
     private var strafeDir = 1
-    private var closeStrafeMode = 0
-    private val MODE_BURST = 0
-    private val MODE_HOLD_LEFT = 1
-    private val MODE_HOLD_RIGHT = 2
-    private var closeStrafeNextAt = 0L
     private var closeStrafeToggleAt = 0L
 
     enum class ArmorEnum { BOOTS, LEGGINGS, CHESTPLATE, HELMET }
@@ -224,10 +218,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         consumingUntil = 0L
         lastFarJumpAt = 0L
 
-        lastStrafeSwitch = 0L
         strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
-        closeStrafeMode = MODE_BURST
-        closeStrafeNextAt = 0L
         closeStrafeToggleAt = 0L
 
         lockLeftAC = false
@@ -404,25 +395,15 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             } else {
                 if (distance < 2.6f) {
                     val nowMs = System.currentTimeMillis()
-                    if (nowMs >= closeStrafeNextAt) {
-                        val roll = RandomUtils.randomIntInRange(0, 99)
-                        closeStrafeMode = when {
-                            roll < 50 -> MODE_BURST
-                            roll < 75 -> MODE_HOLD_LEFT
-                            else -> MODE_HOLD_RIGHT
-                        }
-                        closeStrafeNextAt = nowMs + when (closeStrafeMode) {
-                            MODE_BURST -> RandomUtils.randomIntInRange(280, 420).toLong()
-                            else -> RandomUtils.randomIntInRange(220, 340).toLong()
-                        }
-                        if (closeStrafeMode == MODE_BURST) {
-                            closeStrafeToggleAt = nowMs + RandomUtils.randomIntInRange(60, 110)
-                        } else {
-                            strafeDir = if (closeStrafeMode == MODE_HOLD_LEFT) -1 else 1
-                        }
-                    } else if (closeStrafeMode == MODE_BURST && System.currentTimeMillis() >= closeStrafeToggleAt) {
+                    if (nowMs >= closeStrafeToggleAt) {
                         strafeDir = -strafeDir
-                        closeStrafeToggleAt = System.currentTimeMillis() + RandomUtils.randomIntInRange(60, 110)
+                        closeStrafeToggleAt = nowMs + RandomUtils.randomIntInRange(40, 90)
+                        val tapDuration = RandomUtils.randomIntInRange(40, 80)
+                        if (strafeDir < 0) {
+                            Combat.aTap(tapDuration)
+                        } else {
+                            Combat.dTap(tapDuration)
+                        }
                     }
                     val weightClose = 6
                     if (strafeDir < 0) movePriority[0] += weightClose else movePriority[1] += weightClose
