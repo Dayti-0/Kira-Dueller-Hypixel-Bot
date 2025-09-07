@@ -182,6 +182,12 @@ object Mouse {
                 if (_usingPotion) {
                     if (splashAim == 0.0) splashAim = RandomUtils.randomDoubleInRange(80.0, 90.0)
                     rotations[1] = splashAim.toFloat()
+                } else if (
+                    _usingProjectile &&
+                    kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("pearl") == true
+                ) {
+                    val dist = EntityUtils.getDistanceNoY(kira.mc.thePlayer, kira.bot?.opponent()!!)
+                    rotations[1] -= dist * 0.8f
                 }
 
                 val lookRand = (kira.config?.lookRand ?: 0).toDouble()
