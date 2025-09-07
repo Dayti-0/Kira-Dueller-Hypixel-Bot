@@ -214,28 +214,61 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     }
 
     private fun startOpening(player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
-        val prePot = RandomUtils.randomIntInRange(110, 160)
-        val holdPot = 2100
         val preGap = RandomUtils.randomIntInRange(110, 160)
         val holdGap = 2100
+        val prePot = RandomUtils.randomIntInRange(110, 160)
+        val holdPot = 2100
 
         // 1) Gap d’ouverture
         eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
-        // 2) Potion juste après la fin de la gap (préGap + holdGap + petite marge)
-        val delayToGap = preGap + holdGap + RandomUtils.randomIntInRange(40, 80)
+        // 2) Potion après la gap
+        val delayToPot = preGap + holdGap + RandomUtils.randomIntInRange(40, 80)
         TimeUtils.setTimeout({
-            // si une autre action a prolongé la conso, on attend la libération
-            fun tryChain() {
+            fun chainPotion() {
                 if (isConsuming()) {
-                    TimeUtils.setTimeout({ tryChain() }, 40)
+                    TimeUtils.setTimeout({ chainPotion() }, 40)
                 } else {
                     drinkStrength(prePot, holdPot, /*returnSword=*/true)
-                    openingPhase = false
+
+                    // 3) Pearl dès la potion confirmée
+                    val delayToPearl = prePot + holdPot + RandomUtils.randomIntInRange(40, 80)
+                    TimeUtils.setTimeout({
+                        fun chainPearl() {
+                            if (isConsuming() || !player.isPotionActive(MCPotion.damageBoost)) {
+                                TimeUtils.setTimeout({ chainPearl() }, 40)
+                            } else {
+                                lastPearl = System.currentTimeMillis()
+                                Mouse.stopLeftAC()
+                                lockLeftAC = true
+                                TimeUtils.setTimeout({
+                                    if (Inventory.setInvItem("pearl")) {
+                                        pearls--
+                                        Mouse.setUsingProjectile(true)
+                                        TimeUtils.setTimeout({
+                                            Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
+                                            TimeUtils.setTimeout({
+                                                Mouse.setUsingProjectile(false)
+                                                Inventory.setInvItem("sword")
+                                                TimeUtils.setTimeout({
+                                                    lockLeftAC = false
+                                                    openingPhase = false
+                                                }, RandomUtils.randomIntInRange(200, 300))
+                                            }, RandomUtils.randomIntInRange(250, 300))
+                                        }, RandomUtils.randomIntInRange(300, 600))
+                                    } else {
+                                        lockLeftAC = false
+                                        openingPhase = false
+                                    }
+                                }, RandomUtils.randomIntInRange(250, 500))
+                            }
+                        }
+                        chainPearl()
+                    }, delayToPearl)
                 }
             }
-            tryChain()
-        }, delayToGap)
+            chainPotion()
+        }, delayToPot)
     }
 
     // ------------------- Lifecycle -------------------
@@ -498,6 +531,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
         // Quick pearl (safe hors conso)
         if (!isConsuming() &&
+            !openingPhase &&
             distance > 18f &&
             EntityUtils.entityFacingAway(target, player) &&
             !Mouse.isRunningAway() &&
