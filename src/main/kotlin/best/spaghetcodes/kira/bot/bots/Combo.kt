@@ -570,7 +570,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                 }, RandomUtils.randomIntInRange(250, 500))
             }
             val timeUntilGap = nextGapAt - now
-            if (timeUntilGap <= 10_000) {
+            if (gapCycleStarted && timeUntilGap <= 12_000L) {
                 val pre = RandomUtils.randomIntInRange(110, 160)
                 val hold = 2100
                 eatGap(pre, hold, distance, player, target)
