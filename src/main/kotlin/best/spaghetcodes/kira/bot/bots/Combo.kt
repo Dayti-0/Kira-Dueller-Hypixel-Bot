@@ -491,11 +491,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             }
         }
 
-        // Emergency pearl to break combo when launched upward
+        // Defensive pearl: break juggle when launched upward
         if (!isConsuming() &&
             player.motionY > 0.15 &&
             !player.onGround &&
-            pearls > 0
+            pearls > 0 &&
+            now - lastPearl > 5000
         ) {
             lastPearl = now
             Mouse.stopLeftAC()
