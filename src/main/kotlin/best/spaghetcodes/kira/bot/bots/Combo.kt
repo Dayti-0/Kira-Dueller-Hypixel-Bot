@@ -199,59 +199,37 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     }
 
     private fun startOpening(player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
-        val preGap = RandomUtils.randomIntInRange(110, 160)
-        val holdGap = 2100
+        val prePot = RandomUtils.randomIntInRange(110, 160)
+        val holdPot = 2100
 
-        // 1) Gap d’ouverture
-        eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
+        // 1) Potion d’ouverture
+        drinkStrength(prePot, holdPot, /*returnSword=*/false)
 
-        // 2) Potion seulement une fois la gap confirmée
-        fun chainPotion() {
-            val hasAbsorption = player.isPotionActive(MCPotion.absorption)
-            if (isConsuming() || !hasAbsorption) {
-                TimeUtils.setTimeout({ chainPotion() }, 40)
+        // 2) Gap seulement une fois la potion confirmée
+        fun chainGap() {
+            val hasStrength = player.isPotionActive(MCPotion.damageBoost)
+            if (isConsuming() || !hasStrength) {
+                TimeUtils.setTimeout({ chainGap() }, 40)
             } else {
-                val prePot = RandomUtils.randomIntInRange(110, 160)
-                val holdPot = 2100
-                drinkStrength(prePot, holdPot, /*returnSword=*/false)
+                val preGap = RandomUtils.randomIntInRange(110, 160)
+                val holdGap = 2100
+                eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
-                // 3) Pearl dès la potion confirmée
-                val delayToPearl = prePot + holdPot + RandomUtils.randomIntInRange(40, 80)
+                // 3) Fin de l’ouverture lorsque la gap est consommée
                 TimeUtils.setTimeout({
-                        fun chainPearl() {
-                            if (isConsuming() || !player.isPotionActive(MCPotion.damageBoost)) {
-                                TimeUtils.setTimeout({ chainPearl() }, 40)
-                            } else {
-                                lastPearl = System.currentTimeMillis()
-                                Mouse.stopLeftAC()
-                                lockLeftAC = true
-                                TimeUtils.setTimeout({
-                                    if (Inventory.setInvItem("pearl")) {
-                                        pearls--
-                                        Mouse.setUsingProjectile(true)
-                                        TimeUtils.setTimeout({
-                                            Mouse.rClick(RandomUtils.randomIntInRange(100, 150))
-                                            TimeUtils.setTimeout({
-                                                Mouse.setUsingProjectile(false)
-                                                Inventory.setInvItem("sword")
-                                                TimeUtils.setTimeout({
-                                                    lockLeftAC = false
-                                                    openingPhase = false
-                                                }, RandomUtils.randomIntInRange(200, 300))
-                                            }, RandomUtils.randomIntInRange(250, 300))
-                                        }, RandomUtils.randomIntInRange(300, 600))
-                                    } else {
-                                        lockLeftAC = false
-                                        openingPhase = false
-                                    }
-                                }, RandomUtils.randomIntInRange(250, 500))
-                            }
+                    fun confirmGap() {
+                        val hasAbsorption = player.isPotionActive(MCPotion.absorption)
+                        if (isConsuming() || !hasAbsorption) {
+                            TimeUtils.setTimeout({ confirmGap() }, 40)
+                        } else {
+                            openingPhase = false
                         }
-                        chainPearl()
-                    }, delayToPearl)
+                    }
+                    confirmGap()
+                }, preGap + holdGap + 150)
             }
         }
-        chainPotion()
+        chainGap()
     }
 
     // ------------------- Lifecycle -------------------
