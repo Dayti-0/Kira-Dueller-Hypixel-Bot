@@ -10,7 +10,7 @@ import gg.essential.vigilance.data.PropertyType
 import net.minecraft.client.gui.GuiScreen
 import java.io.File
 
-class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorter()) {
+class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() }, sortingBehavior = ConfigSorter()) {
 
     @Property(
         type = PropertyType.SELECTOR,
@@ -173,6 +173,7 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
             getBot(idx)?.let { kira.swapBot(it) }
         }
 
+        preload()
         initialize()
     }
 
