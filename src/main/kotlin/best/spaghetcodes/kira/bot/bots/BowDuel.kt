@@ -211,7 +211,7 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
         // --------- Strafe / déplacement ----------
         val movePriority = arrayListOf(0, 0)
         var clear = false
-        var randomStrafe = false
+        var randomStrafe: Boolean
 
         // Strafe forcé pendant hop-shot
         if (now < forceStrafeUntil) {
