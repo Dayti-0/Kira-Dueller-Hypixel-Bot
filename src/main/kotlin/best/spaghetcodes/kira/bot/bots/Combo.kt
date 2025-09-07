@@ -14,6 +14,7 @@ import best.spaghetcodes.kira.utils.TimeUtils
 import best.spaghetcodes.kira.utils.WorldUtils
 import net.minecraft.init.Blocks
 import net.minecraft.init.Items
+import net.minecraft.potion.Potion as MCPotion
 import net.minecraft.util.Vec3
 
 class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
@@ -146,6 +147,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     }
 
     private fun eatGap(preMs: Int, holdMs: Int, distance: Float, player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity): Boolean {
+        var gapsBefore = 0
+        for (stack in player.inventory.mainInventory) {
+            if (stack != null && stack.item == Items.golden_apple) {
+                gapsBefore += stack.stackSize
+            }
+        }
         val ok = equipAndHoldRightClick(
             { equipAny("gap", "gapple", "apple", "golden_apple") },
             { isHoldingGap() },
@@ -153,10 +160,21 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         )
         if (ok) {
             TimeUtils.setTimeout({
-                lastGap = System.currentTimeMillis()
-                if (!gapCycleStarted) gapCycleStarted = true
-                nextGapAt = lastGap + gapPeriodMs
-            }, preMs + 5)
+                val hasAbsorption = player.isPotionActive(MCPotion.absorption)
+                var gapsAfter = 0
+                for (stack in player.inventory.mainInventory) {
+                    if (stack != null && stack.item == Items.golden_apple) {
+                        gapsAfter += stack.stackSize
+                    }
+                }
+                if (hasAbsorption || gapsAfter < gapsBefore) {
+                    lastGap = System.currentTimeMillis()
+                    if (!gapCycleStarted) gapCycleStarted = true
+                    nextGapAt = lastGap + gapPeriodMs
+                } else {
+                    eatGap(0, 2600, EntityUtils.getDistanceNoY(player, target), player, target)
+                }
+            }, preMs + holdMs + 150)
         } else {
             // Fallback minimal : on essaie via helper (sélection interne) SANS tenir un 2e clic par-dessus
             useGap(distance, distance < 2f, EntityUtils.entityFacingAway(player, target))
