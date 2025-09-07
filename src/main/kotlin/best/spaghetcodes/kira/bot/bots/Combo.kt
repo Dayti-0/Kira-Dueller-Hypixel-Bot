@@ -376,7 +376,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             distance > lastOpponentDistance &&
             distance > 6f &&
             pearls > 0 &&
-            now - lastPearl > 5000 &&
+            now - lastPearl > 11000 && // 11s cooldown
             !isConsuming()
         ) {
             lastPearl = now
@@ -491,12 +491,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             }
         }
 
-        // Defensive pearl: break juggle when launched upward
+        // Defensive pearl: break juggle when launched upward (11s cooldown)
         if (!isConsuming() &&
             player.motionY > 0.15 &&
             !player.onGround &&
             pearls > 0 &&
-            now - lastPearl > 5000
+            now - lastPearl > 11000 // 11s cooldown
         ) {
             lastPearl = now
             Mouse.stopLeftAC()
@@ -530,13 +530,13 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             }, RandomUtils.randomIntInRange(50, 100))
         }
 
-        // Quick pearl (safe hors conso)
+        // Quick pearl (safe hors conso, 11s cooldown)
         if (!isConsuming() &&
             !openingPhase &&
             distance > 18f &&
             EntityUtils.entityFacingAway(target, player) &&
             !Mouse.isRunningAway() &&
-            now - lastPearl > 5000 &&
+            now - lastPearl > 11000 && // 11s cooldown
             pearls > 0
         ) {
             fun pearlRoutine() {
