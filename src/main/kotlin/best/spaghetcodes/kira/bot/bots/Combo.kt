@@ -277,6 +277,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         Movement.startForward()
         Mouse.startTracking()
         Mouse.stopLeftAC()
+        Mouse.rClickUp()
+        Inventory.setInvItem("sword")
 
         openingPhase = true
         openingScheduled = false
@@ -308,6 +310,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         TimeUtils.setTimeout({
             Movement.clearAll()
             Mouse.stopLeftAC()
+            Mouse.rClickUp()
+            Inventory.setInvItem("sword")
             Combat.stopRandomStrafe()
             tapping = false
             lockLeftAC = false
