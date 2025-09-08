@@ -33,7 +33,7 @@ object WorldUtils {
         val lookVec = EntityUtils.get2dLookVec(player)
         for (i in 1..distance.toInt()) {
             val block = kira.mc.theWorld.getBlockState(
-                BlockPos(eyePos.x + lookVec.xCoord * i, eyePos.y, eyePos.z + lookVec.zCoord * i)
+                BlockPos(eyePos.x + lookVec.xCoord * i, eyePos.y.toDouble(), eyePos.z + lookVec.zCoord * i)
             ).block
             if (block != Blocks.air) {
                 return true
