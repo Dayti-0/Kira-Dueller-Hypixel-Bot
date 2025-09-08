@@ -294,6 +294,8 @@ class CustomConfigGUI : GuiScreen() {
         toggle("Enable Kira Hits", x, y, { cfg.enableHits }, { cfg.enableHits = it }); y += 20
         toggle("Hit & Block", x, y, { cfg.hitAndBlock }, { cfg.hitAndBlock = it }); y += 20
         number("Hit & Block %", x, y, { cfg.hitAndBlockPercent }, { cfg.hitAndBlockPercent = it }, 0, 100, 5); y += 20
+        number("Min Hits Until Block", x, y, { cfg.hitAndBlockMinHits }, { cfg.hitAndBlockMinHits = it }, 1, 20, 1); y += 20
+        number("Max Hits Until Block", x, y, { cfg.hitAndBlockMaxHits }, { cfg.hitAndBlockMaxHits = it }, 1, 20, 1); y += 24
         number("Min CPS", x, y, { cfg.minCPS }, { cfg.minCPS = it }, 0, 25, 1); y += 20
         number("Max CPS", x, y, { cfg.maxCPS }, { cfg.maxCPS = it }, 0, 25, 1); y += 24
 
