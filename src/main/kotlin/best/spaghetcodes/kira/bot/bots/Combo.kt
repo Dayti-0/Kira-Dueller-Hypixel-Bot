@@ -94,7 +94,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                 lockLeftAC = false
                 lockLeftACSince = 0L
             }
-        }, holdMs + 140)
+        }, holdMs + 300)
     }
 
     /** Équipe (avec pré-délai), vérifie l’item en main, puis tient le clic droit. */
@@ -192,7 +192,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                         TimeUtils.setTimeout({ confirmGap() }, RandomUtils.randomIntInRange(150, 200))
                     }
                     else -> {
-                        eatGap(0, 2600, EntityUtils.getDistanceNoY(player, target), player, target)
+                        eatGap(0, 2900, EntityUtils.getDistanceNoY(player, target), player, target)
                     }
                 }
             }
@@ -218,7 +218,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                 TimeUtils.setTimeout({ chainGap() }, 40)
             } else {
                 val preGap = RandomUtils.randomIntInRange(0, 10)
-                val holdGap = 2100
+                val holdGap = 2400
                 eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
                 // 3) Fin de l’ouverture lorsque la gap est consommée
@@ -390,7 +390,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (!openingPhase && strengthCycleStarted && strengthDosesUsed == 1 && !isConsuming()) {
             if (now >= nextStrengthAt) {
                 val pre = RandomUtils.randomIntInRange(110, 160)
-                val hold = 2100
+                val hold = 2400
                 drinkStrength(pre, hold, /*returnSword=*/true)
             }
         }
@@ -439,7 +439,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (!openingPhase && gapCycleStarted && !isConsuming()) {
             if (now >= nextGapAt || now - lastGap > gapPeriodMs + 2000) {
                 val pre = RandomUtils.randomIntInRange(110, 160)
-                val hold = 2100
+                val hold = 2400
                 eatGap(pre, hold, distance, player, target)
             }
         }
@@ -520,7 +520,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             val timeUntilGap = nextGapAt - now
             if (gapCycleStarted && timeUntilGap <= 12_000L) {
                 val pre = RandomUtils.randomIntInRange(110, 160)
-                val hold = 2100
+                val hold = 2400
                 eatGap(pre, hold, distance, player, target)
                 val delay = pre + hold + RandomUtils.randomIntInRange(40, 80)
                 TimeUtils.setTimeout({ pearlRoutine() }, delay)
