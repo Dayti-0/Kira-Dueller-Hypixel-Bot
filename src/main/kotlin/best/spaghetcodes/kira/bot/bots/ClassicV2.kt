@@ -626,28 +626,34 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             } else {
                 // 1) cas spécial : immobile mid (5–7) -> rod prioritaire & spam contrôlé
                 if (isStillNow && distance in rodMidInstantMin..rodMidInstantMax && allowByAntiSpam) {
-                    castRodNow(distance)
-                    // override anti-spam pour laisser le temps de toucher (~300–380ms)
-                    rodAntiSpamUntil = now + RandomUtils.randomIntInRange(300, 380)
-                    prevDistance = distance
-                    return
+                    if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                        castRodNow(distance)
+                        // override anti-spam pour laisser le temps de toucher (~300–380ms)
+                        rodAntiSpamUntil = now + RandomUtils.randomIntInRange(300, 380)
+                        prevDistance = distance
+                        return
+                    }
                 }
 
                 // 2) anti slow-bow proche -> rod
                 if (bowLikelyNowClose && distance <= rodMaxRangeHard) {
-                    castRodNow(distance)
-                    prevDistance = distance
-                    postBowNoRodUntil = now + 320
-                    return
+                    if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                        castRodNow(distance)
+                        prevDistance = distance
+                        postBowNoRodUntil = now + 320
+                        return
+                    }
                 }
 
                 if (distance <= rodMaxRangeHard /* garde-fou */) {
 
                     // 3) MID-RANGE instant (5.5–7.0) — normal
                     if (distance in rodMidInstantMin..rodMidInstantMax && !projectileActive && allowByAntiSpam) {
-                        castRodNow(distance)
-                        prevDistance = distance
-                        return
+                        if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                            castRodNow(distance)
+                            prevDistance = distance
+                            return
+                        }
                     }
 
                     val cdClose = (rodCdCloseMsBase * rodCdBias).toLong()
@@ -667,22 +673,28 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                         !facingAway &&
                         cdCloseOK &&
                         allowByAntiSpam) {
-                        castRodNow(distance)
-                        prevDistance = distance
-                        return
+                        if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                            castRodNow(distance)
+                            prevDistance = distance
+                            return
+                        }
                     }
 
                     // Main / réponse à rod adverse (3.0–6.8) — > ban
                     if (allowRodByMeleePolicy && !facingAway && (cdFarOK || cdCloseOK) && allowByAntiSpam) {
                         if (oppRodRecently && distance > rodBanMeleeDist) {
-                            castRodNow(distance)
-                            prevDistance = distance
-                            return
+                            if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                                castRodNow(distance)
+                                prevDistance = distance
+                                return
+                            }
                         }
                         if (distance in rodMainMin..rodMainMax && distance > rodBanMeleeDist) {
-                            castRodNow(distance)
-                            prevDistance = distance
-                            return
+                            if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                                castRodNow(distance)
+                                prevDistance = distance
+                                return
+                            }
                         }
                     }
 
@@ -692,9 +704,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                         !facingAway &&
                         (cdFarOK || cdCloseOK) &&
                         allowByAntiSpam) {
-                        castRodNow(distance)
-                        prevDistance = distance
-                        return
+                        if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
+                            castRodNow(distance)
+                            prevDistance = distance
+                            return
+                        }
                     }
                 }
             }
