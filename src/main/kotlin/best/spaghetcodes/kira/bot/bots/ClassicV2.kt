@@ -282,13 +282,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     }
 
     // =====================  HELPERS  ==================
-    // Mid-range un peu plus bas (15–25)
-    private fun adjustedAimDistance(d: Float): Float = when {
-        d in 15.0f..22.0f -> d * 0.84f
-        d in 22.0f..30.0f -> d * 0.83f
-        d in 9.0f..15.0f  -> d * 0.90f
-        else              -> d
-    }
 
     private fun chargeMsFor(distance: Float, opening: Boolean): Long {
         return if (opening) {
@@ -739,7 +732,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 left > reserve &&
                 (now - lastShotAt) >= RandomUtils.randomIntInRange(openSpacingMin.toInt(), openSpacingMax.toInt())) {
 
-                val tunedD = adjustedAimDistance(distance)
                 val lock = chargeMsFor(distance, opening = true)
                 startupJumping = false // stop sauts de début au 1er draw
                 bowHardLockUntil = now + lock
@@ -769,7 +761,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 WorldUtils.blockInFront(p, distance, 0.5f) == Blocks.air &&
                 left > reserve) {
 
-                val tunedD = adjustedAimDistance(distance)
                 val lock = chargeMsFor(distance, opening = false)
                 startupJumping = false
                 bowHardLockUntil = now + lock
@@ -794,7 +785,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 if ((away && distance in 3.5f..30f) ||
                     (!away && distance in 28.0f..33.0f)) {
 
-                    val tunedD = adjustedAimDistance(distance)
                     val lock = chargeMsFor(distance, opening = false)
                     startupJumping = false
                     bowHardLockUntil = now + lock
