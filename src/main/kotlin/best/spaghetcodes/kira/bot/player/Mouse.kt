@@ -62,6 +62,12 @@ object Mouse {
             KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, true)
             if (kira.mc.objectMouseOver != null && kira.mc.objectMouseOver.entityHit != null) {
                 kira.mc.playerController.attackEntity(kira.mc.thePlayer, kira.mc.objectMouseOver.entityHit)
+                if (kira.config?.hitAndBlock == true && kira.config?.enableHits == true) {
+                    val hitAndBlockPercent = kira.config?.hitAndBlockPercent ?: 0
+                    if (RandomUtils.randomIntInRange(0, 99) < hitAndBlockPercent) {
+                        rClick(RandomUtils.randomIntInRange(60, 120))
+                    }
+                }
             }
         }
     }
