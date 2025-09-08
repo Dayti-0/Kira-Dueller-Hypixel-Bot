@@ -26,7 +26,7 @@ object StateManager {
         val unformatted = ev.message.unformattedText
         if (unformatted.matches(Regex(".* a rejoint \\(./2\\)!"))) {
             state = States.GAME
-            if (kira.bot !is Sumo) {
+            if (kira.bot !is Sumo && kira.config?.lobbyMovement == true) {
                 LobbyMovement.generic()
             }
             if (unformatted.matches(Regex(".* a rejoint \\(2/2\\)!"))) {
@@ -40,7 +40,7 @@ object StateManager {
             state = States.GAME
             gameFull = false
             lastGameDuration = System.currentTimeMillis() - gameStartedAt
-            if (kira.bot !is Sumo) {
+            if (kira.bot !is Sumo && kira.config?.lobbyMovement == true) {
                 LobbyMovement.generic()
             }
         } else if (unformatted.contains("has quit!")) {

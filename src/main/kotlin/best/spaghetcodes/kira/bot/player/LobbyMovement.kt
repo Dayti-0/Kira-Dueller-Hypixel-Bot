@@ -111,7 +111,9 @@ object LobbyMovement {
     @SubscribeEvent
     @Suppress("UNUSED_PARAMETER")
     fun onTick(event: ClientTickEvent) {
-        if (kira.bot?.toggled() == true && tickYawChange != 0f && kira.mc.thePlayer != null && StateManager.state != StateManager.States.PLAYING) {
+        if (kira.bot?.toggled() == true && kira.config?.lobbyMovement == true && tickYawChange != 0f &&
+            kira.mc.thePlayer != null && StateManager.state != StateManager.States.PLAYING
+        ) {
             kira.mc.thePlayer.rotationYaw += tickYawChange
         }
     }
