@@ -485,7 +485,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Mouse.isUsingProjectile() || now < projectileGraceUntil || now < pendingProjectileUntil || now < actionLockUntil
 
         // Avance / arrêt (avec stick avant)
-        if (now < forwardStickUntil) {
+        if (Mouse.rClickDown && projectileKind == KIND_BOW) {
+            Movement.stopForward()
+        } else if (now < forwardStickUntil) {
             Movement.startForward()
         } else {
             if (distance < 0.75f || (distance < 2.4f && combo >= 2 && approaching)) {
@@ -609,6 +611,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         // =======================  ROD  ===========================
+        if (shotsFired == 0 && distance > 5f) return
         // Priorité : adversaire immobile à MID (5–7) => spam rod contrôlé
         val oppHasBow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
         val bowLikelyNowClose = oppHasBow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded) && distance <= 10.0f
