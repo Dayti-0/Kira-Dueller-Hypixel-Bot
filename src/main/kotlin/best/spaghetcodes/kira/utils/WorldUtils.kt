@@ -25,6 +25,23 @@ object WorldUtils {
         return kira.mc.theWorld.getBlockState(player.position.add(vec.xCoord, -0.2 + yMod, vec.zCoord)).block
     }
 
+    /**
+     * Checks for solid blocks at the player's eye height within [distance] blocks ahead
+     */
+    fun isObstacleAhead(player: EntityPlayer, distance: Float): Boolean {
+        val eyePos = player.position.add(0.0, player.eyeHeight.toDouble(), 0.0)
+        val lookVec = EntityUtils.get2dLookVec(player)
+        for (i in 1..distance.toInt()) {
+            val block = kira.mc.theWorld.getBlockState(
+                BlockPos(eyePos.x + lookVec.xCoord * i, eyePos.y, eyePos.z + lookVec.zCoord * i)
+            ).block
+            if (block != Blocks.air) {
+                return true
+            }
+        }
+        return false
+    }
+
     fun airInFront(player: EntityPlayer, distance: Float): Boolean {
         return airCheck(player, player.position, distance, EntityUtils.get2dLookVec(player))
     }

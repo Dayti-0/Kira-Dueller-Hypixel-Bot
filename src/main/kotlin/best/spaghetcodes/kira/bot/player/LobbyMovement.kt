@@ -13,6 +13,7 @@ object LobbyMovement {
 
     private var tickYawChange = 0f
     private var initialYaw = 0f
+    private var lastDirectionChange = 0L
     private var intervals: ArrayList<Timer?> = ArrayList()
 
     fun sumo() {
@@ -29,6 +30,7 @@ object LobbyMovement {
             Movement.startForward()
             Movement.startSprinting()
             initialYaw = kira.mc.thePlayer.rotationYaw
+            lastDirectionChange = System.currentTimeMillis()
 
             intervals.add(TimeUtils.setInterval(
                 fun () {
@@ -48,7 +50,9 @@ object LobbyMovement {
 
             intervals.add(TimeUtils.setInterval(
                 fun () {
-                    tickYawChange = if (WorldUtils.airInFront(kira.mc.thePlayer, 4f)) {
+                    val now = System.currentTimeMillis()
+                    tickYawChange = if (WorldUtils.isObstacleAhead(kira.mc.thePlayer, 4f) || now - lastDirectionChange > 7000) {
+                        lastDirectionChange = now
                         RandomUtils.randomDoubleInRange(-13.0, 13.0).toFloat()
                     } else {
                         0f
@@ -68,11 +72,10 @@ object LobbyMovement {
 
     private fun sumo1() {
         if (kira.mc.thePlayer != null) {
-            var left = RandomUtils.randomBool()
-
             val speed = RandomUtils.randomDoubleInRange(3.0, 9.0).toFloat()
-
-            tickYawChange = if (left) -speed else speed
+            val dir = if (RandomUtils.randomBool()) -1 else 1
+            tickYawChange = speed * dir
+            lastDirectionChange = System.currentTimeMillis()
             TimeUtils.setTimeout(fun () {
                 Movement.startForward()
                 Movement.startSprinting()
@@ -80,19 +83,20 @@ object LobbyMovement {
                     Movement.startJumping()
                 }, RandomUtils.randomIntInRange(400, 800))
                 intervals.add(TimeUtils.setInterval(fun () {
-                    tickYawChange = if (WorldUtils.airInFront(kira.mc.thePlayer, 7f)) {
-                        if (WorldUtils.airInFront(kira.mc.thePlayer, 3f)) {
-                            RandomUtils.randomDoubleInRange(if (left) 9.5 else -9.5, if (left) 13.0 else -13.0).toFloat()
-                        } else RandomUtils.randomDoubleInRange(if (left) 4.5 else -4.5, if (left) 7.0 else -7.0).toFloat()
+                    val now = System.currentTimeMillis()
+                    val needTurn = WorldUtils.isObstacleAhead(kira.mc.thePlayer, 7f) || now - lastDirectionChange > 7000
+                    tickYawChange = if (needTurn) {
+                        lastDirectionChange = now
+                        val turnDir = if (RandomUtils.randomBool()) 1 else -1
+                        if (WorldUtils.isObstacleAhead(kira.mc.thePlayer, 3f)) {
+                            RandomUtils.randomDoubleInRange(9.5, 13.0).toFloat() * turnDir
+                        } else {
+                            RandomUtils.randomDoubleInRange(4.5, 7.0).toFloat() * turnDir
+                        }
                     } else {
                         0f
                     }
                 }, 0, RandomUtils.randomIntInRange(50, 100)))
-                intervals.add(TimeUtils.setTimeout(fun () {
-                    intervals.add(TimeUtils.setInterval(fun () {
-                        left = !left
-                    }, 0, RandomUtils.randomIntInRange(5000, 10000)))
-                }, RandomUtils.randomIntInRange(5000, 10000)))
             }, RandomUtils.randomIntInRange(100, 250))
         }
     }
