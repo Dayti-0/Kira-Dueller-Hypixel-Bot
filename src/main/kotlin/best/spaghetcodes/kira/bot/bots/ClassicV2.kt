@@ -33,7 +33,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val fullDrawMsMin = 820
     private val fullDrawMsMax = 980
     private val bowCancelCloseDist = 5.0f
-    private val bowMinUseDist = 9.0f            // ne pas initier un tir < 9 blocs
+    private val bowMinUseDist = 6.0f            // ne pas initier un tir < 9 blocs
 
     // Ouverture contrôlée (1–2 flèches max, espacées)
     private var openVolleyMax = 1
