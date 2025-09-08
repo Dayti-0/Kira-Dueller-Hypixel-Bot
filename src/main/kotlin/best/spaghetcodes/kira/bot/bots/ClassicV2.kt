@@ -32,7 +32,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     // =====================  ARC  =====================
     private val fullDrawMsMin = 820
     private val fullDrawMsMax = 980
-    private val bowCancelCloseDist = 8.0f
+    private val bowCancelCloseDist = 5.0f
     private val bowMinUseDist = 9.0f            // ne pas initier un tir < 9 blocs
 
     // Ouverture contrôlée (1–2 flèches max, espacées)
@@ -507,6 +507,8 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         // Annuler l’arc si trop proche
         if (projectileActive && Mouse.rClickDown && projectileKind == KIND_BOW && distance < bowCancelCloseDist) {
             Mouse.rClickUp()
+            Mouse.setUsingProjectile(false)
+            Inventory.setInvItem("sword")
             bowHardLockUntil = 0L
             projectileGraceUntil = 0L
             pendingProjectileUntil = 0L
@@ -699,7 +701,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         // ========================  ARC  ==========================
-        if (!projectileActive && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !Mouse.rClickDown) {
+        if (!projectileActive && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !Mouse.rClickDown && distance > 5f) {
             val reserve = reserveNeeded(now)
             val left = arrowsLeft()
 
@@ -727,7 +729,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 pendingProjectileUntil = now + 60L
                 actionLockUntil = now + (lock + 120)
                 projectileKind = KIND_BOW
-                useBow(tunedD) {
+                useBowImmediateFull {
                     shotsFired++
                     openVolleyFired++
                     lastShotAt = System.currentTimeMillis()
@@ -757,7 +759,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 pendingProjectileUntil = now + 50L
                 actionLockUntil = now + (lock + 100)
                 projectileKind = KIND_BOW
-                useBow(tunedD) {
+                useBowImmediateFull {
                     shotsFired++
                     lastReactiveShotAt = System.currentTimeMillis()
                 }
@@ -782,7 +784,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                     pendingProjectileUntil = now + 60L
                     actionLockUntil = now + (lock + 120)
                     projectileKind = KIND_BOW
-                    useBow(tunedD) { shotsFired++ }
+                    useBowImmediateFull { shotsFired++ }
                     projectileGraceUntil = bowHardLockUntil + 120
                     postBowNoRodUntil = now + lock + 320L
                     prevDistance = distance
