@@ -4,6 +4,7 @@ import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.bots.*
 import best.spaghetcodes.kira.gui.CustomConfigGUI
+import best.spaghetcodes.kira.bot.player.LobbyMovement
 import gg.essential.vigilance.Vigilant
 import gg.essential.vigilance.data.Property
 import gg.essential.vigilance.data.PropertyType
@@ -171,6 +172,9 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
         // Toujours utiliser getBot ici -> pas d'Any
         registerListener("currentBot") { idx: Int ->
             getBot(idx)?.let { kira.swapBot(it) }
+        }
+        registerListener("lobbyMovement") { enabled: Boolean ->
+            if (!enabled) LobbyMovement.stop()
         }
 
         preload()
