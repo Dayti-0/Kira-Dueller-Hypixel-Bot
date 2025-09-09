@@ -57,7 +57,12 @@ object Mouse {
     // --------------------------------------------
 
     fun leftClick() {
-        if (kira.bot?.toggled() == true && kira.mc.thePlayer != null && !kira.mc.thePlayer.isUsingItem) {
+        if (
+            kira.bot?.toggled() == true &&
+            kira.config?.enableHits == true &&
+            kira.mc.thePlayer != null &&
+            !kira.mc.thePlayer.isUsingItem
+        ) {
             kira.mc.thePlayer.swingItem()
             KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, true)
             if (kira.mc.objectMouseOver != null && kira.mc.objectMouseOver.entityHit != null) {
@@ -126,7 +131,7 @@ object Mouse {
     }
 
     private fun leftACFunc() {
-        if (kira.bot?.toggled() == true && leftAC) {
+        if (kira.bot?.toggled() == true && kira.config?.enableHits == true && leftAC) {
             if (!kira.mc.thePlayer.isUsingItem) {
                 val minCPS = kira.config?.minCPS ?: 10
                 val maxCPS = kira.config?.maxCPS ?: 14
