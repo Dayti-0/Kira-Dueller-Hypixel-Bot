@@ -44,17 +44,14 @@ object Mouse {
      */
     private fun bowPitchComp(distance: Float): Float {
         return when {
-            // courte portée : quasi aucune compensation
-            distance < 10f  -> 0.0f
-            distance < 12f  -> 0.3f
-            distance < 14f  -> 0.8f
-            distance < 16f  -> 1.0f
-            // milieu de portée : valeurs revues à la baisse
-            distance < 20f  -> 1.6f
-            distance < 24f  -> 2.3f
-            distance < 28f  -> 3.8f
-            // très longue distance : légère réduction également
-            else            -> 5.2f
+            // offset nul jusqu'à ~30 blocs
+            distance < 30f -> 0.0f
+            // augmentation progressive avec la distance
+            distance < 35f -> 1.0f
+            distance < 40f -> 2.0f
+            distance < 50f -> 3.0f
+            distance < 60f -> 4.0f
+            else -> 5.0f
         }
     }
     // --------------------------------------------
