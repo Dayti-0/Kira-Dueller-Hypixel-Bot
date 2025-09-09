@@ -245,7 +245,11 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     @SubscribeEvent
     fun onAttackEntityEvent(ev: AttackEntityEvent) {
         if (toggled() && ev.entity == mc.thePlayer) {
-            attackedID = ev.target.entityId
+            if (kira.config?.enableHits != true) {
+                ev.isCanceled = true
+            } else {
+                attackedID = ev.target.entityId
+            }
         }
     }
 
