@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
@@ -310,7 +311,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     // Série de swings “humains” (2–4 coups) — une seule fois
     private fun triggerHumanSwingSeries() {
-        if (humanSwingSeriesDone) return
+        if (humanSwingSeriesDone || kira.config?.enableHits != true) return
         humanSwingSeriesDone = true
         val swings = RandomUtils.randomIntInRange(2, 4)
         var delay = 0
@@ -449,7 +450,13 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         // Swings humains une seule fois (14–20)
         val inHumanZone = distance in humanSwingZoneMin..humanSwingZoneMax
-        if (!humanSwingSeriesDone && inHumanZone && !wasInHumanZone && now >= humanSwingSeriesActiveUntil) {
+        if (
+            !humanSwingSeriesDone &&
+            inHumanZone &&
+            !wasInHumanZone &&
+            now >= humanSwingSeriesActiveUntil &&
+            kira.config?.enableHits == true
+        ) {
             triggerHumanSwingSeries()
         }
         wasInHumanZone = inHumanZone
