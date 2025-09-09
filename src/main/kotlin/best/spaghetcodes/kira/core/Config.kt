@@ -52,6 +52,20 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
     @Property(type = PropertyType.SWITCH, name = "Enable Kira Hits", description = "Whether the bot should perform hits.", category = "Combat")
     var enableHits = true
 
+    @Property(type = PropertyType.SWITCH, name = "Enable Hit & Block", description = "After a hit, briefly block with the sword.", category = "Combat")
+    var enableHitAndBlock = false
+
+    @Property(
+        type = PropertyType.NUMBER,
+        name = "Hit & Block Chance",
+        description = "Chance in percent to block after a hit.",
+        category = "Combat",
+        min = 0,
+        max = 100,
+        increment = 5
+    )
+    var hitAndBlockChance = 0
+
     @Property(type = PropertyType.SLIDER, name = "Min CPS", description = "The minimum CPS that the bot will be clicking at.", category = "Combat", min = 0, max = 25)
     var minCPS = 15
 
@@ -163,6 +177,8 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
         addDependency("ggDelay", "sendAutoGG")
         addDependency("startMessage", "sendStartMessage")
         addDependency("startMessageDelay", "sendStartMessage")
+        addDependency("enableHitAndBlock", "enableHits")
+        addDependency("hitAndBlockChance", "enableHitAndBlock")
         addDependency("dodgeWins", "enableDodging")
         addDependency("dodgeWS", "enableDodging")
         addDependency("dodgeWLR", "enableDodging")

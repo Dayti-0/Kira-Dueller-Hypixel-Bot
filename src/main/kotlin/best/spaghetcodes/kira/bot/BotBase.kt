@@ -2,6 +2,11 @@ package best.spaghetcodes.kira.bot
 
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.player.*
+import best.spaghetcodes.kira.bot.bots.Blitz
+import best.spaghetcodes.kira.bot.bots.Classic
+import best.spaghetcodes.kira.bot.bots.ClassicV2
+import best.spaghetcodes.kira.bot.bots.Combo
+import best.spaghetcodes.kira.bot.bots.OP
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.utils.*
 import com.google.gson.JsonArray
@@ -17,6 +22,7 @@ import net.minecraft.client.multiplayer.GuiConnecting
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.network.Packet
+import net.minecraft.network.play.server.S0BPacketAnimation
 import net.minecraft.network.play.server.S19PacketEntityStatus
 import net.minecraft.network.play.server.S3EPacketTeams
 import net.minecraft.network.play.server.S45PacketTitle
@@ -125,17 +131,18 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                         val entity = packet.getEntity(mc.theWorld)
                         if (entity != null) {
                             if (entity.entityId == attackedID) {
-                                attackedID = -1
-                                onAttack()
-                                combo++
-                                opponentCombo = 0
-                                ticksSinceHit = 0
+                                confirmAttack()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
                                 combo = 0
                                 opponentCombo++
                             }
                         }
+                    }
+                }
+                is S0BPacketAnimation -> {
+                    if (packet.animationType == 1 && packet.entityId == attackedID) {
+                        confirmAttack()
                     }
                 }
                 is S3EPacketTeams -> {
@@ -242,9 +249,33 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
+    private fun confirmAttack() {
+        attackedID = -1
+        onAttack()
+        combo++
+        opponentCombo = 0
+        ticksSinceHit = 0
+        tryHitAndBlock()
+    }
+
+    private fun tryHitAndBlock() {
+        val cfg = kira.config ?: return
+        if (cfg.enableHits != true || cfg.enableHitAndBlock != true) return
+        val bot = kira.bot
+        if (bot !is Classic && bot !is ClassicV2 && bot !is Combo && bot !is OP && bot !is Blitz) return
+        val held = mc.thePlayer?.heldItem
+        if (held?.unlocalizedName?.lowercase()?.contains("sword") != true) return
+        val chance = (cfg.hitAndBlockChance / 5) * 5
+        if (chance <= 0) return
+        if (RandomUtils.randomIntInRange(1, 100) <= chance) {
+            Mouse.rClick(RandomUtils.randomIntInRange(40, 80))
+            ChatUtils.info("hit and block")
+        }
+    }
+
     @SubscribeEvent
     fun onAttackEntityEvent(ev: AttackEntityEvent) {
-        if (toggled() && ev.entity == mc.thePlayer) {
+        if (toggled() && ev.entityPlayer == mc.thePlayer) {
             if (kira.config?.enableHits != true) {
                 ev.isCanceled = true
             } else {
