@@ -37,6 +37,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val fullDrawMsMax = 980
     private val openShotMinDist = 9.0f
     private val parryMinDist = 7.0f
+    private val parryCloseCancelDist = 4.0f
     private val stillFrameThreshold = 0.0125
     private val stillFramesNeeded = 10
     private val parryCooldownMs = 900L
@@ -46,6 +47,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val parryHoldMaxMs = 1220
     private val parryStickMinMs = 1000
     private val parryStickMaxMs = 1800
+    private val parryJumpCd = 580L
 
     private val bowCancelCloseDist = 4.8f
     private val bowMinUseDist = 6.0f            // ne pas initier un tir < 9 blocs
@@ -133,9 +135,12 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var parryFromBow = false
     private var parryExtendedUntil = 0L
 
+    private var parryCloseLockUntil = 0L
+
     // strafe pendant parade
     private var parryStrafeDir = 1
     private var parryStrafeFlipAt = 0L
+    private var lastParryJumpAt = 0L
 
     // anti-reswitch après rod
     private var forceKeepRodUntil = 0L
@@ -144,6 +149,8 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodWindowCount = 0
     private var rodWindowResetAt = 0L
     private var postBowNoRodUntil = 0L
+
+    private var allowParryAfter = 0L
 
     override fun onGameStart() {
         Mouse.startTracking()
@@ -182,6 +189,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         projectileKind = KIND_NONE
         parryFromBow = false
         parryExtendedUntil = 0L
+        parryCloseLockUntil = 0L
         stillFrames = 0
         bowSlowFrames = 0
         oppLastX = 0.0
@@ -190,6 +198,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         parryStrafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
         parryStrafeFlipAt = 0L
+        lastParryJumpAt = 0L
 
         rodWindowCount = 0
         rodWindowResetAt = System.currentTimeMillis() + rodWindowMs
@@ -201,6 +210,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         openStartDelayUntil = now + RandomUtils.randomIntInRange(700, 1100)
         lastShotAt = 0L
         postBowNoRodUntil = 0L
+        allowParryAfter = gameStartAt + 2800L
     }
 
     override fun onGameEnd() {
@@ -401,11 +411,30 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             }
         }
 
+        // Annulation proche stricte + verrou court
+        if (Mouse.rClickDown && distance < parryCloseCancelDist) {
+            Mouse.rClickUp()
+            parryFromBow = false
+            parryExtendedUntil = 0L
+            parryCloseLockUntil = now + 700L
+        }
+
         // Parade épée (sticky) + ne pas bloquer la rod prioritaire
         if (holdingSword) {
             if (Mouse.rClickDown) {
-                if (distance < 4.0f && !EntityUtils.entityFacingAway(p, opp)) {
-                    Mouse.rClickUp()
+                if (distance >= parryCloseCancelDist &&
+                    p.onGround &&
+                    now - lastParryJumpAt >= parryJumpCd &&
+                    !projectileActive) {
+
+                    if (RandomUtils.randomIntInRange(0, 1) == 1 || now >= parryStrafeFlipAt) {
+                        parryStrafeDir = -parryStrafeDir
+                        parryStrafeFlipAt = now + RandomUtils.randomIntInRange(260, 420)
+                    }
+                    Movement.singleJump(RandomUtils.randomIntInRange(140, 210))
+                    lastParryJumpAt = now
+                    Movement.startForward()
+                    Movement.startSprinting()
                 }
                 val movingHard = (!isStill && !(oppHasBow && bowSlowFrames >= bowSlowFramesNeeded)) || approaching
                 val mustKeep = (parryFromBow && now < parryExtendedUntil)
@@ -422,12 +451,16 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             } else {
                 val sinceStart = now - gameStartAt
                 val stillButFar = isStill && distance > 16f
+                val closeRange = distance < parryCloseCancelDist
                 val canStartParry =
                     sinceStart > 2000 &&
+                    !closeRange &&
                     distance >= parryMinDist &&
                     ((isStill && distance <= 16f) || bowDrawLikely) &&
                     !projectileActive &&
                     WorldUtils.blockInFront(p, distance, 0.5f) == Blocks.air &&
+                    now >= allowParryAfter &&
+                    now >= parryCloseLockUntil &&
                     (now - lastSwordBlock) > parryCooldownMs
 
                 if (canStartParry && !stillButFar) {
