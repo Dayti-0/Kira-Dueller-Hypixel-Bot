@@ -77,7 +77,8 @@ object Mouse {
                     hitsUntilBlock--
                     if (hitsUntilBlock <= 0) {
                         if (RandomUtils.randomIntInRange(0, 100) < (kira.config?.hitAndBlockPercent ?: 100)) {
-                            rClick(RandomUtils.randomIntInRange(60, 120))
+                            val duration = RandomUtils.randomIntInRange(60, 120)
+                            TimeUtils.setTimeout({ rClick(duration) }, 40)
                         }
                         resetHitsUntilBlock()
                     }
