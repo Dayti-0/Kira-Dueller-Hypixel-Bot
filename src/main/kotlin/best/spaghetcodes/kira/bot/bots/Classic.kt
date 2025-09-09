@@ -217,7 +217,8 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         Mouse.setUsingProjectile(true)
 
         val clickMs = RandomUtils.randomIntInRange(80, 110)
-        val settleAfter = RandomUtils.randomIntInRange(260, 380)
+        // shorter settle to allow quicker sword swap, similar to ClassicV2
+        val settleAfter = RandomUtils.randomIntInRange(200, 260)
 
         projectileKind = KIND_ROD
 
@@ -234,8 +235,8 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         val rodAlreadyHeld = heldNow != null && heldNow.unlocalizedName.lowercase().contains("rod")
         val delay = if (!rodAlreadyHeld || beingComboedClose) 50 else 0 // 1 tick si nécessaire
 
-        // retour épée un peu plus tôt
-        forceKeepRodUntil = now + delay + clickMs + 120L
+        // keep rod only briefly before allowing sword swap
+        forceKeepRodUntil = now + delay + clickMs + 60L
 
         // quota (non-urgent) : incrémenté ici car toute rod arrive via cette voie
         if (now > rodWindowResetAt) {
@@ -406,6 +407,17 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Movement.stopForward()
         } else if (!tapping) {
             Movement.startForward()
+        }
+
+        // Force holding the sword if the opponent is within ~3.6 blocks
+        if (distance <= 3.6f &&
+            p.heldItem != null &&
+            !p.heldItem.unlocalizedName.lowercase().contains("sword")) {
+            if (Mouse.rClickDown || projectileActive) {
+                TimeUtils.setTimeout({ Inventory.setInvItem("sword") }, 0)
+            } else {
+                Inventory.setInvItem("sword")
+            }
         }
 
         // Switch épée (pas pendant locks / grace / forceKeepRod)
