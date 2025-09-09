@@ -328,9 +328,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private fun castRodNow(distanceNow: Float) {
         fun doClick() {
             val nowClick = System.currentTimeMillis()
-
-            Mouse.setUsingProjectile(true)
-            Mouse.rClick(RandomUtils.randomIntInRange(70, 95))
+            useRodImmediate()
             reentryRodGraceUntil = 0L
 
             // HOLD DE ROD APRÈS CAST — presets:
@@ -351,12 +349,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             lastRodAttemptAt = nowClick
             pendingRodCheck = true
             lastOppHurtTime = opponent()?.hurtTime ?: 0
-
-            // Retour à l'épée automatique après le hold
-            TimeUtils.setTimeout({
-                Inventory.setInvItem("sword")
-                Mouse.setUsingProjectile(false)
-            }, max(holdMs + 20, settle))
 
             lastRodUse = nowClick
 
@@ -385,6 +377,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             }
         }
 
+        Mouse.stopLeftAC()
         // Sélection + CLIC TOUT DE SUITE
         val held = mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()
         if (held == null || !held.contains("rod")) {
