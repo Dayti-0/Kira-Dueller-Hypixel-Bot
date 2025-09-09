@@ -79,6 +79,17 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var stagnantSince = 0L
     private var cornerBreakUntil = 0L
 
+    // Biais court et state machine strafe proche
+    private var strafeBiasDir = 0
+    private var strafeBiasStickUntil = 0L
+
+    private var closeStrafeMode = 0
+    private val MODE_BURST = 0
+    private val MODE_HOLD_LEFT = 1
+    private val MODE_HOLD_RIGHT = 2
+    private var closeStrafeNextAt = 0L
+    private var closeStrafeToggleAt = 0L
+
     private var rodLockUntil = 0L
     private var lastRodUse = 0L
     private var lastRodAttemptAt = 0L
@@ -172,6 +183,11 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         stagnantSince = 0L
         cornerBreakUntil = 0L
         strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
+        strafeBiasDir = 0
+        strafeBiasStickUntil = 0L
+        closeStrafeMode = MODE_BURST
+        closeStrafeNextAt = 0L
+        closeStrafeToggleAt = 0L
 
         Mouse.rClickUp()
         gameStartAt = System.currentTimeMillis()
@@ -444,6 +460,10 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                         Mouse.rClickUp()
                         parryFromBow = false
                         parryExtendedUntil = 0L
+                        if (distance < 4f) {
+                            strafeBiasDir = strafeDir
+                            strafeBiasStickUntil = now + RandomUtils.randomIntInRange(260, 420)
+                        }
                     } else {
                         holdBlockUntil = max(holdBlockUntil, now + RandomUtils.randomIntInRange(120, 300))
                     }
@@ -651,7 +671,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
         // ----------------------------------------------------
 
-        // Anti-corner & Strafe (V1)
+        // Anti-corner & Strafe (V2)
         val movePriority = arrayListOf(0, 0)
         var clear = false
         var randomStrafe = false
@@ -665,6 +685,12 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             val w = if (distance > 6f) 7 else 9
             if (parryStrafeDir < 0) movePriority[0] += w else movePriority[1] += w
             randomStrafe = false
+        }
+
+        // Biais court post actions spécifiques
+        if (!parryActive && now < strafeBiasStickUntil && strafeBiasDir != 0) {
+            val w = if (distance > 6f) 6 else 7
+            if (strafeBiasDir < 0) movePriority[0] += w else movePriority[1] += w
         }
 
         val blockAheadClose = WorldUtils.blockInFront(p, 1.2f, 1.0f) != Blocks.air
@@ -682,33 +708,61 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             if (EntityUtils.entityFacingAway(p, opp)) {
                 if (WorldUtils.leftOrRightToPoint(p, Vec3(0.0, 0.0, 0.0))) movePriority[0] += 4 else movePriority[1] += 4
             } else if (!parryActive) {
-                val rotations = EntityUtils.getRotations(opp, p, false)
-                if (rotations != null && now - lastStrafeSwitch > 350) {
-                    val preferSide = if (rotations[0] < 0) +1 else -1
-                    if (preferSide != strafeDir) {
-                        strafeDir = preferSide
+                if (distance < 2.6f) {
+                    if (now >= closeStrafeNextAt) {
+                        val roll = RandomUtils.randomIntInRange(0, 99)
+                        closeStrafeMode = when {
+                            roll < 50 -> MODE_BURST
+                            roll < 75 -> MODE_HOLD_LEFT
+                            else -> MODE_HOLD_RIGHT
+                        }
+                        closeStrafeNextAt = now + when (closeStrafeMode) {
+                            MODE_BURST -> RandomUtils.randomIntInRange(280, 420).toLong()
+                            else -> RandomUtils.randomIntInRange(220, 340).toLong()
+                        }
+                        if (closeStrafeMode == MODE_BURST) {
+                            closeStrafeToggleAt = now + RandomUtils.randomIntInRange(60, 110)
+                        } else {
+                            strafeDir = if (closeStrafeMode == MODE_HOLD_LEFT) -1 else 1
+                        }
+                    } else if (closeStrafeMode == MODE_BURST && now >= closeStrafeToggleAt) {
+                        strafeDir = -strafeDir
+                        closeStrafeToggleAt = now + RandomUtils.randomIntInRange(60, 110)
+                    }
+                    val weightClose = 4
+                    if (strafeDir < 0) movePriority[0] += weightClose else movePriority[1] += weightClose
+                    Movement.startForward()
+                    Movement.startSprinting()
+                    randomStrafe = false
+                } else {
+                    val rotations = EntityUtils.getRotations(opp, p, false)
+                    if (rotations != null && now - lastStrafeSwitch > 350) {
+                        val preferSide = if (rotations[0] < 0) +1 else -1
+                        if (preferSide != strafeDir) {
+                            strafeDir = preferSide
+                            lastStrafeSwitch = now
+                        }
+                    }
+                    if (distance in 1.8f..3.6f) {
+                        if (deltaDist < 0.03f) {
+                            if (stagnantSince == 0L) stagnantSince = now
+                            else if (now - stagnantSince > 550 && now - lastStrafeSwitch > 300) {
+                                strafeDir = -strafeDir
+                                lastStrafeSwitch = now
+                                stagnantSince = 0L
+                            }
+                        } else stagnantSince = 0L
+                    } else stagnantSince = 0L
+
+                    if (distance < 6.5f && now - lastStrafeSwitch > RandomUtils.randomIntInRange(950, 1200)) {
+                        strafeDir = -strafeDir
                         lastStrafeSwitch = now
                     }
-                }
-                if (distance in 1.8f..3.6f) {
-                    if (deltaDist < 0.03f) {
-                        if (stagnantSince == 0L) stagnantSince = now
-                        else if (now - stagnantSince > 550 && now - lastStrafeSwitch > 300) {
-                            strafeDir = -strafeDir
-                            lastStrafeSwitch = now
-                            stagnantSince = 0L
-                        }
-                    } else stagnantSince = 0L
-                } else stagnantSince = 0L
 
-                if (distance < 6.5f && now - lastStrafeSwitch > RandomUtils.randomIntInRange(950, 1200)) {
-                    strafeDir = -strafeDir
-                    lastStrafeSwitch = now
+                    val weight = if (now < cornerBreakUntil) 8 else if (distance < 4f) 7 else 5
+                    if (strafeDir < 0) movePriority[0] += weight else movePriority[1] += weight
+                    randomStrafe = (distance in 8.0f..15.0f) || (oppHasBow && distance > 8.0f)
                 }
-
-                val weight = if (now < cornerBreakUntil) 8 else if (distance < 4f) 7 else 5
-                if (strafeDir < 0) movePriority[0] += weight else movePriority[1] += weight
-                randomStrafe = (distance in 8.0f..15.0f) || (oppHasBow && distance > 8.0f)
             }
         }
 
