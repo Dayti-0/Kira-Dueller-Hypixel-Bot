@@ -92,7 +92,6 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
                 }
             }
         }
-        Mouse.leftClick()
     }
 
     override fun onTick() {

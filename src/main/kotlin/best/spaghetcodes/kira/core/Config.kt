@@ -52,15 +52,6 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
     @Property(type = PropertyType.SWITCH, name = "Enable Kira Hits", description = "Whether the bot should perform hits.", category = "Combat")
     var enableHits = true
 
-    @Property(type = PropertyType.SWITCH, name = "Block Hit", description = "Block after hitting an opponent.", category = "Combat")
-    var blockHit = false
-
-    @Property(type = PropertyType.SLIDER, name = "Block Hit Percent", description = "Chance of blocking after hitting.", category = "Combat", min = 0, max = 100, increment = 5)
-    var blockHitPercent = 50
-
-    @Property(type = PropertyType.NUMBER, name = "Block Hit Interval", description = "Hits before blocking.", category = "Combat", min = 1, max = 20, increment = 1)
-    var blockHitInterval = 3
-
     @Property(type = PropertyType.SLIDER, name = "Min CPS", description = "The minimum CPS that the bot will be clicking at.", category = "Combat", min = 0, max = 25)
     var minCPS = 15
 
@@ -177,9 +168,6 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
         addDependency("dodgeWLR", "enableDodging")
         addDependency("dodgeLostTo", "enableDodging")
         addDependency("dodgeNoStats", "enableDodging")
-        addDependency("blockHit", "enableHits")
-        addDependency("blockHitPercent", "blockHit")
-        addDependency("blockHitInterval", "blockHit")
 
         // Toujours utiliser getBot ici -> pas d'Any
         registerListener("currentBot") { idx: Int ->

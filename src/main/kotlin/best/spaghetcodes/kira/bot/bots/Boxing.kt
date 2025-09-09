@@ -66,7 +66,6 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         Combat.wTap(100)
         TimeUtils.setTimeout(fun () { tapping = false }, 100)
         if (combo >= 3) Movement.clearLeftRight()
-        Mouse.leftClick()
     }
 
     override fun onTick() {

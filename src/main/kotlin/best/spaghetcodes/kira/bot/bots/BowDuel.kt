@@ -90,10 +90,6 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
         }, RandomUtils.randomIntInRange(200, 400))
     }
 
-    override fun onAttack() {
-        Mouse.leftClick()
-    }
-
     override fun onTick() {
         val p = mc.thePlayer ?: return
         val opp = opponent() ?: return
