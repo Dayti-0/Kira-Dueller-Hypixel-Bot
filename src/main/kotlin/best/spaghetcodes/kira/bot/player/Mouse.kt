@@ -31,9 +31,8 @@ object Mouse {
     private var splashAim = 0.0
 
     private fun resetHitsUntilBlock() {
-        val minHits = kira.config?.hitAndBlockMinHits ?: 1
-        val maxHits = kira.config?.hitAndBlockMaxHits ?: 1
-        hitsUntilBlock = RandomUtils.randomIntInRange(minHits, maxHits)
+        val interval = kira.config?.blockHitInterval ?: 1
+        hitsUntilBlock = interval
     }
 
     // ---- Bow ballistic compensation (pitch) ----
@@ -91,14 +90,14 @@ object Mouse {
             kira.mc.thePlayer != null &&
             !kira.mc.thePlayer.isUsingItem
         ) {
-            val doHitAndBlock = kira.config?.hitAndBlock == true && kira.config?.enableHits == true
+            val doHitAndBlock = kira.config?.blockHit == true && kira.config?.enableHits == true
             if (doHitAndBlock) {
                 if (hitsUntilBlock <= 0) {
                     resetHitsUntilBlock()
                 }
                 hitsUntilBlock--
                 if (hitsUntilBlock <= 0) {
-                    if (RandomUtils.randomIntInRange(0, 100) < (kira.config?.hitAndBlockPercent ?: 100)) {
+                    if (RandomUtils.randomIntInRange(0, 100) < (kira.config?.blockHitPercent ?: 100)) {
                         val duration = RandomUtils.randomIntInRange(60, 120)
                         val target = kira.mc.objectMouseOver?.entityHit
                         if (!rClickDown) {
