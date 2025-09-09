@@ -46,12 +46,14 @@ dependencies {
     annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT:processor")
 
     testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
     testImplementation("io.mockk:mockk:1.13.5")
 }
 
 repositories {
     maven("https://repo.essential.gg/repository/maven-public")
     maven("https://repo.spongepowered.org/repository/maven-public")
+    mavenCentral()
 }
 
 tasks {
