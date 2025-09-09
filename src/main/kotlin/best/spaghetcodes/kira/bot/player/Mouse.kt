@@ -44,14 +44,17 @@ object Mouse {
      */
     private fun bowPitchComp(distance: Float): Float {
         return when {
+            // courte portée : quasi aucune compensation
             distance < 10f  -> 0.0f
-            distance < 12f  -> 0.5f
-            distance < 14f  -> 1.0f
-            distance < 16f  -> 1.2f   // était ~1.5
-            distance < 20f  -> 1.9f   // était ~2.3
-            distance < 24f  -> 2.7f   // était ~3.2
-            distance < 28f  -> 4.2f   // léger -0.3
-            else            -> 5.6f
+            distance < 12f  -> 0.3f
+            distance < 14f  -> 0.8f
+            distance < 16f  -> 1.0f
+            // milieu de portée : valeurs revues à la baisse
+            distance < 20f  -> 1.6f
+            distance < 24f  -> 2.3f
+            distance < 28f  -> 3.8f
+            // très longue distance : légère réduction également
+            else            -> 5.2f
         }
     }
     // --------------------------------------------
@@ -174,6 +177,13 @@ object Mouse {
             }
         }
         if (kira.mc.thePlayer != null && kira.bot?.toggled() == true && tracking && kira.bot?.opponent() != null) {
+            if (rClickDown &&
+                kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("bow") == true
+            ) {
+                // ne jamais avancer/reculer pendant la visée
+                Movement.stopForward()
+                Movement.stopBackward()
+            }
             if (_runningAway) _usingProjectile = false
             var rotations = EntityUtils.getRotations(kira.mc.thePlayer, kira.bot?.opponent(), false)
 
