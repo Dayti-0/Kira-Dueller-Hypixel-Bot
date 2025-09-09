@@ -65,24 +65,42 @@ object Mouse {
     // --------------------------------------------
 
     fun leftClick() {
-        if (kira.bot?.toggled() == true && kira.mc.thePlayer != null && !kira.mc.thePlayer.isUsingItem) {
+        if (kira.bot?.toggled() == true &&
+            kira.mc.thePlayer != null &&
+            !kira.mc.thePlayer.isUsingItem
+        ) {
+            val doHitAndBlock = kira.config?.hitAndBlock == true && kira.config?.enableHits == true
+            if (doHitAndBlock) {
+                if (hitsUntilBlock <= 0) {
+                    resetHitsUntilBlock()
+                }
+                hitsUntilBlock--
+                if (hitsUntilBlock <= 0) {
+                    if (RandomUtils.randomIntInRange(0, 100) < (kira.config?.hitAndBlockPercent ?: 100)) {
+                        val duration = RandomUtils.randomIntInRange(60, 120)
+                        val target = kira.mc.objectMouseOver?.entityHit
+                        if (!rClickDown) {
+                            rClickDown()
+                            TimeUtils.setTimeout(this::rClickUp, duration)
+                        }
+                        TimeUtils.setTimeout({
+                            kira.mc.thePlayer.swingItem()
+                            KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, true)
+                            if (target != null) {
+                                kira.mc.playerController.attackEntity(kira.mc.thePlayer, target)
+                            }
+                        }, 40)
+                        resetHitsUntilBlock()
+                        return
+                    }
+                    resetHitsUntilBlock()
+                }
+            }
+
             kira.mc.thePlayer.swingItem()
             KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, true)
             if (kira.mc.objectMouseOver != null && kira.mc.objectMouseOver.entityHit != null) {
                 kira.mc.playerController.attackEntity(kira.mc.thePlayer, kira.mc.objectMouseOver.entityHit)
-                if (kira.config?.hitAndBlock == true && kira.config?.enableHits == true) {
-                    if (hitsUntilBlock <= 0) {
-                        resetHitsUntilBlock()
-                    }
-                    hitsUntilBlock--
-                    if (hitsUntilBlock <= 0) {
-                        if (RandomUtils.randomIntInRange(0, 100) < (kira.config?.hitAndBlockPercent ?: 100)) {
-                            val duration = RandomUtils.randomIntInRange(60, 120)
-                            TimeUtils.setTimeout({ rClick(duration) }, 40)
-                        }
-                        resetHitsUntilBlock()
-                    }
-                }
             }
         }
     }
