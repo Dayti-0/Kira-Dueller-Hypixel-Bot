@@ -439,7 +439,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         val now = System.currentTimeMillis()
         val distance = EntityUtils.getDistanceNoY(p, opp)
-        val attackDist = kira.config?.maxDistanceAttack ?: 5f
+        val attackDist = kira.config?.maxDistanceAttack?.toFloat() ?: 5f
         if (distance <= attackDist && !Mouse.isUsingProjectile()) {
             Mouse.startLeftAC()
         } else {
