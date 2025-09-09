@@ -76,7 +76,9 @@ object Mouse {
                     }
                     hitsUntilBlock--
                     if (hitsUntilBlock <= 0) {
-                        rClick(RandomUtils.randomIntInRange(60, 120))
+                        if (RandomUtils.randomIntInRange(0, 100) < (kira.config?.hitAndBlockPercent ?: 100)) {
+                            rClick(RandomUtils.randomIntInRange(60, 120))
+                        }
                         resetHitsUntilBlock()
                     }
                 }
