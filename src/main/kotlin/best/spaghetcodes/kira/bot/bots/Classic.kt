@@ -63,6 +63,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodCdFarMsBase = 850L
     private var rodCdBias = 1.0f // >1 = plus long, <1 = plus court
     private val rodCdBiasMax = 1.25f
+    private val rodBanMeleeDist = 4.0f // *** BAN ROD en zone de mêlée ***
     private val rodInterceptMin = 5.8f
     private val rodInterceptMax = 7.2f
     private val rodMidInstantMin = 5.5f
@@ -523,6 +524,13 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Movement.stopForward()
         } else if (!tapping) {
             Movement.startForward()
+        }
+
+        // Forcer l'épée si la rod est tenue en mêlée
+        val rodMeleeBanDist = max(3.6f, rodBanMeleeDist)
+        if (p.heldItem != null && p.heldItem.unlocalizedName.lowercase().contains("rod") && distance < rodMeleeBanDist) {
+            Inventory.setInvItem("sword")
+            rodLockUntil = 0L
         }
 
         // Switch épée (pas pendant locks / grace / forceKeepRod)
