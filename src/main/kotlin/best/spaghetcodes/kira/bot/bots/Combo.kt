@@ -448,7 +448,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (!isConsuming() &&
             player.motionY > 0.15 &&
             !player.onGround &&
-            now - gameStartAt > 120_000L &&
+            now - gameStartAt > 45_000L &&
             pearls > 0 &&
             now - lastPearl > 11000 // 11s cooldown
         ) {
@@ -488,7 +488,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         if (!isConsuming() &&
             !openingPhase &&
             distance > 24f &&
-            now - gameStartAt > 120_000L &&
+            now - gameStartAt > 45_000L &&
             EntityUtils.entityFacingAway(target, player) &&
             !Mouse.isRunningAway() &&
             now - lastPearl > 11000 && // 11s cooldown
