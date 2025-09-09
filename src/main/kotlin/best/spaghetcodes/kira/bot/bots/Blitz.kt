@@ -67,9 +67,18 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
 
         val distance = EntityUtils.getDistanceNoY(p, opp)
+        val held = p.heldItem
+        val holdingWeapon = held != null && (held.unlocalizedName.lowercase().contains("sword") || held.unlocalizedName.lowercase().contains("axe"))
+        val shouldAttack = !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
+                holdingWeapon && distance <= 3.5f
+        if (shouldAttack) {
+            Mouse.startLeftAC()
+        } else {
+            Mouse.stopLeftAC()
+        }
+
         val now = System.currentTimeMillis()
 
         // Sauts (Blitz un peu plus agressif)

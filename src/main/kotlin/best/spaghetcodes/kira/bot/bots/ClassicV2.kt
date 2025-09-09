@@ -425,7 +425,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
 
         // Sauts de début : ACTIFS EN CONTINU jusqu'au PREMIER brandissage d'ARC
         if (startupJumping) {
@@ -490,6 +489,16 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         val projectileActive =
             Mouse.isUsingProjectile() || now < projectileGraceUntil || now < pendingProjectileUntil || now < actionLockUntil
+
+        val held = p.heldItem
+        val holdingWeapon = held != null && (held.unlocalizedName.lowercase().contains("sword") || held.unlocalizedName.lowercase().contains("axe"))
+        val shouldAttack = !projectileActive && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
+                holdingWeapon && distance <= 3.5f
+        if (shouldAttack) {
+            Mouse.startLeftAC()
+        } else {
+            Mouse.stopLeftAC()
+        }
 
         // Avance / arrêt (avec stick avant)
         if (now < forwardStickUntil) {
