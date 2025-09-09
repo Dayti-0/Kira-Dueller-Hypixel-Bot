@@ -187,7 +187,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         Movement.startForward()
         Mouse.rClickUp()
 
-        TimeUtils.setTimeout({ Inventory.setInvItem("rod") }, 200)
+        Inventory.setInvItem("bow")
         firstRod = true
 
         startupJumping = true
