@@ -605,18 +605,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         // ========== JUMPS CONTEXTUELS (hors parade/proj) ==========
         if (!Mouse.rClickDown && !projectileActive && (now - lastGotHitAt) > 260 && !startupJumping) {
-            val facingAway = EntityUtils.entityFacingAway(p, opp)
-            val oppVeryStill = (stillFrames >= 6)
-            if (distance > 8.0f) {
-                if (p.onGround && now - lastTacticalJumpAt >= 520) {
-                    Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
-                    lastTacticalJumpAt = now
-                }
-            } else if (distance in 4.5f..8.0f && (facingAway || oppVeryStill)) {
-                if (p.onGround && now - lastTacticalJumpAt >= 720) {
-                    Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
-                    lastTacticalJumpAt = now
-                }
+            if (distance >= 6.0f && p.onGround && now - lastTacticalJumpAt >= 520) {
+                Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
+                lastTacticalJumpAt = now
+            } else {
+                Movement.stopJumping()
             }
         }
 
