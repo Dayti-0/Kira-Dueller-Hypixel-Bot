@@ -149,7 +149,9 @@ object Mouse {
     private fun rClickDown() {
         if (kira.bot?.toggled() == true) {
             rClickDown = true
-            KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindUseItem.keyCode, true)
+            val key = kira.mc.gameSettings.keyBindUseItem.keyCode
+            KeyBinding.setKeyBindState(key, true)
+            KeyBinding.onTick(key)
         }
     }
 
