@@ -1,5 +1,6 @@
 package best.spaghetcodes.kira.bot.bots
 
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.features.Bow
 import best.spaghetcodes.kira.bot.features.MovePriority
@@ -417,7 +418,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
 
         // Sauts de début : ACTIFS EN CONTINU jusqu'au PREMIER brandissage d'ARC
         if (startupJumping) {
@@ -428,6 +428,12 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         val now = System.currentTimeMillis()
         val distance = EntityUtils.getDistanceNoY(p, opp)
+        val attackDist = kira.config?.maxDistanceAttack ?: 5f
+        if (distance <= attackDist && !Mouse.isUsingProjectile()) {
+            Mouse.startLeftAC()
+        } else {
+            Mouse.stopLeftAC()
+        }
         val approaching = (prevDistance > 0f) && (prevDistance - distance >= 0.15f)
 
         // Détecte "loin" -> "ré-entrée" (approche) pour lever la latence de rod
