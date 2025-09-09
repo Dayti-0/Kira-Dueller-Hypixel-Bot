@@ -124,6 +124,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     // Maintien minimal de la rod APRÈS cast (évite le switch épée prématuré)
     private var rodHoldUntil = 0L
 
+    // Indique si la prochaine canne sera la première du duel
+    private var firstRod = false
+
     // ==================  PARADE ÉPÉE  =================
     private val parryMinDist = 15.0f
     private val parryCloseCancelDist = 15.0f
@@ -183,6 +186,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         Movement.startSprinting()
         Movement.startForward()
         Mouse.rClickUp()
+
+        TimeUtils.setTimeout({ Inventory.setInvItem("rod") }, 200)
+        firstRod = true
 
         startupJumping = true
 
@@ -382,7 +388,12 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         if (held == null || !held.contains("rod")) {
             Inventory.setInvItem("rod")
         }
-        doClick()
+        if (firstRod) {
+            firstRod = false
+            TimeUtils.setTimeout(::doClick, 30)
+        } else {
+            doClick()
+        }
     }
 
     private fun updateRodAccuracyHeuristic(now: Long) {
@@ -690,7 +701,8 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                                 return
                             }
                         }
-                        if (distance in rodMainMin..rodMainMax && distance > rodBanMeleeDist) {
+                        val mainMin = if (firstRod) rodMainMin + 0.5f else rodMainMin
+                        if (distance in mainMin..rodMainMax && distance > rodBanMeleeDist) {
                             if (projectileKind != KIND_BOW && !Mouse.rClickDown) {
                                 castRodNow(distance)
                                 prevDistance = distance
