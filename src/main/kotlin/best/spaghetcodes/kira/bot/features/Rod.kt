@@ -63,12 +63,14 @@ interface Rod {
         val settleAfter = RandomUtils.randomIntInRange(260, 380)
 
         // Switch instant + clic droit immédiat
+        println("useRodImmediate: switching to rod")
         Inventory.setInvItem("rod")
         Mouse.rClick(clickMs)
 
         // Retour épée après court temps de vol
         TimeUtils.setTimeout({
             Inventory.setInvItem("sword")
+            println("useRodImmediate: switched back to sword")
             TimeUtils.setTimeout({
                 Mouse.setUsingProjectile(false)
             }, RandomUtils.randomIntInRange(80, 140))
