@@ -108,8 +108,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
             // tracking ON en continu
             Mouse.startTracking()
 
-            // auto-CPS OFF
-            Mouse.stopLeftAC()
+            // auto-CPS ON
+            Mouse.startLeftAC()
 
             if (distance > 8.8f) {
                 if (opponent() != null && opponent()!!.heldItem != null && opponent()!!.heldItem.unlocalizedName.lowercase().contains("bow")) {

@@ -424,7 +424,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
+        Mouse.startLeftAC()
 
         // Sauts de début : ACTIFS EN CONTINU jusqu'au PREMIER brandissage d'ARC
         if (startupJumping) {

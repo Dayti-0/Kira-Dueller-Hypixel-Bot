@@ -80,7 +80,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
             // tracking ON en continu
             Mouse.startTracking()
 
-            Mouse.stopLeftAC()
+            Mouse.startLeftAC()
 
             if (combo >= 3 && distance >= 3.2f && mc.thePlayer.onGround) {
                 Movement.singleJump(RandomUtils.randomIntInRange(100, 150))

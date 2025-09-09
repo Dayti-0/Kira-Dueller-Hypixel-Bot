@@ -67,7 +67,7 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
+        Mouse.startLeftAC()
 
         val distance = EntityUtils.getDistanceNoY(p, opp)
         val now = System.currentTimeMillis()
