@@ -47,6 +47,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val parryStickMaxMs = 1800
 
     private val bowCancelCloseDist = 4.8f
+    private val bowMinUseDist = 6.0f            // ne pas initier un tir < 9 blocs
     private val singleJumpMinDist = 2.8f
     private val bowSlowThreshold = 0.06
     private val bowSlowFramesNeeded = 3
@@ -427,7 +428,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             if (openVolleyFired < openVolleyMax &&
                 now < openWindowUntil &&
                 now >= openStartDelayUntil &&
-                distance >= openShotMinDist &&
+                distance >= max(openShotMinDist, bowMinUseDist) &&
                 shotsFired < maxArrows &&
                 left > reserve &&
                 (now - lastShotAt) >= RandomUtils.randomIntInRange(openSpacingMin.toInt(), openSpacingMax.toInt())) {
