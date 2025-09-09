@@ -250,18 +250,14 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         gameStartAt = System.currentTimeMillis()
 
         openingPhase = true
-        openingScheduled = true
+        openingScheduled = false
 
-        TimeUtils.setTimeout({
-            val player = mc.thePlayer
-            val target = opponent()
-            if (player == null || target == null) {
-                openingScheduled = false
-                return@setTimeout
-            }
-            startOpening(player, target)
+        val player = mc.thePlayer
+        val target = opponent()
+        if (player != null && target != null) {
             openingScheduled = true
-        }, 0)
+            startOpening(player, target)
+        }
 
         strengthDosesUsed = 0
         lastPotion = 0L

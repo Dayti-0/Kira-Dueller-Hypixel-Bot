@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
@@ -424,7 +425,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
 
         // Sauts de début : ACTIFS EN CONTINU jusqu'au PREMIER brandissage d'ARC
         if (startupJumping) {
@@ -483,6 +483,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         val projectileActive =
             Mouse.isUsingProjectile() || now < projectileGraceUntil || now < pendingProjectileUntil || now < actionLockUntil
+
+        val holdingSword = p.heldItem != null && p.heldItem.unlocalizedName.lowercase().contains("sword")
+        val shouldAttack = kira.config?.enableHits == true && holdingSword && !projectileActive && !Mouse.rClickDown && distance < 10f
+        if (shouldAttack) Mouse.startLeftAC() else Mouse.stopLeftAC()
 
         // Avance / arrêt (avec stick avant)
         if (now < forwardStickUntil) {
