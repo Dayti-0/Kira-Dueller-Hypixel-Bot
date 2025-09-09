@@ -59,6 +59,7 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
         tapping = true
         TimeUtils.setTimeout({ tapping = false }, 100)
         if (combo >= 3) Movement.clearLeftRight()
+        Mouse.leftClick()
     }
 
     override fun onTick() {

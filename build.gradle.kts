@@ -44,6 +44,9 @@ dependencies {
 
     compileOnly("org.spongepowered:mixin:0.8.5-SNAPSHOT")
     annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT:processor")
+
+    testImplementation(kotlin("test"))
+    testImplementation("io.mockk:mockk:1.13.5")
 }
 
 repositories {
