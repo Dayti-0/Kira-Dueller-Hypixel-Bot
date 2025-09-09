@@ -82,6 +82,20 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var shotsFired = 0
     private val maxArrows = 5
 
+    // Ouverture contrôlée (1–2 flèches max, espacées)
+    private var openVolleyMax = 1
+    private var openVolleyFired = 0
+    private var openWindowUntil = 0L
+    private var openStartDelayUntil = 0L
+    private var lastShotAt = 0L
+    private val openSpacingMin = 650L
+    private val openSpacingMax = 900L
+
+    // Réserve d’arrows
+    private val reserveTightMs = 10_000L
+    private val earlyReserve = 3
+    private val midReserve = 2
+
     // suivi immobilité / slow-walk
     private var oppLastX = 0.0
     private var oppLastZ = 0.0
@@ -114,6 +128,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     // quota rods (non-urgentes)
     private var rodWindowCount = 0
     private var rodWindowResetAt = 0L
+    private var postBowNoRodUntil = 0L
 
     override fun onGameStart() {
         Mouse.startTracking()
@@ -156,23 +171,13 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         rodWindowCount = 0
         rodWindowResetAt = System.currentTimeMillis() + rodWindowMs
 
-        // Tir d’ouverture (full draw)
-        TimeUtils.setTimeout({
-            val opp = opponent()
-            if (opp != null && !Mouse.isUsingProjectile()) {
-                val d = EntityUtils.getDistanceNoY(mc.thePlayer, opp)
-                if (d >= openShotMinDist && shotsFired < maxArrows) {
-                    val now = System.currentTimeMillis()
-                    bowHardLockUntil = now + RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
-                    pendingProjectileUntil = now + 60L
-                    actionLockUntil = now + (fullDrawMsMax + 200)
-                    projectileKind = KIND_BOW
-                    val tunedD = if (d in 9.0f..18.5f) d * 0.92f else d
-                    useBow(tunedD) { shotsFired++ }
-                    projectileGraceUntil = bowHardLockUntil + 120
-                }
-            }
-        }, RandomUtils.randomIntInRange(350, 650))
+        openVolleyMax = RandomUtils.randomIntInRange(1, 2)
+        openVolleyFired = 0
+        val now = System.currentTimeMillis()
+        openWindowUntil = now + 4500L
+        openStartDelayUntil = now + RandomUtils.randomIntInRange(700, 1100)
+        lastShotAt = 0L
+        postBowNoRodUntil = 0L
     }
 
     override fun onGameEnd() {
@@ -407,12 +412,40 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         // ---------------- Fenêtres rod / bow ----------------
-        if (!projectileActive && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !Mouse.rClickDown) {
+        if (!projectileActive && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !Mouse.rClickDown && now >= postBowNoRodUntil) {
 
             // reset fenêtre quota rods
             if (now > rodWindowResetAt) {
                 rodWindowResetAt = now + rodWindowMs
                 rodWindowCount = 0
+            }
+
+            val left = arrowsLeft()
+            val reserve = reserveNeeded(now)
+
+            // Ouverture (1–2 flèches max, espacées)
+            if (openVolleyFired < openVolleyMax &&
+                now < openWindowUntil &&
+                now >= openStartDelayUntil &&
+                distance >= openShotMinDist &&
+                shotsFired < maxArrows &&
+                left > reserve &&
+                (now - lastShotAt) >= RandomUtils.randomIntInRange(openSpacingMin.toInt(), openSpacingMax.toInt())) {
+
+                val lock = chargeMsFor(distance, opening = true)
+                bowHardLockUntil = now + lock
+                pendingProjectileUntil = now + 60L
+                actionLockUntil = now + (lock + 120)
+                projectileKind = KIND_BOW
+                useBowImmediateFull {
+                    shotsFired++
+                    openVolleyFired++
+                    lastShotAt = System.currentTimeMillis()
+                }
+                projectileGraceUntil = bowHardLockUntil + 120
+                postBowNoRodUntil = now + lock + 380L
+                prevDistance = distance
+                return
             }
 
             // (0) BREAK-COMBO prioritaire (ignore le quota)
@@ -488,14 +521,15 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             // (D) Bow “safe”, full charge (tuning mid-range)
             if ((EntityUtils.entityFacingAway(p, opp) && distance in 3.5f..30f) ||
                 (distance in 28.0f..33.0f && !EntityUtils.entityFacingAway(p, opp))) {
-                if (distance > 10f && shotsFired < maxArrows) {
-                    val tunedD = if (distance in 9.0f..18.5f) distance * 0.92f else distance
-                    bowHardLockUntil = now + RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
+                if (distance > 10f && shotsFired < maxArrows && left > reserve) {
+                    val lock = chargeMsFor(distance, opening = false)
+                    bowHardLockUntil = now + lock
                     pendingProjectileUntil = now + 60L
-                    actionLockUntil = now + (fullDrawMsMax + 100)
+                    actionLockUntil = now + (lock + 100)
                     projectileKind = KIND_BOW
-                    useBow(tunedD) { shotsFired++ }
+                    useBowImmediateFull { shotsFired++ }
                     projectileGraceUntil = bowHardLockUntil + 120
+                    postBowNoRodUntil = now + lock + 320L
                     return
                 }
             }
@@ -566,4 +600,24 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         handle(clear, randomStrafe, movePriority)
         prevDistance = distance
     }
+
+    // ===================== HELPERS =====================
+
+    private fun chargeMsFor(distance: Float, opening: Boolean): Long {
+        return if (opening) {
+            RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
+        } else {
+            when {
+                distance < 6.0f   -> RandomUtils.randomIntInRange(220, 320).toLong()
+                distance < 10.0f  -> RandomUtils.randomIntInRange(320, 450).toLong()
+                distance < 15.0f  -> RandomUtils.randomIntInRange(450, 650).toLong()
+                distance < 25.0f  -> RandomUtils.randomIntInRange(550, 800).toLong()
+                else              -> RandomUtils.randomIntInRange(fullDrawMsMin, fullDrawMsMax).toLong()
+            }
+        }
+    }
+
+    private fun arrowsLeft(): Int = maxArrows - shotsFired
+    private fun reserveNeeded(now: Long): Int =
+        if (now - gameStartAt < reserveTightMs) earlyReserve else midReserve
 }
