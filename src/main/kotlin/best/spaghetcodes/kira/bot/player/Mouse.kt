@@ -49,18 +49,40 @@ object Mouse {
      * (pitch positif = on regarde vers le bas, donc on SOUSTRAIT l'offset)
      *
      * Ajustement: mid-range 15–25 blocs un peu **moins haut**.
+     *
+     * Les offsets sont maintenant interpolés linéairement afin d'éviter
+     * les sauts brusques qui provoquaient des tirs trop hauts.
      */
+
+    /**
+     * Paires (distance, compensation) utilisées pour l'interpolation.
+     * Les valeurs sont volontairement réduites entre 10 et 25 blocs.
+     */
+    private val bowPitchTable = arrayOf(
+        10f to 0.0f,
+        12f to 0.35f,
+        14f to 0.8f,
+        16f to 1.1f,
+        20f to 1.8f,
+        24f to 2.6f,
+        28f to 3.7f,
+        32f to 5.0f
+    )
+
     private fun bowPitchComp(distance: Float): Float {
-        return when {
-            distance < 10f  -> 0.0f
-            distance < 12f  -> 0.5f
-            distance < 14f  -> 1.0f
-            distance < 16f  -> 1.2f   // était ~1.5
-            distance < 20f  -> 1.9f   // était ~2.3
-            distance < 24f  -> 2.7f   // était ~3.2
-            distance < 28f  -> 4.2f   // léger -0.3
-            else            -> 5.6f
+        if (distance <= bowPitchTable[0].first) return bowPitchTable[0].second
+
+        for (i in 0 until bowPitchTable.size - 1) {
+            val (d1, p1) = bowPitchTable[i]
+            val (d2, p2) = bowPitchTable[i + 1]
+
+            if (distance <= d2) {
+                val t = (distance - d1) / (d2 - d1)
+                return p1 + t * (p2 - p1)
+            }
         }
+
+        return bowPitchTable.last().second
     }
     // --------------------------------------------
 
