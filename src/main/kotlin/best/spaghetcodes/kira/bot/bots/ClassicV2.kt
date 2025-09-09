@@ -610,7 +610,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         // =======================  ROD  ===========================
-        if (shotsFired == 0 && distance > 5f) return
         // Priorité : adversaire immobile à MID (5–7) => spam rod contrôlé
         val oppHasBow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
         val bowLikelyNowClose = oppHasBow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded) && distance <= 10.0f
