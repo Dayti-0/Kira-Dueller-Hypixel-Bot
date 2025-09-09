@@ -108,8 +108,15 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
             // tracking ON en continu
             Mouse.startTracking()
 
-            // auto-CPS OFF
-            Mouse.stopLeftAC()
+            val held = mc.thePlayer.heldItem
+            val holdingWeapon = held != null && (held.unlocalizedName.lowercase().contains("sword") || held.unlocalizedName.lowercase().contains("axe"))
+            val shouldAttack = !Mouse.isUsingProjectile() && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !Mouse.rClickDown &&
+                    holdingWeapon && distance <= 3.5f
+            if (shouldAttack) {
+                Mouse.startLeftAC()
+            } else {
+                Mouse.stopLeftAC()
+            }
 
             if (distance > 8.8f) {
                 if (opponent() != null && opponent()!!.heldItem != null && opponent()!!.heldItem.unlocalizedName.lowercase().contains("bow")) {
