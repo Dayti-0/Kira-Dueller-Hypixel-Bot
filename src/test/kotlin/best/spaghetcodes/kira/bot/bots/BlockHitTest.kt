@@ -13,6 +13,12 @@ import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.item.ItemStack
 import kotlin.test.*
 
+private fun invokeOnAttack(bot: BotBase) {
+    val method = BotBase::class.java.getDeclaredMethod("onAttack")
+    method.isAccessible = true
+    method.invoke(bot)
+}
+
 class BlockHitTest {
 
     @BeforeTest
@@ -49,14 +55,14 @@ class BlockHitTest {
     @Test
     fun blitzOnAttackTriggersLeftClick() {
         val bot = Blitz()
-        bot.onAttack()
+        invokeOnAttack(bot)
         verify(exactly = 1) { Mouse.leftClick() }
     }
 
     @Test
     fun boxingOnAttackTriggersLeftClick() {
         val bot = Boxing()
-        bot.onAttack()
+        invokeOnAttack(bot)
         verify(exactly = 1) { Mouse.leftClick() }
     }
 
@@ -76,7 +82,7 @@ class BlockHitTest {
         field.isAccessible = true
         field.set(bot, opp)
 
-        bot.onAttack()
+        invokeOnAttack(bot)
         verify(exactly = 1) { Mouse.leftClick() }
     }
 }
