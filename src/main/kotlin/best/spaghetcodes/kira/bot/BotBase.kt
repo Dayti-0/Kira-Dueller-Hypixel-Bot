@@ -2,6 +2,11 @@ package best.spaghetcodes.kira.bot
 
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.player.*
+import best.spaghetcodes.kira.bot.bots.Blitz
+import best.spaghetcodes.kira.bot.bots.Classic
+import best.spaghetcodes.kira.bot.bots.ClassicV2
+import best.spaghetcodes.kira.bot.bots.Combo
+import best.spaghetcodes.kira.bot.bots.OP
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.utils.*
 import com.google.gson.JsonArray
@@ -130,6 +135,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 combo++
                                 opponentCombo = 0
                                 ticksSinceHit = 0
+                                tryHitAndBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
                                 combo = 0
@@ -239,6 +245,20 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                     }
                 }
             }
+        }
+    }
+
+    private fun tryHitAndBlock() {
+        val cfg = kira.config ?: return
+        if (cfg.enableHits != true || cfg.enableHitAndBlock != true) return
+        val bot = kira.bot
+        if (bot !is Classic && bot !is ClassicV2 && bot !is Combo && bot !is OP && bot !is Blitz) return
+        val held = mc.thePlayer?.heldItem
+        if (held?.unlocalizedName?.lowercase()?.contains("sword") != true) return
+        val chance = cfg.hitAndBlockChance
+        if (chance <= 0) return
+        if (RandomUtils.randomIntInRange(1, 100) <= chance) {
+            Mouse.rClick(RandomUtils.randomIntInRange(40, 80))
         }
     }
 
