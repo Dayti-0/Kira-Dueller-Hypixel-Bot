@@ -1,5 +1,6 @@
 package best.spaghetcodes.kira.bot.bots
 
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.features.Bow
 import best.spaghetcodes.kira.bot.features.MovePriority
@@ -372,11 +373,15 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         if (!p.isSprinting) Movement.startSprinting()
         Mouse.startTracking()
-        Mouse.stopLeftAC()
-
         val now = System.currentTimeMillis()
         updateRodAccuracyHeuristic(now)
         val distance = EntityUtils.getDistanceNoY(p, opp)
+        val attackDist = kira.config?.maxDistanceAttack?.toFloat() ?: 5f
+        if (distance <= attackDist && !Mouse.isUsingProjectile()) {
+            Mouse.startLeftAC()
+        } else {
+            Mouse.stopLeftAC()
+        }
         val approaching = (prevDistance > 0f) && (prevDistance - distance >= 0.15f)
 
         val projectileActive =
