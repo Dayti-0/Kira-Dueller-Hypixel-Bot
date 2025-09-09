@@ -55,7 +55,7 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
     @Property(type = PropertyType.SWITCH, name = "Enable Hit & Block", description = "After a hit, briefly block with the sword.", category = "Combat")
     var enableHitAndBlock = false
 
-    @Property(type = PropertyType.SLIDER, name = "Hit & Block Chance", description = "Chance in percent to block after a hit.", category = "Combat", min = 0, max = 100)
+    @Property(type = PropertyType.SLIDER, name = "Hit & Block Chance", description = "Chance in percent to block after a hit.", category = "Combat", min = 0, max = 100, increment = 5)
     var hitAndBlockChance = 0
 
     @Property(type = PropertyType.SLIDER, name = "Min CPS", description = "The minimum CPS that the bot will be clicking at.", category = "Combat", min = 0, max = 25)
