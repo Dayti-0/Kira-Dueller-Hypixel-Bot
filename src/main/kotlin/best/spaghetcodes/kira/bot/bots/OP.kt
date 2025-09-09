@@ -48,6 +48,17 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
         Movement.startSprinting()
         Movement.startForward()
         TimeUtils.setTimeout(Movement::startJumping, RandomUtils.randomIntInRange(400, 1200))
+
+        useSplashPotion(speedDamage, false, false)
+        speedPotsLeft--
+        lastSpeedUse = System.currentTimeMillis()
+
+        TimeUtils.setTimeout({
+            useSplashPotion(regenDamage, false, false)
+            regenPotsLeft--
+            lastRegenUse = System.currentTimeMillis()
+        }, RandomUtils.randomIntInRange(800, 1200))
+
         Mouse.stopLeftAC()
     }
 
