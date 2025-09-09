@@ -185,6 +185,8 @@ object Mouse {
             var rotations = EntityUtils.getRotations(kira.mc.thePlayer, kira.bot?.opponent(), false)
 
             if (rotations != null) {
+                val distance = EntityUtils.getDistanceNoY(kira.mc.thePlayer, kira.bot?.opponent()!!)
+
                 if (_runningAway) {
                     if (runningRotations == null) {
                         runningRotations = rotations
@@ -200,13 +202,15 @@ object Mouse {
                     _usingProjectile &&
                     kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("pearl") == true
                 ) {
-                    val dist = EntityUtils.getDistanceNoY(kira.mc.thePlayer, kira.bot?.opponent()!!)
-                    rotations[1] -= dist * 0.8f
+                    rotations[1] -= distance * 0.8f
                 }
 
                 val lookRand = (kira.config?.lookRand ?: 0).toDouble()
-                var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + RandomUtils.randomDoubleInRange(-lookRand, lookRand)).toFloat()
-                var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + RandomUtils.randomDoubleInRange(-lookRand, lookRand)).toFloat()
+                val minDist = (kira.config?.lookRandMinDistance ?: 5).toFloat()
+                val randYaw = if (distance >= minDist) RandomUtils.randomDoubleInRange(-lookRand, lookRand) else 0.0
+                val randPitch = if (distance >= minDist) RandomUtils.randomDoubleInRange(-lookRand, lookRand) else 0.0
+                var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
+                var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
 
                 // Compensation de pitch quand l'arc est bandé
                 val bowOffset =
@@ -216,7 +220,7 @@ object Mouse {
                     else 0f
                 dpitch -= bowOffset
 
-                val factor = when (EntityUtils.getDistanceNoY(kira.mc.thePlayer, kira.bot?.opponent()!!)) {
+                val factor = when (distance) {
                     in 0f..10f -> 1.0f
                     in 10f..20f -> 0.6f
                     in 20f..30f -> 0.4f

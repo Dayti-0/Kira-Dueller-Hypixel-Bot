@@ -73,6 +73,9 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
     @Property(type = PropertyType.DECIMAL_SLIDER, name = "Look Randomization", description = "Random offset added to view movement.", category = "Combat", minF = 0f, maxF = 2f)
     var lookRand = 0.3f
 
+    @Property(type = PropertyType.NUMBER, name = "Look Rand Min Distance", description = "Minimum distance for look randomization.", category = "Combat", min = 0, max = 20, increment = 1)
+    var lookRandMinDistance = 5
+
     @Property(type = PropertyType.NUMBER, name = "Max Look Distance", description = "Max distance for tracking.", category = "Combat", min = 10, max = 200, increment = 5)
     var maxDistanceLook = 150
 
