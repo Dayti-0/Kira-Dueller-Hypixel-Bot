@@ -63,8 +63,11 @@ object Mouse {
             kira.mc.thePlayer != null &&
             !kira.mc.thePlayer.isUsingItem
         ) {
+            leftClickDur = 2
             kira.mc.thePlayer.swingItem()
-            KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, true)
+            val key = kira.mc.gameSettings.keyBindAttack.keyCode
+            KeyBinding.setKeyBindState(key, true)
+            KeyBinding.onTick(key)
             if (kira.mc.objectMouseOver != null && kira.mc.objectMouseOver.entityHit != null) {
                 kira.mc.playerController.attackEntity(kira.mc.thePlayer, kira.mc.objectMouseOver.entityHit)
             }
@@ -168,6 +171,8 @@ object Mouse {
         if (kira.mc.thePlayer != null && kira.bot?.toggled() == true) {
             if (leftAC) leftACFunc()
             if (leftClickDur > 0) {
+                val key = kira.mc.gameSettings.keyBindAttack.keyCode
+                KeyBinding.onTick(key)
                 leftClickDur--
             } else {
                 KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, false)
