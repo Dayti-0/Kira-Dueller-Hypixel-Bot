@@ -186,6 +186,7 @@ object Mouse {
 
             if (rotations != null) {
                 val distance = EntityUtils.getDistanceNoY(kira.mc.thePlayer, kira.bot?.opponent()!!)
+                val closeCombat = distance <= 3.5f
 
                 if (_runningAway) {
                     if (runningRotations == null) {
@@ -216,6 +217,10 @@ object Mouse {
                 else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
                 var randPitch = if (isBowAiming) 0.0
                 else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
+                if (closeCombat) {
+                    randYaw = 0.0
+                    randPitch = 0.0
+                }
                 var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
                 var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
 
