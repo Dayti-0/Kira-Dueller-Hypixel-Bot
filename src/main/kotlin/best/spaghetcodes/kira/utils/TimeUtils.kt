@@ -1,17 +1,20 @@
 package best.spaghetcodes.kira.utils
 
 import net.minecraft.client.Minecraft
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
+import net.minecraftforge.fml.common.gameevent.TickEvent
+import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
+import java.util.concurrent.CopyOnWriteArrayList
 
 object TimeUtils {
 
-    private val scheduler = Executors.newSingleThreadScheduledExecutor()
+    private class ScheduledTask(var nextRun: Long, val interval: Long?, val function: () -> Unit)
 
-    class Task internal constructor(private val future: ScheduledFuture<*>) {
+    private val tasks = CopyOnWriteArrayList<ScheduledTask>()
+
+    class Task internal constructor(private val scheduled: ScheduledTask) {
         fun cancel() {
-            future.cancel(false)
+            tasks.remove(scheduled)
         }
     }
 
@@ -19,31 +22,34 @@ object TimeUtils {
      * Call a function after delay ms
      */
     fun setTimeout(function: () -> Unit, delay: Int): Task? {
-        return try {
-            val future = scheduler.schedule({
-                Minecraft.getMinecraft().addScheduledTask(function)
-            }, delay.toLong(), TimeUnit.MILLISECONDS)
-            Task(future)
-        } catch (e: Exception) {
-            println("Error scheduling timeout with ${delay}ms: " + e.message)
-            null
-        }
+        val task = ScheduledTask(System.currentTimeMillis() + delay, null, function)
+        tasks.add(task)
+        return Task(task)
     }
 
     /**
      * Call a function every interval ms after delay ms
      */
     fun setInterval(function: () -> Unit, delay: Int, interval: Int): Task? {
-        return try {
-            val future = scheduler.scheduleAtFixedRate({
-                Minecraft.getMinecraft().addScheduledTask(function)
-            }, delay.toLong(), interval.toLong(), TimeUnit.MILLISECONDS)
-            Task(future)
-        } catch (e: Exception) {
-            println(
-                "Error scheduling interval with ${delay}ms delay and ${interval}ms interval: " + e.message
-            )
-            null
+        val task = ScheduledTask(System.currentTimeMillis() + delay, interval.toLong(), function)
+        tasks.add(task)
+        return Task(task)
+    }
+
+    @SubscribeEvent
+    fun onClientTick(event: ClientTickEvent) {
+        if (event.phase != TickEvent.Phase.END) return
+
+        val now = System.currentTimeMillis()
+        for (task in tasks) {
+            if (task.nextRun <= now) {
+                Minecraft.getMinecraft().addScheduledTask(task.function)
+                if (task.interval != null) {
+                    task.nextRun = now + task.interval
+                } else {
+                    tasks.remove(task)
+                }
+            }
         }
     }
 }
