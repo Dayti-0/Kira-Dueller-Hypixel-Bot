@@ -142,20 +142,16 @@ object EntityUtils {
             val diffPitch = MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
             val smoothing = 3f
 
-            if (crossHairDistance(yaw, pitch, player) > 5f) {
-                if (raw) {
-                    floatArrayOf(
-                        diffYaw / smoothing,
-                        diffPitch / smoothing
-                    )
-                } else floatArrayOf(
+            if (raw) {
+                floatArrayOf(
+                    diffYaw / smoothing,
+                    diffPitch / smoothing
+                )
+            } else {
+                floatArrayOf(
                     player.rotationYaw + diffYaw / smoothing,
                     player.rotationPitch + diffPitch / smoothing
                 )
-            } else {
-                if (raw) {
-                    floatArrayOf(0f, 0f)
-                } else floatArrayOf(player.rotationYaw, player.rotationPitch)
             }
         }
     }

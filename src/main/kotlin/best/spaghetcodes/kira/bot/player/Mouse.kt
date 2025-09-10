@@ -202,7 +202,14 @@ object Mouse {
             var rotations = EntityUtils.getRotations(kira.mc.thePlayer, kira.bot?.opponent(), false)
 
             if (rotations != null) {
-                val distance = EntityUtils.getDistanceNoY(kira.mc.thePlayer, kira.bot?.opponent()!!)
+                val player = kira.mc.thePlayer!!
+                val smoothing = 3f
+                val targetYaw = player.rotationYaw + (rotations[0] - player.rotationYaw) * smoothing
+                val targetPitch = player.rotationPitch + (rotations[1] - player.rotationPitch) * smoothing
+                if (EntityUtils.crossHairDistance(targetYaw, targetPitch, player) <= 6f) {
+                    return
+                }
+                val distance = EntityUtils.getDistanceNoY(player, kira.bot?.opponent()!!)
                 val closeCombat = distance <= 3.5f
 
                 if (_runningAway) {
