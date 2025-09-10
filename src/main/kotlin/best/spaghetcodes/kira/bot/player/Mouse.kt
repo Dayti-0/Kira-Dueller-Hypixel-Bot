@@ -221,15 +221,17 @@ object Mouse {
                     randYaw = 0.0
                     randPitch = 0.0
                 }
-                var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
-                var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
 
-                if (abs(dyaw) < 0.5f && abs(dpitch) < 0.5f) {
+                val exactYaw = rotations[0] - kira.mc.thePlayer.rotationYaw
+                val exactPitch = rotations[1] - kira.mc.thePlayer.rotationPitch
+
+                if (abs(exactYaw) < 0.5f && abs(exactPitch) < 0.5f) {
                     randYaw = 0.0
                     randPitch = 0.0
-                    dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
-                    dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
                 }
+
+                var dyaw = (exactYaw + randYaw).toFloat()
+                var dpitch = (exactPitch + randPitch).toFloat()
 
                 // Compensation de pitch quand l'arc est bandé
                 val bowOffset = if (isBowAiming) bowPitchComp(bowDistanceToOpponent()) else 0f
