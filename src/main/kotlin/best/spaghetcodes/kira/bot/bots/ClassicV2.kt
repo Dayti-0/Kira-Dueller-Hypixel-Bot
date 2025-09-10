@@ -177,6 +177,15 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var closeStrafeToggleAt = 0L
     // --------------------------------------------------
 
+    private fun computeCloseStrafeNext(distance: Float): Long {
+        val range = when {
+            distance < 1.4f -> 340..480
+            distance < 2.0f -> 280..420
+            else -> 220..340
+        }
+        return RandomUtils.randomIntInRange(range.first, range.last).toLong()
+    }
+
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
         Mouse.startTracking()
@@ -831,35 +840,42 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
             // ======= Close-range strafe logic (< 2.6 blocs) =======
             if (distance < 2.6f) {
-                // Sélection/renouvèlement du mode
                 if (now >= closeStrafeNextAt) {
-                    val roll = RandomUtils.randomIntInRange(0, 99)
-                    closeStrafeMode = when {
-                        roll < 50 -> MODE_BURST              // 50% très rapide
-                        roll < 75 -> MODE_HOLD_LEFT          // 25% maintien gauche
-                        else     -> MODE_HOLD_RIGHT          // 25% maintien droit
-                    }
-                    closeStrafeNextAt = now + when (closeStrafeMode) {
-                        MODE_BURST -> RandomUtils.randomIntInRange(280, 420).toLong()
-                        else       -> RandomUtils.randomIntInRange(220, 340).toLong()
-                    }
-                    if (closeStrafeMode == MODE_BURST) {
-                        closeStrafeToggleAt = now + RandomUtils.randomIntInRange(60, 110)
+                    closeStrafeMode = if (distance < 1.8f) {
+                        if (RandomUtils.randomBool()) MODE_HOLD_LEFT else MODE_HOLD_RIGHT
                     } else {
-                        strafeDir = if (closeStrafeMode == MODE_HOLD_LEFT) -1 else 1
+                        val roll = RandomUtils.randomIntInRange(0, 99)
+                        when {
+                            roll < 50 -> MODE_BURST
+                            roll < 75 -> MODE_HOLD_LEFT
+                            else -> MODE_HOLD_RIGHT
+                        }
                     }
-                } else if (closeStrafeMode == MODE_BURST && now >= closeStrafeToggleAt) {
+                    closeStrafeNextAt = now + computeCloseStrafeNext(distance)
+                    if (closeStrafeMode == MODE_BURST) {
+                        closeStrafeToggleAt = now + RandomUtils.randomIntInRange(150, 220)
+                    } else {
+                        val newDir = if (closeStrafeMode == MODE_HOLD_LEFT) -1 else 1
+                        if (newDir != strafeDir && now - lastStrafeSwitch >= 150) {
+                            strafeDir = newDir
+                            lastStrafeSwitch = now
+                        } else {
+                            strafeDir = newDir
+                        }
+                    }
+                } else if (closeStrafeMode == MODE_BURST && now >= closeStrafeToggleAt && now - lastStrafeSwitch >= 150) {
                     strafeDir = -strafeDir
-                    closeStrafeToggleAt = now + RandomUtils.randomIntInRange(60, 110)
+                    lastStrafeSwitch = now
+                    closeStrafeToggleAt = now + RandomUtils.randomIntInRange(150, 220)
                 }
 
-                // Poids et mouvement
                 val weightClose = 4
                 if (strafeDir < 0) movePriority[0] += weightClose else movePriority[1] += weightClose
                 Movement.startForward()
                 Movement.startSprinting()
                 randomStrafe = false
             } else {
+                closeStrafeNextAt = 0L
                 // ======= Medium/long range =======
                 if (distance < 6.5f && now - lastStrafeSwitch > RandomUtils.randomIntInRange(820, 1100)) {
                     strafeDir = -strafeDir
