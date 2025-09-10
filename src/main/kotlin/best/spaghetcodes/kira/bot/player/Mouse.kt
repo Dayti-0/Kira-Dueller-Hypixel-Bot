@@ -212,12 +212,19 @@ object Mouse {
                 else ((distance - minDist) / (maxDist - minDist)).coerceIn(0f, 1f)
                 val isBowAiming = rClickDown &&
                     kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("bow") == true
-                val randYaw = if (isBowAiming) 0.0
+                var randYaw = if (isBowAiming) 0.0
                 else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
-                val randPitch = if (isBowAiming) 0.0
+                var randPitch = if (isBowAiming) 0.0
                 else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
                 var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
                 var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
+
+                if (abs(dyaw) < 0.5f && abs(dpitch) < 0.5f) {
+                    randYaw = 0.0
+                    randPitch = 0.0
+                    dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
+                    dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
+                }
 
                 // Compensation de pitch quand l'arc est bandé
                 val bowOffset = if (isBowAiming) bowPitchComp(bowDistanceToOpponent()) else 0f
