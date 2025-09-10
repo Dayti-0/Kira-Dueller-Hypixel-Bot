@@ -10,6 +10,7 @@ import best.spaghetcodes.kira.core.Config
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.gui.StatsOverlay
 import best.spaghetcodes.kira.events.packet.PacketListener
+import best.spaghetcodes.kira.utils.TimeUtils
 import com.google.gson.Gson
 import net.minecraft.client.Minecraft
 import net.minecraftforge.common.MinecraftForge
@@ -59,6 +60,7 @@ class kira {
         MinecraftForge.EVENT_BUS.register(LobbyMovement)
         MinecraftForge.EVENT_BUS.register(KeyBindings)
         MinecraftForge.EVENT_BUS.register(StatsOverlay())
+        MinecraftForge.EVENT_BUS.register(TimeUtils)
 
         // Utilise l’accès typé -> aucun Any ici.
         val idx = config?.currentBot ?: 0
