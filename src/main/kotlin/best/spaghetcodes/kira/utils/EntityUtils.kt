@@ -138,29 +138,19 @@ object EntityUtils {
             val dist = MathHelper.sqrt_double(diffX * diffX + diffZ * diffZ).toDouble()
             val yaw = (Math.atan2(diffZ, diffX) * 180.0 / 3.141592653589793).toFloat() - 90.0f
             val pitch = (-(Math.atan2(diffY, dist) * 180.0 / 3.141592653589793)).toFloat()
+            val diffYaw = MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)
+            val diffPitch = MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
+            val smoothing = 2f
 
-            if ((crossHairDistance(yaw, pitch, player) > 6 || dist in 2.5..4.0) || Mouse.isUsingProjectile() || Mouse.isUsingPotion()) {
-                if (raw) {
-                    floatArrayOf(
-                        MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw),
-                        MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
-                    )
-                } else floatArrayOf(
-                    player.rotationYaw + MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw),
-                    player.rotationPitch + MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
+            if (raw) {
+                floatArrayOf(
+                    diffYaw / smoothing,
+                    diffPitch / smoothing
                 )
-            } else {
-                if (raw) {
-                    floatArrayOf(
-                        0F, 0F
-                    )
-                } else {
-                    floatArrayOf(
-                        player.rotationYaw,
-                        player.rotationPitch
-                    )
-                }
-            }
+            } else floatArrayOf(
+                player.rotationYaw + diffYaw / smoothing,
+                player.rotationPitch + diffPitch / smoothing
+            )
         }
     }
 
