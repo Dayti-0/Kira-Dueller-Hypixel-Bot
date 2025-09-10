@@ -28,6 +28,8 @@ object Mouse {
 
     private var splashAim = 0.0
 
+    private var aimBlockTicks = 0
+
     // ---- Bow ballistic compensation (pitch) ----
     private fun bowDistanceToOpponent(): Float {
         val p = kira.mc.thePlayer ?: return 0f
@@ -133,6 +135,10 @@ object Mouse {
         return _runningAway
     }
 
+    fun blockAim(ticks: Int) {
+        aimBlockTicks = ticks
+    }
+
     private fun leftACFunc() {
         if (kira.bot?.toggled() == true && kira.config?.enableHits == true && leftAC) {
             if (!kira.mc.thePlayer.isUsingItem) {
@@ -181,6 +187,10 @@ object Mouse {
             }
         }
         if (kira.mc.thePlayer != null && kira.bot?.toggled() == true && tracking && kira.bot?.opponent() != null) {
+            if (aimBlockTicks > 0) {
+                aimBlockTicks--
+                return
+            }
             if (rClickDown &&
                 kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("bow") == true
             ) {
@@ -239,6 +249,10 @@ object Mouse {
 
                 var dyaw = (exactYaw + randYaw).toFloat()
                 var dpitch = (exactPitch + randPitch).toFloat()
+
+                if (abs(exactYaw) < 2f) {
+                    dyaw /= 3f
+                }
 
                 // Compensation de pitch quand l'arc est bandé
                 val bowOffset = if (isBowAiming) bowPitchComp(bowDistanceToOpponent()) else 0f
