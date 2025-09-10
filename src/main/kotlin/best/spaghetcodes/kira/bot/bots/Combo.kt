@@ -36,7 +36,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private var consumingUntil = 0L
     private var lastFarJumpAt = 0L
     private var strafeDir = 1
-    private var closeStrafeToggleAt = 0L
+    private var closeStrafeNextAt = 0L
+    private var lastCloseStrafeSwitch = 0L
     private var lockLeftAC = false
     private var lockLeftACSince = 0L
     private var tapping = false
@@ -45,6 +46,14 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private val strengthPeriodMs = 294_000L
     private val gapPeriodMs = 26_000L
     private fun isConsuming(): Boolean = System.currentTimeMillis() < consumingUntil
+
+    private fun computeCloseStrafeDelay(distance: Float): Long {
+        return when {
+            distance < 1.4f -> 340L
+            distance < 2.0f -> 260L
+            else -> 200L
+        }
+    }
 
     enum class ArmorEnum { BOOTS, LEGGINGS, CHESTPLATE, HELMET }
     private var armor = hashMapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1)
@@ -540,20 +549,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             } else {
                 if (distance < 2.6f) {
                     val nowMs = System.currentTimeMillis()
-                    if (nowMs >= closeStrafeToggleAt) {
+                    if (nowMs >= closeStrafeNextAt && nowMs - lastCloseStrafeSwitch >= 150) {
                         strafeDir = -strafeDir
-                        closeStrafeToggleAt = nowMs + RandomUtils.randomIntInRange(40, 90)
-                        val tapDuration = RandomUtils.randomIntInRange(40, 80)
-                        if (strafeDir < 0) {
-                            Combat.aTap(tapDuration)
-                        } else {
-                            Combat.dTap(tapDuration)
-                        }
+                        lastCloseStrafeSwitch = nowMs
+                        closeStrafeNextAt = nowMs + computeCloseStrafeDelay(distance)
+                    } else if (closeStrafeNextAt == 0L) {
+                        closeStrafeNextAt = nowMs + computeCloseStrafeDelay(distance)
                     }
                     val weightClose = 6
                     if (strafeDir < 0) movePriority[0] += weightClose else movePriority[1] += weightClose
                     randomStrafe = false
                 } else {
+                    closeStrafeNextAt = 0L
                     if (distance < 4f && combo > 2) {
                         val rotations = EntityUtils.getRotations(target, player, false)
                         if (rotations != null) {
