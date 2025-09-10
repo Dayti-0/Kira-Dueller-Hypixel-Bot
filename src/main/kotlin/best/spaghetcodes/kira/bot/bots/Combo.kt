@@ -288,7 +288,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         lastFarJumpAt = 0L
 
         strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
-        closeStrafeToggleAt = 0L
+        closeStrafeNextAt = 0L
 
         lockLeftAC = false
         lockLeftACSince = 0L
