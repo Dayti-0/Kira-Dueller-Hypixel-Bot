@@ -140,6 +140,7 @@ object Movement {
             stopRight()
             startLeft()
         }
+        Mouse.blockAim(RandomUtils.randomIntInRange(1, 2))
     }
 
     fun forward(): Boolean {
