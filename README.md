@@ -65,11 +65,12 @@ Optimisé pour la 1.8.9, il combine **mécaniques de combat** avancées, **autom
 ### 🎯 Combat Intelligent
 - **Smart Aim** — visée prédictive avec compensation de latence  
 - **Smart Strafe** — *(en cours de dev)*  
-- **W-Tap optimisé** — timings de recul et d’engage  
+- **W-Tap optimisé** — timings de recul et d’engage
 - **Combo System** — enchaînements intelligents
+- **Distance-based Look Randomization** — moins de jitter à courte portée, effet complet à longue distance
 
 ### 🛡️ Sécurité & Furtivité
-- **Anti-détection**  
+- **Anti-détection**
 - **Randomisation** des actions (human-like)
 - **Masquage** dans la liste des mods
 
@@ -109,6 +110,8 @@ Combat:
   Lobby Movement: true
   Fast Requeue: true
 ```
+
+> Par défaut, la randomisation démarre à 5 blocs et atteint son effet maximal à 15 blocs.
 
 ---
 

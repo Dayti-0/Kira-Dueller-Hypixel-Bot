@@ -207,8 +207,11 @@ object Mouse {
 
                 val lookRand = (kira.config?.lookRand ?: 0).toDouble()
                 val minDist = (kira.config?.lookRandMinDistance ?: 5).toFloat()
-                val randYaw = if (distance >= minDist) RandomUtils.randomDoubleInRange(-lookRand, lookRand) else 0.0
-                val randPitch = if (distance >= minDist) RandomUtils.randomDoubleInRange(-lookRand, lookRand) else 0.0
+                val maxDist = (kira.config?.lookRandMaxDistance ?: 15).toFloat()
+                val scale = if (maxDist <= minDist) 1f
+                else ((distance - minDist) / (maxDist - minDist)).coerceIn(0f, 1f)
+                val randYaw = RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
+                val randPitch = RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
                 var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
                 var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
 
