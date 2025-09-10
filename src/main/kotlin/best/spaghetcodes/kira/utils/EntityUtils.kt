@@ -53,8 +53,6 @@ object EntityUtils {
         return if (target == null || player == null) {
             null
         } else {
-            // Always calculate yaw and pitch toward the target regardless of
-            // crosshair distance.
             val pos: Vec3?
             if (center) {
                 pos = Vec3(target.posX, target.posY + target.eyeHeight, target.posZ)
@@ -142,18 +140,30 @@ object EntityUtils {
             val pitch = (-(Math.atan2(diffY, dist) * 180.0 / 3.141592653589793)).toFloat()
             val diffYaw = MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)
             val diffPitch = MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
-            val smoothing = 2f
+            val smoothing = 3f
 
-            if (raw) {
-                floatArrayOf(
-                    diffYaw / smoothing,
-                    diffPitch / smoothing
+            if (crossHairDistance(yaw, pitch, player) > 5f) {
+                if (raw) {
+                    floatArrayOf(
+                        diffYaw / smoothing,
+                        diffPitch / smoothing
+                    )
+                } else floatArrayOf(
+                    player.rotationYaw + diffYaw / smoothing,
+                    player.rotationPitch + diffPitch / smoothing
                 )
-            } else floatArrayOf(
-                player.rotationYaw + diffYaw / smoothing,
-                player.rotationPitch + diffPitch / smoothing
-            )
+            } else {
+                if (raw) {
+                    floatArrayOf(0f, 0f)
+                } else floatArrayOf(player.rotationYaw, player.rotationPitch)
+            }
         }
+    }
+
+    fun crossHairDistance(yaw: Float, pitch: Float, player: EntityPlayer): Float {
+        val nYaw = abs(player.rotationYaw - yaw)
+        val nPitch = abs(player.rotationPitch - pitch)
+        return MathHelper.sqrt_float(nYaw * nYaw + nPitch * nPitch)
     }
 
     fun getDistanceNoY(player: EntityPlayer?, target: Entity?): Float {
