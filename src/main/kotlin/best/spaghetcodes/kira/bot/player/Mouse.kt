@@ -37,21 +37,20 @@ object Mouse {
 
     /**
      * Décalage vertical en degrés à appliquer quand l'arc est bandé.
-     * Adouci à courte portée (tests terrain) ; full draw 1.8.9.
+     * Jusqu'à ~30 blocs aucune élévation n'est nécessaire ; au-delà,
+     * la visée monte progressivement suivant la distance pour compenser
+     * la chute de flèche (full draw 1.8.9).
      * (pitch positif = on regarde vers le bas, donc on SOUSTRAIT l'offset)
-     *
-     * Ajustement: mid-range 15–25 blocs un peu **moins haut**.
      */
     private fun bowPitchComp(distance: Float): Float {
         return when {
-            distance < 10f  -> 0.0f
-            distance < 12f  -> 0.5f
-            distance < 14f  -> 1.0f
-            distance < 16f  -> 1.2f   // était ~1.5
-            distance < 20f  -> 1.9f   // était ~2.3
-            distance < 24f  -> 2.7f   // était ~3.2
-            distance < 28f  -> 4.2f   // léger -0.3
-            else            -> 5.6f
+            distance < 30f -> 0.0f
+            distance < 35f -> 0.6f
+            distance < 40f -> 1.2f
+            distance < 50f -> 2.0f
+            distance < 60f -> 3.0f
+            distance < 70f -> 4.2f
+            else           -> 5.6f
         }
     }
     // --------------------------------------------
