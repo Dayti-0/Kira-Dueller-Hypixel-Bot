@@ -70,11 +70,14 @@ class Config : Vigilant(File(kira.configLocation).apply { parentFile.mkdirs() },
     @Property(type = PropertyType.NUMBER, name = "Vertical Look Speed", description = "Vertical look speed.", category = "Combat", min = 1, max = 50, increment = 1)
     var lookSpeedVertical = 5
 
-    @Property(type = PropertyType.DECIMAL_SLIDER, name = "Look Randomization", description = "Random offset added to view movement.", category = "Combat", minF = 0f, maxF = 2f)
+    @Property(type = PropertyType.DECIMAL_SLIDER, name = "Look Randomization", description = "Maximum random offset added to view movement (scaled by distance).", category = "Combat", minF = 0f, maxF = 2f)
     var lookRand = 0.3f
 
-    @Property(type = PropertyType.NUMBER, name = "Look Rand Min Distance", description = "Minimum distance for look randomization.", category = "Combat", min = 0, max = 20, increment = 1)
+    @Property(type = PropertyType.NUMBER, name = "Look Rand Min Distance", description = "Distance where look randomization begins.", category = "Combat", min = 0, max = 20, increment = 1)
     var lookRandMinDistance = 5
+
+    @Property(type = PropertyType.NUMBER, name = "Look Rand Max Distance", description = "Distance where look randomization reaches full strength.", category = "Combat", min = 5, max = 40, increment = 1)
+    var lookRandMaxDistance = 15
 
     @Property(type = PropertyType.NUMBER, name = "Max Look Distance", description = "Max distance for tracking.", category = "Combat", min = 10, max = 200, increment = 5)
     var maxDistanceLook = 150
