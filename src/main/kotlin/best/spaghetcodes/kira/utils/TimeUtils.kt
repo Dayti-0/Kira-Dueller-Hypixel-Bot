@@ -1,6 +1,5 @@
 package best.spaghetcodes.kira.utils
 
-import net.minecraft.client.Minecraft
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
@@ -43,7 +42,7 @@ object TimeUtils {
         val now = System.currentTimeMillis()
         for (task in tasks) {
             if (task.nextRun <= now) {
-                Minecraft.getMinecraft().addScheduledTask(task.function)
+                task.function()
                 if (task.interval != null) {
                     task.nextRun = now + task.interval
                 } else {
