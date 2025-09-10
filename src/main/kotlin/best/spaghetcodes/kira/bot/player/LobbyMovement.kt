@@ -7,14 +7,13 @@ import best.spaghetcodes.kira.utils.TimeUtils
 import best.spaghetcodes.kira.utils.WorldUtils
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
-import java.util.Timer
 
 object LobbyMovement {
 
     private var tickYawChange = 0f
     private var initialYaw = 0f
     private var lastDirectionChange = 0L
-    private var intervals: ArrayList<Timer?> = ArrayList()
+    private var intervals: ArrayList<TimeUtils.Task?> = ArrayList()
 
     fun sumo() {
         /*val opt = RandomUtils.randomIntInRange(0, 1)

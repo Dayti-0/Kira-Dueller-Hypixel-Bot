@@ -11,7 +11,6 @@ import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
-import java.util.*
 import kotlin.math.abs
 
 class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
@@ -31,7 +30,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
     }
 
     private var tapping = false
-    private var fishTimer: Timer? = null
+    private var fishTimer: TimeUtils.Task? = null
 
     override fun onGameStart() {
         Movement.startSprinting()

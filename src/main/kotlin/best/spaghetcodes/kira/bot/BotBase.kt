@@ -36,7 +36,6 @@ import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToSe
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent
 import java.math.RoundingMode
 import java.text.DecimalFormat
-import java.util.Timer
 import kotlin.concurrent.thread
 
 open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
@@ -57,14 +56,14 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var playersLost: ArrayList<String> = arrayListOf()
 
     private var opponent: EntityPlayer? = null
-    private var opponentTimer: Timer? = null
+    private var opponentTimer: TimeUtils.Task? = null
     private var calledFoundOpponent = false
 
     protected var combo = 0
     protected var opponentCombo = 0
     protected var ticksSinceHit = 0
 
-    private var reconnectTimer: Timer? = null
+    private var reconnectTimer: TimeUtils.Task? = null
 
     private var ticksSinceGameStart = 0
 
