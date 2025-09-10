@@ -237,25 +237,28 @@ object Mouse {
                 else ((distance - minDist) / (maxDist - minDist)).coerceIn(0f, 1f)
                 val isBowAiming = rClickDown &&
                     kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("bow") == true
-                var randYaw = if (isBowAiming) 0.0
-                else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
-                var randPitch = if (isBowAiming) 0.0
-                else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
-                if (closeCombat) {
-                    randYaw = 0.0
-                    randPitch = 0.0
-                }
 
                 val exactYaw = rotations[0] - kira.mc.thePlayer.rotationYaw
                 val exactPitch = rotations[1] - kira.mc.thePlayer.rotationPitch
 
-                if (abs(exactYaw) < 0.5f && abs(exactPitch) < 0.5f) {
-                    randYaw = 0.0
-                    randPitch = 0.0
-                }
+                var dyaw: Float
+                var dpitch: Float
 
-                var dyaw = (exactYaw + randYaw).toFloat()
-                var dpitch = (exactPitch + randPitch).toFloat()
+                if (abs(exactYaw) < 0.5f && abs(exactPitch) < 0.5f) {
+                    dyaw = exactYaw
+                    dpitch = exactPitch
+                } else {
+                    var randYaw = if (isBowAiming) 0.0
+                    else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
+                    var randPitch = if (isBowAiming) 0.0
+                    else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
+                    if (closeCombat) {
+                        randYaw = 0.0
+                        randPitch = 0.0
+                    }
+                    dyaw = (exactYaw + randYaw).toFloat()
+                    dpitch = (exactPitch + randPitch).toFloat()
+                }
 
                 if (abs(exactYaw) < 2f) {
                     dyaw /= 3f
