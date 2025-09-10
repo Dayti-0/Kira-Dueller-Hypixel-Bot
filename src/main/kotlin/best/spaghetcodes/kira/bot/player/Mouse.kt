@@ -60,7 +60,6 @@ object Mouse {
         if (
             kira.bot?.toggled() == true &&
             kira.config?.enableHits == true &&
-            kira.config?.enableKiraHit == true &&
             kira.mc.thePlayer != null &&
             !kira.mc.thePlayer.isUsingItem
         ) {
