@@ -82,7 +82,8 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
 
             val held = mc.thePlayer.heldItem
             val holdingWeapon = held != null && !held.unlocalizedName.lowercase().contains("bow") && !held.unlocalizedName.lowercase().contains("rod")
-            val shouldAttack = !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
+            val shouldAttack = kira.config?.enableHits == true &&
+                    !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
                     holdingWeapon && distance <= 3.5f
             if (shouldAttack) {
                 Mouse.startLeftAC()

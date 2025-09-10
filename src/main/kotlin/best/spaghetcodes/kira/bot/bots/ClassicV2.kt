@@ -492,7 +492,8 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         val held = p.heldItem
         val holdingWeapon = held != null && (held.unlocalizedName.lowercase().contains("sword") || held.unlocalizedName.lowercase().contains("axe"))
-        val shouldAttack = !projectileActive && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
+        val shouldAttack = kira.config?.enableHits == true &&
+                !projectileActive && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
                 holdingWeapon && distance <= 3.5f
         if (shouldAttack) {
             Mouse.startLeftAC()

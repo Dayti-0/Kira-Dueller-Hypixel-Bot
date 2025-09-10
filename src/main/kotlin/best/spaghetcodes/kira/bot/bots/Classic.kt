@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import best.spaghetcodes.kira.utils.ChatUtils
 import net.minecraft.init.Blocks
@@ -290,7 +291,8 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         val held = p.heldItem
         val holdingWeapon = held != null && (held.unlocalizedName.lowercase().contains("sword") || held.unlocalizedName.lowercase().contains("axe"))
-        val shouldAttack = !projectileActive && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
+        val shouldAttack = kira.config?.enableHits == true &&
+                !projectileActive && !Mouse.isUsingPotion() && !Mouse.isRunningAway() && !Mouse.rClickDown &&
                 holdingWeapon && distance <= 3.5f
         if (shouldAttack) {
             Mouse.startLeftAC()

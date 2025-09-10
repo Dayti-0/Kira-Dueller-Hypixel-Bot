@@ -5,6 +5,7 @@ import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
@@ -149,7 +150,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                 && !isHitselecting && approaching
                 && distance <= prefireFastApproachDist && distance > attackStartDist)
 
-        if (inAttackLatch || inPrefire) {
+        if (kira.config?.enableHits == true && (inAttackLatch || inPrefire)) {
             val latch = if (inPrefire) prefireLatchMs else attackLatchMs
             keepACUntil = now + latch
             Mouse.startLeftAC()
