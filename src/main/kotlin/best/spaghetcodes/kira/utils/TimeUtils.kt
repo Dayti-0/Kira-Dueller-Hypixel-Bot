@@ -7,7 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 object TimeUtils {
 
-    private class ScheduledTask(var nextRun: Long, val interval: Long?, val function: () -> Unit)
+    internal class ScheduledTask(var nextRun: Long, val interval: Long?, val function: () -> Unit)
 
     private val tasks = CopyOnWriteArrayList<ScheduledTask>()
 
