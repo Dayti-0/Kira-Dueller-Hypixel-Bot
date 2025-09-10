@@ -60,6 +60,7 @@ object Mouse {
         if (
             kira.bot?.toggled() == true &&
             kira.config?.enableHits == true &&
+            kira.config?.enableKiraHit == true &&
             kira.mc.thePlayer != null &&
             !kira.mc.thePlayer.isUsingItem
         ) {
@@ -134,7 +135,7 @@ object Mouse {
     }
 
     private fun leftACFunc() {
-        if (kira.bot?.toggled() == true && kira.config?.enableHits == true && leftAC) {
+        if (kira.bot?.toggled() == true && kira.config?.enableHits == true && kira.config?.enableKiraHit == true && leftAC) {
             if (!kira.mc.thePlayer.isUsingItem) {
                 val minCPS = kira.config?.minCPS ?: 10
                 val maxCPS = kira.config?.maxCPS ?: 14
@@ -170,12 +171,14 @@ object Mouse {
     fun onTick(event: TickEvent.ClientTickEvent) {
         if (kira.mc.thePlayer != null && kira.bot?.toggled() == true) {
             if (leftAC) leftACFunc()
-            if (leftClickDur > 0) {
-                val key = kira.mc.gameSettings.keyBindAttack.keyCode
-                KeyBinding.onTick(key)
-                leftClickDur--
-            } else {
-                KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, false)
+            if (kira.config?.enableKiraHit == true) {
+                if (leftClickDur > 0) {
+                    val key = kira.mc.gameSettings.keyBindAttack.keyCode
+                    KeyBinding.onTick(key)
+                    leftClickDur--
+                } else {
+                    KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, false)
+                }
             }
         }
         if (kira.mc.thePlayer != null && kira.bot?.toggled() == true && tracking && kira.bot?.opponent() != null) {
