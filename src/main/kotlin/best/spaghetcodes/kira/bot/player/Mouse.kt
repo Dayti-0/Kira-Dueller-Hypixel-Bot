@@ -210,17 +210,17 @@ object Mouse {
                 val maxDist = (kira.config?.lookRandMaxDistance ?: 15).toFloat()
                 val scale = if (maxDist <= minDist) 1f
                 else ((distance - minDist) / (maxDist - minDist)).coerceIn(0f, 1f)
-                val randYaw = RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
-                val randPitch = RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
+                val isBowAiming = rClickDown &&
+                    kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("bow") == true
+                val randYaw = if (isBowAiming) 0.0
+                else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
+                val randPitch = if (isBowAiming) 0.0
+                else RandomUtils.randomDoubleInRange(-lookRand, lookRand) * scale
                 var dyaw = ((rotations[0] - kira.mc.thePlayer.rotationYaw) + randYaw).toFloat()
                 var dpitch = ((rotations[1] - kira.mc.thePlayer.rotationPitch) + randPitch).toFloat()
 
                 // Compensation de pitch quand l'arc est bandé
-                val bowOffset =
-                    if (rClickDown &&
-                        kira.mc.thePlayer?.heldItem?.unlocalizedName?.lowercase()?.contains("bow") == true
-                    ) bowPitchComp(bowDistanceToOpponent())
-                    else 0f
+                val bowOffset = if (isBowAiming) bowPitchComp(bowDistanceToOpponent()) else 0f
                 dpitch -= bowOffset
 
                 val factor = when (distance) {
