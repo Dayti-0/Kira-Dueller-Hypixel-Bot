@@ -53,6 +53,8 @@ object EntityUtils {
         return if (target == null || player == null) {
             null
         } else {
+            // Always calculate yaw and pitch toward the target regardless of
+            // crosshair distance.
             val pos: Vec3?
             if (center) {
                 pos = Vec3(target.posX, target.posY + target.eyeHeight, target.posZ)
@@ -152,12 +154,6 @@ object EntityUtils {
                 player.rotationPitch + diffPitch / smoothing
             )
         }
-    }
-
-    fun crossHairDistance(yaw: Float, pitch: Float, player: EntityPlayer): Float {
-        val nYaw = abs(player.rotationYaw - yaw)
-        val nPitch = abs(player.rotationPitch - pitch)
-        return MathHelper.sqrt_float(nYaw * nYaw + nPitch * nPitch)
     }
 
     fun getDistanceNoY(player: EntityPlayer?, target: Entity?): Float {
