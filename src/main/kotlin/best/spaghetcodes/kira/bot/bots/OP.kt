@@ -61,7 +61,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
             val player = mc.thePlayer
             if (opp != null && player != null) {
                 val dist = EntityUtils.getDistanceNoY(player, opp)
-                if (dist >= 6f) {
+                if (dist >= 7f) {
                     check?.cancel()
                     useSplashPotion(damage, false, EntityUtils.entityFacingAway(player, opp))
                     TimeUtils.setTimeout({ retreating = false }, RandomUtils.randomIntInRange(900, 1100))
@@ -183,6 +183,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
                 System.currentTimeMillis() - lastSpeedUse > 15000 &&
                 System.currentTimeMillis() - lastPotion > 3500) {
                 if (speedPotsLeft == 2) {
+                    Movement.startForward()
+                    Movement.startSprinting()
                     Movement.startJumping()
                     useSplashPotion(speedDamage, distance < 3.5f, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
                     speedPotsLeft--
@@ -192,12 +194,14 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
                         check = TimeUtils.setInterval({
                             if (!Mouse.isUsingPotion()) {
                                 check?.cancel()
+                                Movement.startForward()
+                                Movement.startSprinting()
                                 Movement.startJumping()
                                 TimeUtils.setTimeout({
                                     useSplashPotion(regenDamage, false, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
                                     regenPotsLeft--
                                     lastRegenUse = System.currentTimeMillis()
-                                }, RandomUtils.randomIntInRange(150, 300))
+                                }, RandomUtils.randomIntInRange(400, 600))
                             }
                         }, 0, 50)
                     }
