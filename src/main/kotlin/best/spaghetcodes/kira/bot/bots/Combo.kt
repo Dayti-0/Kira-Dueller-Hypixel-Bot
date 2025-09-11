@@ -4,6 +4,7 @@ import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.features.Gap
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Potion
+import best.spaghetcodes.kira.bot.features.HitBlock
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
@@ -18,7 +19,7 @@ import net.minecraft.init.Items
 import net.minecraft.potion.Potion as MCPotion
 import net.minecraft.util.Vec3
 
-class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
+class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion, HitBlock {
 
     // ---- State ----
     private var gameStartAt = 0L

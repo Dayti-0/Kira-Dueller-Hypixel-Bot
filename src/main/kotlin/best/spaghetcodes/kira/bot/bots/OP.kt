@@ -12,7 +12,7 @@ import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 
-class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
+class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, HitBlock {
 
     override fun getName(): String = "OP"
 

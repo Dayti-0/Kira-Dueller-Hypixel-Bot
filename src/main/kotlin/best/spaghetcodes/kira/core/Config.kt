@@ -72,6 +72,30 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     @Property(type = PropertyType.SWITCH, name = "Kira Hit", description = "Automatically attack opponents.", category = "Combat")
     var kiraHit = true
 
+    @Property(type = PropertyType.SWITCH, name = "Hit & Block", description = "Briefly block after successful sword hits.", category = "Combat")
+    var hitBlock = false
+
+    @Property(
+        type = PropertyType.SELECTOR,
+        name = "Hit & Block Mode",
+        description = "How Hit & Block triggers.",
+        category = "Combat",
+        options = ["Chance", "Cooldown Hits"]
+    )
+    var hitBlockMode = 0
+
+    @Property(type = PropertyType.NUMBER, name = "Hit & Block Min Interval", description = "Minimum interval between Hit & Block actions (ms).", category = "Combat", min = 0, max = 2000, increment = 10)
+    var hitBlockMinInterval = 0
+
+    @Property(type = PropertyType.NUMBER, name = "Hit & Block Chance", description = "Percentage chance for Hit & Block when in Chance mode.", category = "Combat", min = 0, max = 100, increment = 1)
+    var hitBlockChance = 0
+
+    @Property(type = PropertyType.NUMBER, name = "Hit & Block Min Hits", description = "Minimum successful hits before Hit & Block when in Cooldown mode.", category = "Combat", min = 1, max = 10, increment = 1)
+    var hitBlockMinHits = 2
+
+    @Property(type = PropertyType.NUMBER, name = "Hit & Block Max Hits", description = "Maximum successful hits before Hit & Block when in Cooldown mode.", category = "Combat", min = 1, max = 10, increment = 1)
+    var hitBlockMaxHits = 4
+
     @Property(type = PropertyType.SWITCH, name = "Enable AutoGG", description = "Send a gg message after every game", category = "AutoGG")
     var sendAutoGG = true
 

@@ -299,6 +299,31 @@ class CustomConfigGUI : GuiScreen() {
         number("Max Attack Distance", x, y, { cfg.maxDistanceAttack }, { cfg.maxDistanceAttack = it }, 3, 6, 1); y += 20
         toggle("Kira Hit", x, y, { cfg.kiraHit }, { cfg.kiraHit = it }); y += 24
 
+        toggle("Hit & Block", x, y, { cfg.hitBlock }, { cfg.hitBlock = it }); y += 24
+        selector(
+            "H&B Mode",
+            x,
+            y,
+            { cfg.hitBlockMode },
+            { cfg.hitBlockMode = it },
+            listOf("Chance", "Cooldown Hits")
+        );
+        y += 24
+        number(
+            "H&B Min Interval (ms)",
+            x,
+            y,
+            { cfg.hitBlockMinInterval },
+            { cfg.hitBlockMinInterval = it },
+            0,
+            2000,
+            10
+        );
+        y += 20
+        number("H&B Chance (%)", x, y, { cfg.hitBlockChance }, { cfg.hitBlockChance = it }, 0, 100, 1); y += 20
+        number("H&B Min Hits", x, y, { cfg.hitBlockMinHits }, { cfg.hitBlockMinHits = it }, 1, 10, 1); y += 20
+        number("H&B Max Hits", x, y, { cfg.hitBlockMaxHits }, { cfg.hitBlockMaxHits = it }, 1, 10, 1); y += 24
+
         // Option Boxing Fish dans l’onglet Combat
         toggle("Boxing: Use Fish", x, y, { cfg.boxingFish }, { cfg.boxingFish = it }); y += 20
 

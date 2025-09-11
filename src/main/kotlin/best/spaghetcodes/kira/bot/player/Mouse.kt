@@ -63,15 +63,15 @@ object Mouse {
     // --------------------------------------------
 
     fun leftClick() {
+        val mc = kira.mc
+        val player = mc.thePlayer ?: return
         if (kira.bot?.toggled() == true &&
             kira.config?.kiraHit == true &&
-            kira.mc.thePlayer != null &&
-            !kira.mc.thePlayer.isUsingItem) {
-            kira.mc.thePlayer.swingItem()
-            KeyBinding.setKeyBindState(kira.mc.gameSettings.keyBindAttack.keyCode, true)
-            if (kira.mc.objectMouseOver != null && kira.mc.objectMouseOver.entityHit != null) {
-                kira.mc.playerController.attackEntity(kira.mc.thePlayer, kira.mc.objectMouseOver.entityHit)
-            }
+            !player.isUsingItem) {
+            val target = mc.objectMouseOver?.entityHit ?: return
+            player.swingItem()
+            KeyBinding.setKeyBindState(mc.gameSettings.keyBindAttack.keyCode, true)
+            mc.playerController.attackEntity(player, target)
         }
     }
 

@@ -3,6 +3,9 @@ package best.spaghetcodes.kira.bot
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.player.*
 import best.spaghetcodes.kira.core.KeyBindings
+import best.spaghetcodes.kira.core.Config
+import best.spaghetcodes.kira.bot.bots.*
+import best.spaghetcodes.kira.bot.features.HitBlock
 import best.spaghetcodes.kira.utils.*
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -21,6 +24,7 @@ import net.minecraft.network.play.server.S19PacketEntityStatus
 import net.minecraft.network.play.server.S3EPacketTeams
 import net.minecraft.network.play.server.S45PacketTitle
 import net.minecraft.util.EnumChatFormatting
+import net.minecraft.item.ItemSword
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.event.entity.EntityJoinWorldEvent
 import net.minecraftforge.event.entity.player.AttackEntityEvent
@@ -58,6 +62,12 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     protected var combo = 0
     protected var opponentCombo = 0
     protected var ticksSinceHit = 0
+
+    // Hit & Block state
+    private var hbNextAllowedAt = 0L
+    private var hbHitsSince = 0
+    private var hbTargetHits = 0
+    private var hbLastHitAt = 0L
 
     private var reconnectTimer: Timer? = null
 
@@ -117,6 +127,54 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     // ----------------------------------------------------
 
+    private fun performHitBlock(now: Long, cfg: Config) {
+        val dur = RandomUtils.randomIntInRange(40, 80)
+        val delay = RandomUtils.randomIntInRange(0, 20)
+        TimeUtils.setTimeout({ Mouse.rClick(dur) }, delay)
+        val interval = (cfg.hitBlockMinInterval + RandomUtils.randomIntInRange(-20, 20)).coerceAtLeast(0)
+        hbNextAllowedAt = now + interval
+    }
+
+    private fun maybeHitBlock() {
+        val cfg = kira.config ?: return
+        if (!cfg.hitBlock) return
+        if (this !is HitBlock) return
+        val player = mc.thePlayer ?: return
+        val opp = opponent ?: return
+        if (EntityUtils.getDistanceNoY(player, opp) > 4f) return
+        val item = player.heldItem?.item
+        if (item !is ItemSword) return
+
+        val now = System.currentTimeMillis()
+        val allowed = now >= hbNextAllowedAt
+
+        when (cfg.hitBlockMode) {
+            0 -> { // Chance
+                if (allowed && cfg.hitBlockChance > 0 && RandomUtils.randomIntInRange(1, 100) <= cfg.hitBlockChance) {
+                    performHitBlock(now, cfg)
+                }
+            }
+            1 -> { // Cooldown hits
+                if (now - hbLastHitAt > 2000) {
+                    hbHitsSince = 0
+                    hbTargetHits = 0
+                }
+                hbHitsSince++
+                if (allowed) {
+                    if (hbTargetHits == 0) {
+                        hbTargetHits = RandomUtils.randomIntInRange(cfg.hitBlockMinHits, cfg.hitBlockMaxHits)
+                    }
+                    if (hbHitsSince >= hbTargetHits) {
+                        performHitBlock(now, cfg)
+                        hbHitsSince = 0
+                        hbTargetHits = 0
+                    }
+                }
+            }
+        }
+        hbLastHitAt = now
+    }
+
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
             when (packet) {
@@ -130,6 +188,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 combo++
                                 opponentCombo = 0
                                 ticksSinceHit = 0
+                                maybeHitBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
                                 combo = 0
@@ -444,6 +503,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
+        hbNextAllowedAt = 0L
+        hbHitsSince = 0
+        hbTargetHits = 0
+        hbLastHitAt = 0L
     }
 
     private fun gameStart() {

@@ -2,6 +2,7 @@ package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.features.MovePriority
+import best.spaghetcodes.kira.bot.features.HitBlock
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
@@ -11,7 +12,7 @@ import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 
-class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
+class Blitz : BotBase("/play duels_blitz_duel"), MovePriority, HitBlock {
 
     override fun getName(): String = "Blitz"
 

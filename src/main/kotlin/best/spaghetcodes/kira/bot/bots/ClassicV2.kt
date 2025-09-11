@@ -4,6 +4,7 @@ import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.features.Bow
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Rod
+import best.spaghetcodes.kira.bot.features.HitBlock
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
@@ -16,7 +17,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
+class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority, HitBlock {
 
     override fun getName(): String = "ClassicV2"
 
