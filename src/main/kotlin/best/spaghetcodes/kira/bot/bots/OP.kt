@@ -11,7 +11,6 @@ import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
-import java.util.Random
 
 class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
 
@@ -42,9 +41,41 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
     override var lastPotion = 0L
     override var lastGap = 0L
 
+    private var gameStartAt = 0L
+    private var retreating = false
+
     var tapping = false
 
+    private fun retreatAndSplash(damage: Int, onComplete: () -> Unit) {
+        retreating = true
+        Mouse.stopLeftAC()
+        Mouse.setUsingProjectile(false)
+        Mouse.setRunningAway(true)
+        Movement.startForward()
+        Movement.startSprinting()
+        Movement.startJumping()
+
+        var check: java.util.Timer? = null
+        check = TimeUtils.setInterval({
+            val opp = opponent()
+            val player = mc.thePlayer
+            if (opp != null && player != null) {
+                val dist = EntityUtils.getDistanceNoY(player, opp)
+                if (dist >= 6f) {
+                    check?.cancel()
+                    useSplashPotion(damage, false, EntityUtils.entityFacingAway(player, opp))
+                    TimeUtils.setTimeout({ retreating = false }, RandomUtils.randomIntInRange(900, 1100))
+                    onComplete()
+                }
+            } else {
+                check?.cancel()
+                retreating = false
+            }
+        }, 0, 50)
+    }
+
     override fun onGameStart() {
+        gameStartAt = System.currentTimeMillis()
         Mouse.startTracking()                 // tracking ON
         Movement.startSprinting()
         Movement.startForward()
@@ -67,6 +98,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
         lastRegenUse = 0L
         lastPotion = 0L
         lastGap = 0L
+        gameStartAt = 0L
+        retreating = false
 
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
@@ -113,7 +146,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
             // tracking ON en continu
             Mouse.startTracking()
 
-            if (kira.config?.kiraHit == true) {
+            if (kira.config?.kiraHit == true && !retreating) {
                 Mouse.startLeftAC()
             } else {
                 Mouse.stopLeftAC()
@@ -149,27 +182,49 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
             if (!hasSpeed && speedPotsLeft > 0 &&
                 System.currentTimeMillis() - lastSpeedUse > 15000 &&
                 System.currentTimeMillis() - lastPotion > 3500) {
-                useSplashPotion(speedDamage, distance < 3.5f, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
-                speedPotsLeft--
-                lastSpeedUse = System.currentTimeMillis()
+                if (speedPotsLeft == 2) {
+                    Movement.startJumping()
+                    useSplashPotion(speedDamage, distance < 3.5f, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
+                    speedPotsLeft--
+                    lastSpeedUse = System.currentTimeMillis()
+                    if (regenPotsLeft == 2) {
+                        var check: java.util.Timer? = null
+                        check = TimeUtils.setInterval({
+                            if (!Mouse.isUsingPotion()) {
+                                check?.cancel()
+                                Movement.startJumping()
+                                TimeUtils.setTimeout({
+                                    useSplashPotion(regenDamage, false, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
+                                    regenPotsLeft--
+                                    lastRegenUse = System.currentTimeMillis()
+                                }, RandomUtils.randomIntInRange(150, 300))
+                            }
+                        }, 0, 50)
+                    }
+                } else {
+                    retreatAndSplash(speedDamage) {
+                        speedPotsLeft--
+                        lastSpeedUse = System.currentTimeMillis()
+                    }
+                }
             }
 
             if (WorldUtils.blockInFront(mc.thePlayer, 3f, 1.5f) != Blocks.air) {
                 Mouse.setRunningAway(false)
             }
 
+            val now = System.currentTimeMillis()
             if (((distance > 3f && mc.thePlayer.health < 12) || mc.thePlayer.health < 9) &&
                 combo < 2 && mc.thePlayer.health <= opponent()!!.health) {
                 if (!Mouse.isUsingProjectile() && !Mouse.isRunningAway() && !Mouse.isUsingPotion() &&
-                    System.currentTimeMillis() - lastPotion > 3500) {
-                    if (regenPotsLeft > 0 && System.currentTimeMillis() - lastRegenUse > 3500) {
-                        useSplashPotion(regenDamage, distance < 2f, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
-                        regenPotsLeft--
-                        lastRegenUse = System.currentTimeMillis()
-                    } else if (regenPotsLeft == 0 && System.currentTimeMillis() - lastRegenUse > 4000) {
-                        if (gapsLeft > 0 && System.currentTimeMillis() - lastGap > 4000) {
-                            useGap(distance, distance < 2f, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
-                            gapsLeft--
+                    now - lastPotion > 3500) {
+                    if (gapsLeft > 0 && now - lastGap > 4000) {
+                        useGap(distance, distance < 2f, EntityUtils.entityFacingAway(mc.thePlayer, opponent()!!))
+                        gapsLeft--
+                    } else if (regenPotsLeft > 0 && now - gameStartAt >= 120000 && now - lastRegenUse > 3500) {
+                        retreatAndSplash(regenDamage) {
+                            regenPotsLeft--
+                            lastRegenUse = System.currentTimeMillis()
                         }
                     }
                 }
