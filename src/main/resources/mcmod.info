@@ -11,7 +11,7 @@
             "Nix"
         ],
         "credits": "HumanDuck23",
-        "logoFile": "src/main/resources/logo.png",
+        "logoFile": "logo.png",
         "screenshots": [],
         "dependencies": []
     }
