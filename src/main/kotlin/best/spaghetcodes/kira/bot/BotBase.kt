@@ -64,6 +64,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
 
+    protected var statKeys: Map<String, String> = emptyMap()
+
     fun opponent() = opponent
 
     open fun getName(): String = "Base"
@@ -77,7 +79,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     protected open fun onFoundOpponent() {}
     protected open fun onTick() {}
 
-    protected fun setStatKeys(keys: Map<String, String>) {}
+    protected fun setStatKeys(keys: Map<String, String>) {
+        statKeys = keys
+    }
 
     // -------- Résultat via résumé & kill (FR/EN) --------
 
@@ -199,6 +203,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                             Triple(p, me, false)
                                         }
 
+                                    lastOpponentName = if (iWon) loser else winner
                                     resultCounted = true
                                     ChatUtils.info(Session.getSession())
 
@@ -315,9 +320,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
             // Fallback résultat via résumé (FR/EN)
             if (!resultCounted && (unformatted.contains("GAGNANT") || unformatted.contains("WINNER"))) {
-                parseWinnerFromSummary(unformatted)?.let { (winner, _) ->
+                parseWinnerFromSummary(unformatted)?.let { (winner, loser) ->
                     val me = mc.thePlayer.gameProfile.name
                     val iWon = winner.equals(me, ignoreCase = true)
+                    lastOpponentName = if (iWon) loser else winner
                     if (iWon) {
                         Session.wins++
                     } else {
@@ -330,9 +336,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
             // Secours immédiat : ligne de kill (FR/EN)
             if (!resultCounted) {
-                parseKillLine(unformatted)?.let { (winner, _) ->
+                parseKillLine(unformatted)?.let { (winner, loser) ->
                     val me = mc.thePlayer.gameProfile.name
                     val iWon = winner.equals(me, ignoreCase = true)
+                    lastOpponentName = if (iWon) loser else winner
                     if (iWon) {
                         Session.wins++
                     } else {

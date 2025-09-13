@@ -5,6 +5,7 @@ import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.RandomUtils
 import best.spaghetcodes.kira.utils.TimeUtils
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
+import net.minecraftforge.fml.common.gameevent.TickEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
 import java.util.*
 import kotlin.math.PI
@@ -81,6 +82,7 @@ object LobbyMovement {
         // Remplace l’ancien “snap 180°” par un DEMI-CERCLE lissé, même intervalle 7000/7000
         intervals.add(TimeUtils.setInterval(fun() {
             val p = kira.mc.thePlayer ?: return@setInterval
+            p.rotationPitch = 0f
 
             // alterner droite/gauche
             ffTurnRight = !ffTurnRight
@@ -331,6 +333,7 @@ object LobbyMovement {
 
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent) {
+        if (event.phase != TickEvent.Phase.END) return
         if (!canActivateAndRunAnyMovement()) {
             if (activeMovementType != null) stop()
             return
