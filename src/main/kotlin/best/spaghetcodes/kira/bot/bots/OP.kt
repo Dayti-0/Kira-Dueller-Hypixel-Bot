@@ -345,27 +345,48 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
         }
     }
 
-    // =====================  GAP (AUCUN retrait, AUCUNE rotation forcée) =====================
-    private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean) {
-        val now = System.currentTimeMillis()
-        if (eatingGap || now < lastGap + MIN_GAP_INTERVAL_MS) return
+    // =====================  GAP (retour et rod avant de consommer) =====================
+    private fun eatGoldenApple(distance: Float, facingAway: Boolean) {
+        val start = System.currentTimeMillis()
+        if (eatingGap || start < lastGap + MIN_GAP_INTERVAL_MS) return
 
         eatingGap = true
         Mouse.stopLeftAC()
         Mouse.setUsingProjectile(false)
 
-        // On ne tourne pas, on ne recule pas : on mange en place selon la logique PV.
-        useGap(distance, close, facingAway)
-        gapsLeft--
-        lastGap = now
-        gapLockUntil = now + MIN_GAP_INTERVAL_MS
+        // Reculer puis donner un coup de canne avec un maintien légèrement prolongé
+        retreating = true
+        Movement.stopForward()
+        Movement.startBackward()
+
+        val rodHold = RandomUtils.randomIntInRange(260, 300)
+        Mouse.setUsingProjectile(true)
+        Inventory.setInvItem("rod")
+        Mouse.rClick(RandomUtils.randomIntInRange(70, 95))
 
         TimeUtils.setTimeout({
-            eatingGap = false
-            if (!Mouse.isUsingProjectile() && !Mouse.isUsingPotion()) {
-                Inventory.setInvItem("sword")
-            }
-        }, RandomUtils.randomIntInRange(2400, 2800))
+            Inventory.setInvItem("sword")
+            Mouse.setUsingProjectile(false)
+
+            // Consommer directement sans activer le mode "runningAway" du Gap
+            useGap(distance, false, facingAway)
+            gapsLeft--
+            lastGap = System.currentTimeMillis()
+            gapLockUntil = lastGap + MIN_GAP_INTERVAL_MS
+
+            val finishDelay = RandomUtils.randomIntInRange(2400, 2800)
+            TimeUtils.setTimeout({
+                Movement.stopBackward()
+                if (!tapping) Movement.startForward()
+                retreating = false
+                eatingGap = false
+                Mouse.startTracking()
+                if (kira.config?.kiraHit == true) Mouse.startLeftAC()
+                if (!Mouse.isUsingProjectile() && !Mouse.isUsingPotion()) {
+                    Inventory.setInvItem("sword")
+                }
+            }, finishDelay)
+        }, rodHold + RandomUtils.randomIntInRange(180, 260))
     }
 
     // =====================  LIFECYCLE  =====================
@@ -381,6 +402,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
         Combat.stopRandomStrafe()
         allowStrafing = false
 
+        retreating = false
+        eatingGap = false
         takingPotion = false
         aimFreezeUntil = 0L
 
@@ -533,8 +556,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
 
             if (!allowStrafing && hasSpeed && hasRegen) allowStrafing = true
 
-            // Tracking caméra
-            if (retreating || takingPotion || now < aimFreezeUntil) Mouse.stopTracking() else Mouse.startTracking()
+            // Tracking caméra (ne le couper que pour les potions)
+            if ((retreating && !eatingGap) || takingPotion || now < aimFreezeUntil) Mouse.stopTracking() else Mouse.startTracking()
 
             if (kira.config?.kiraHit == true && !retreating && !eatingGap && !takingPotion) Mouse.startLeftAC() else Mouse.stopLeftAC()
 
@@ -593,7 +616,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
                     !eatingGap && !takingPotion && now - lastPotion > 3500) {
 
                     if (gapsLeft > 0 && now >= gapLockUntil) {
-                        eatGoldenApple(distance, distance < 2f, EntityUtils.entityFacingAway(p, opp))
+                        eatGoldenApple(distance, EntityUtils.entityFacingAway(p, opp))
                     } else if (regenPotsLeft > 0 && now - gameStartAt >= 120000 && now - lastRegenUse > 3500) {
                         retreatAndSplash(regenDamage) {
                             regenPotsLeft--
