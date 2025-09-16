@@ -14,7 +14,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, Flint {
+class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap {
 
     override fun getName(): String = "OP"
 
@@ -38,8 +38,6 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     var speedPotsLeft = 2
     var regenPotsLeft = 2
     var gapsLeft = 6
-
-    override var flintUses = 4
 
     var lastSpeedUse = 0L
     var lastRegenUse = 0L
@@ -447,82 +445,70 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             Movement.startBackward()
         }
 
-        fun startEatingSequence() {
-            var eatingStarted = false
-            var decremented = false
+        // 1) Essai "standard" via helper
+        var eatingStarted = false
+        var decremented = false
 
-            fun ensureHoldingGap(): Boolean {
-                val held = p.heldItem?.unlocalizedName?.lowercase() ?: ""
-                if (held.contains("apple")) return true
-                // essaie plusieurs alias
-                return Inventory.setInvItem("gold") ||
-                       Inventory.setInvItem("gap") ||
-                       Inventory.setInvItem("gapple") ||
-                       Inventory.setInvItem("apple") ||
-                       Inventory.setInvItem("golden_apple")
-            }
+        fun ensureHoldingGap(): Boolean {
+            val held = p.heldItem?.unlocalizedName?.lowercase() ?: ""
+            if (held.contains("apple")) return true
+            // essaie plusieurs alias
+            return Inventory.setInvItem("gold") ||
+                   Inventory.setInvItem("gap") ||
+                   Inventory.setInvItem("gapple") ||
+                   Inventory.setInvItem("apple") ||
+                   Inventory.setInvItem("golden_apple")
+        }
 
-            fun tryStartEat(forceHoldMs: Int? = null, after: (() -> Unit)? = null) {
-                val okSelect = ensureHoldingGap()
-                if (okSelect) {
-                    // Si le helper interne ne tient pas le clic droit, on le force
-                    val hold = forceHoldMs ?: RandomUtils.randomIntInRange(1700, 1900)
-                    if (!Mouse.rClickDown) {
-                        Mouse.rClick(hold)
+        fun tryStartEat(forceHoldMs: Int? = null, after: (() -> Unit)? = null) {
+            val okSelect = ensureHoldingGap()
+            if (okSelect) {
+                // Si le helper interne ne tient pas le clic droit, on le force
+                val hold = forceHoldMs ?: RandomUtils.randomIntInRange(1700, 1900)
+                if (!Mouse.rClickDown) {
+                    Mouse.rClick(hold)
+                }
+                TimeUtils.setTimeout({
+                    if (!isUsingItemSafe(p) && !Mouse.rClickDown) {
+                        // on force une 2e fois (sélection + hold)
+                        ensureHoldingGap()
+                        Mouse.rClick(RandomUtils.randomIntInRange(1700, 1900))
                     }
-                    TimeUtils.setTimeout({
-                        if (!isUsingItemSafe(p) && !Mouse.rClickDown) {
-                            // on force une 2e fois (sélection + hold)
-                            ensureHoldingGap()
-                            Mouse.rClick(RandomUtils.randomIntInRange(1700, 1900))
-                        }
-                        after?.invoke()
-                    }, RandomUtils.randomIntInRange(90, 130))
-                } else {
                     after?.invoke()
+                }, RandomUtils.randomIntInRange(90, 130))
+            } else {
+                after?.invoke()
+            }
+        }
+
+        // Appel initial au helper du mixin (peut sélectionner + cliquer selon l'implémentation)
+        useGap(distance, false, facingAway)
+
+        // 2) Vérification after a short delay : si pas en train d'eat -> on force manuellement
+        TimeUtils.setTimeout({
+            eatingStarted = isUsingItemSafe(p)
+            if (!eatingStarted) {
+                // fallback manuel fiable
+                tryStartEat(forceHoldMs = RandomUtils.randomIntInRange(1700, 1900)) {
+                    eatingStarted = isUsingItemSafe(p)
                 }
             }
+        }, RandomUtils.randomIntInRange(90, 130))
 
-            // Appel initial au helper du mixin (peut sélectionner + cliquer selon l'implémentation)
-            useGap(distance, false, facingAway)
+        // 3) Confirmation + bookkeeping SEULEMENT si ça a démarré
+        TimeUtils.setTimeout({
+            eatingStarted = eatingStarted || isUsingItemSafe(p)
 
-            // 2) Vérification after a short delay : si pas en train d'eat -> on force manuellement
-            TimeUtils.setTimeout({
-                eatingStarted = isUsingItemSafe(p)
-                if (!eatingStarted) {
-                    // fallback manuel fiable
-                    tryStartEat(forceHoldMs = RandomUtils.randomIntInRange(1700, 1900)) {
-                        eatingStarted = isUsingItemSafe(p)
-                    }
+            if (eatingStarted) {
+                // On ne décrémente et ne verrouille qu'une fois sûr que ça mange
+                if (!decremented) {
+                    gapsLeft = max(0, gapsLeft - 1)
+                    lastGap = System.currentTimeMillis()
+                    gapLockUntil = lastGap + MIN_GAP_INTERVAL_MS
+                    decremented = true
                 }
-            }, RandomUtils.randomIntInRange(90, 130))
 
-            // 3) Confirmation + bookkeeping SEULEMENT si ça a démarré
-            TimeUtils.setTimeout({
-                eatingStarted = eatingStarted || isUsingItemSafe(p)
-
-                if (eatingStarted) {
-                    // On ne décrémente et ne verrouille qu'une fois sûr que ça mange
-                    if (!decremented) {
-                        gapsLeft = max(0, gapsLeft - 1)
-                        lastGap = System.currentTimeMillis()
-                        gapLockUntil = lastGap + MIN_GAP_INTERVAL_MS
-                        decremented = true
-                    }
-
-                    waitUntilFinishedEating(maxWaitMs = 2600) {
-                        if (close) {
-                            Movement.stopBackward()
-                            if (wasForward) Movement.startForward()
-                        }
-                        eatingGap = false
-                        if (Mouse.rClickDown) Mouse.rClickUp()
-                        if (!Mouse.isUsingProjectile() && !Mouse.isUsingPotion()) {
-                            Inventory.setInvItem("sword")
-                        }
-                    }
-                } else {
-                    // Échec de démarrage : rollback propre, pas de décrément, reprise combat
+                waitUntilFinishedEating(maxWaitMs = 2600) {
                     if (close) {
                         Movement.stopBackward()
                         if (wasForward) Movement.startForward()
@@ -533,45 +519,19 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                         Inventory.setInvItem("sword")
                     }
                 }
-            }, RandomUtils.randomIntInRange(240, 320))
-        }
-
-        performPreGapAction(distance, close) {
-            startEatingSequence()
-        }
-    }
-
-    private fun performPreGapAction(distance: Float, close: Boolean, onComplete: () -> Unit) {
-        val canUseFlint = flintUses > 0 && Inventory.hasItem("flintandsteel")
-        if (canUseFlint && (close || distance <= 3.8f)) {
-            useFlint(distance) {
-                onComplete()
+            } else {
+                // Échec de démarrage : rollback propre, pas de décrément, reprise combat
+                if (close) {
+                    Movement.stopBackward()
+                    if (wasForward) Movement.startForward()
+                }
+                eatingGap = false
+                if (Mouse.rClickDown) Mouse.rClickUp()
+                if (!Mouse.isUsingProjectile() && !Mouse.isUsingPotion()) {
+                    Inventory.setInvItem("sword")
+                }
             }
-            return
-        }
-
-        val now = System.currentTimeMillis()
-        val hasRod = Inventory.hasItem("rod")
-        val rodReady = hasRod && now >= rodHoldUntil && now >= rodAntiSpamUntil && !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.rClickDown
-
-        if (rodReady) {
-            castRodNow(distance)
-            val wait = ((rodHoldUntil - System.currentTimeMillis()).coerceAtLeast(0L)).toInt() +
-                    RandomUtils.randomIntInRange(220, 280)
-            TimeUtils.setTimeout({
-                onComplete()
-            }, wait)
-            return
-        }
-
-        if (canUseFlint) {
-            useFlint(distance) {
-                onComplete()
-            }
-            return
-        }
-
-        onComplete()
+        }, RandomUtils.randomIntInRange(240, 320))
     }
 
     // =====================  LIFECYCLE  =====================
@@ -580,8 +540,6 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         openingPhaseUntil = gameStartAt + 5500L
         openingDone = false
         openingRegenPending = false
-
-        flintUses = 4
 
         Mouse.startTracking()
         Movement.startSprinting()
@@ -638,7 +596,6 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         speedPotsLeft = 2
         regenPotsLeft = 2
         gapsLeft = 6
-        flintUses = 4
 
         lastSpeedUse = 0L
         lastRegenUse = 0L
