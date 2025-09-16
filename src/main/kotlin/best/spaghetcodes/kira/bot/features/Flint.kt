@@ -41,7 +41,6 @@ interface Flint {
         Mouse.rClick(clickMs)
 
         TimeUtils.setTimeout({
-            Movement.stopBackward()
             after()
         }, clickMs + RandomUtils.randomIntInRange(120, 180))
     }
