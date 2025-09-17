@@ -430,10 +430,19 @@ private fun stopPreGapBackwardLock() {
 }
 
 // stricte : <=3.5 flint (si dispo et non épuisé), (3.5;6.0] rod unique, sinon rien.
-private fun performPreGapActionStrict(initialDistance: Float, onComplete: () -> Unit) {
+// Si l'adversaire est déjà collé (<~3.5 blocs), tenter un rod rapproché pour se dégager.
+private fun performPreGapActionStrict(initialDistance: Float, close: Boolean, onComplete: () -> Unit) {
     val now = System.currentTimeMillis()
     val hasRod = Inventory.hasItem("rod")
     val rodReady = hasRod && now >= rodHoldUntil && now >= rodAntiSpamUntil && !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.rClickDown
+
+    if (close && rodReady && initialDistance in rodCloseMin..rodCloseMax) {
+        castRodNow(initialDistance)
+        val wait = ((rodHoldUntil - System.currentTimeMillis()).coerceAtLeast(0L)).toInt() +
+                RandomUtils.randomIntInRange(140, 200)
+        TimeUtils.setTimeout({ onComplete() }, wait)
+        return
+    }
 
     if (initialDistance <= 3.5f) {
         val canUseFlint = flintUses > 0 && Inventory.hasItem("flintandsteel")
@@ -562,7 +571,7 @@ private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean)
     }
 
     // Action PRÉ-GAP unique stricte (selon la distance au début)
-    performPreGapActionStrict(initialD) {
+    performPreGapActionStrict(initialD, close) {
         // ensuite la pomme; le lock de recul reste actif
         startEatingSequence()
     }
@@ -632,7 +641,11 @@ private fun bowPunishShot(distance: Float) {
     if (Mouse.rClickDown) Mouse.rClickUp()
     Inventory.setInvItem("bow")
     // charge ~0.85 - 1.0s
-    val hold = RandomUtils.randomIntInRange(850, 1000)
+    val hold = when {
+        distance < 7.5f -> RandomUtils.randomIntInRange(720, 860)
+        distance < 12.0f -> RandomUtils.randomIntInRange(850, 1000)
+        else -> RandomUtils.randomIntInRange(960, 1100)
+    }
     Mouse.rClick(hold)
     TimeUtils.setTimeout({
         if (Mouse.rClickDown) Mouse.rClickUp()
