@@ -457,6 +457,20 @@ private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean)
     val gapThreshold = if (recentRegen) 8f else 10f
     if (healthOnly >= gapThreshold) return
 
+    val panicRetreat = close && !facingAway
+    val releaseRetreat: () -> Unit = {
+        if (panicRetreat) {
+            Mouse.setRunningAway(false)
+            Movement.stopJumping()
+        }
+    }
+
+    if (panicRetreat) {
+        Movement.startSprinting()
+        Movement.startJumping()
+        Mouse.setRunningAway(true)
+    }
+
     eatingGap = true
     Mouse.stopLeftAC()
     Mouse.setUsingProjectile(false)
@@ -525,6 +539,7 @@ private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean)
                 waitUntilFinishedEating(maxWaitMs = 2600) {
                     // sortie : relâcher le recul et sprinter immédiatement
                     stopPreGapBackwardLock()
+                    releaseRetreat()
                     Movement.startForward()
                     Movement.startSprinting()
                     eatingGap = false
@@ -536,6 +551,7 @@ private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean)
             } else {
                 // échec : rollback, relâcher lock
                 stopPreGapBackwardLock()
+                releaseRetreat()
                 eatingGap = false
                 if (Mouse.rClickDown) Mouse.rClickUp()
                 if (!Mouse.isUsingProjectile() && !Mouse.isUsingPotion()) {
@@ -615,13 +631,22 @@ private fun bowPunishShot(distance: Float) {
     Mouse.setUsingProjectile(true)
     if (Mouse.rClickDown) Mouse.rClickUp()
     Inventory.setInvItem("bow")
-    val hold = RandomUtils.randomIntInRange(850, 1000)
+    val hold = when {
+        distance < 6.5f -> RandomUtils.randomIntInRange(640, 780)
+        distance < 12.0f -> RandomUtils.randomIntInRange(780, 960)
+        else -> RandomUtils.randomIntInRange(960, 1100)
+    }
     Mouse.rClick(hold)
+    val settle = when {
+        distance < 6.5f -> RandomUtils.randomIntInRange(30, 70)
+        distance < 12.0f -> RandomUtils.randomIntInRange(40, 90)
+        else -> RandomUtils.randomIntInRange(60, 110)
+    }
     TimeUtils.setTimeout({
         if (Mouse.rClickDown) Mouse.rClickUp()
         Inventory.setInvItem("sword")
         Mouse.setUsingProjectile(false)
-    }, hold + RandomUtils.randomIntInRange(40, 100))
+    }, hold + settle)
     shotsFired++
     bowShotsThisEat++
 }
