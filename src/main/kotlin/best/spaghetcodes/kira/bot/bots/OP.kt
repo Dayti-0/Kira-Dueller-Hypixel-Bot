@@ -183,7 +183,7 @@ private fun castRodNow(distanceNow: Float) {
         Mouse.setUsingProjectile(false)
         // sécurité anti-parry hérité d'un clic droit : on relâche toujours
         if (Mouse.rClickDown) Mouse.rClickUp()
-    }, max(holdMs + 20, settle))
+    }, max(holdMs + 20, settle).toInt())
 
     lastRodUse = nowClick
 
@@ -440,7 +440,7 @@ private fun feetSplash(damage: Int, onComplete: (() -> Unit)? = null, attempt: I
                     Mouse.startTracking()
                     onComplete?.invoke()
                 }
-            }, 240L)
+            }, 240)
         }, RandomUtils.randomIntInRange(80, 140))
     }
 }
@@ -616,7 +616,7 @@ private fun oppHoldingGoldenApple(): Boolean {
     val opp = opponent() ?: return false
     val item = opp.heldItem ?: return false
     val name = (item.unlocalizedName + " " + item.displayName).lowercase()
-    return name.contains("golden") && name.contains("apple") || name.contains("applegold") || name.contains("app") && name.contains("gold")
+    return name.contains("golden") && name.contains("apple") || name.contains("applegold") || (name.contains("app") && name.contains("gold"))
 }
 
 private fun horizontalSpeed(entity: net.minecraft.entity.EntityLivingBase): Double {
@@ -708,7 +708,10 @@ override fun onGameStart() {
         }
     }, RandomUtils.randomIntInRange(220, 380))
 
-    TimeUtils.setTimeout(Movement::startJumping, RandomUtils.randomIntInRange(3000, 4000))
+    TimeUtils.setTimeout({
+        Movement.startJumping()
+    }, RandomUtils.randomIntInRange(3000, 4000))
+
     if (kira.config?.kiraHit == true) Mouse.startLeftAC() else Mouse.stopLeftAC()
 
     strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
@@ -805,7 +808,7 @@ override fun onGameEnd() {
     Mouse.stopLeftAC()
     if (Mouse.rClickDown) Mouse.rClickUp()
     val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
-    TimeUtils.setTimeout(fun () {
+    TimeUtils.setTimeout({
         i?.cancel()
         Mouse.stopTracking()
         Movement.clearAll()
@@ -821,7 +824,7 @@ override fun onAttack() {
             Combat.wTap(300)
             tapping = true
             combo-- // logique d'attaque inchangée; n'influence pas la décision de manger
-            TimeUtils.setTimeout(fun () { tapping = false }, 300)
+            TimeUtils.setTimeout({ tapping = false }, 300)
         } else if (n.contains("sword")) {
             if (distance < 2f) {
                 // court “block-hit” contrôlé + watchdog
@@ -830,7 +833,7 @@ override fun onAttack() {
             } else {
                 Combat.wTap(100)
                 tapping = true
-                TimeUtils.setTimeout(fun () { tapping = false }, 100)
+                TimeUtils.setTimeout({ tapping = false }, 100)
             }
             val now = System.currentTimeMillis()
             forwardStickUntil = now + RandomUtils.randomIntInRange(220, 280)
@@ -1043,7 +1046,7 @@ override fun onTick() {
         // Transition de sortie : quand il arrête de manger -> un coup de canne unique si 3.5..7.0
         if (!enemyEating && enemyEatEnteredAt != 0L && now - enemyEatEnteredAt < 4000L) {
             // "front-edge" sur la sortie : utiliser clear-since 200ms plus haut -> si on vient de sortir
-            if (enemyEatClearSince in 1..350L) {
+            if (enemyEatClearSince in 1..350) {
                 val rodReady = Inventory.hasItem("rod") && now >= rodHoldUntil && now >= rodAntiSpamUntil &&
                         !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.rClickDown
                 if (distance in 3.5f..7.0f && rodReady) {
