@@ -935,10 +935,10 @@ override fun onTick() {
         // ===== 2e SPEED : cast aux pieds (robuste) =====
         if (openingDone && now >= openingPhaseUntil && !hasSpeed && speedPotsLeft > 0 && now - lastSpeedUse > 15000 &&
             now - lastPotion > 3500 && !takingPotion) {
-            feetSplash(speedDamage) {
+            feetSplash(speedDamage, onComplete = {
                 speedPotsLeft--
                 lastSpeedUse = System.currentTimeMillis()
-            }
+            })
         }
 
         if (WorldUtils.blockInFront(p, 3f, 1.5f) != Blocks.air) {
@@ -960,10 +960,10 @@ override fun onTick() {
                     eatGoldenApple(distance, distance < 2f, EntityUtils.entityFacingAway(p, opp))
                 } else if (regenPotsLeft > 0 && now - gameStartAt >= 120000 && now - lastRegenUse > 3500 && !openingRegenPending) {
                     // Optionnel : regen tardive si pas de gap dispo ou lock
-                    feetSplash(regenDamage) {
+                    feetSplash(regenDamage, onComplete = {
                         regenPotsLeft--
                         lastRegenUse = System.currentTimeMillis()
-                    }
+                    })
                 }
             }
         }
@@ -974,10 +974,10 @@ override fun onTick() {
             val cdsOk = (now - lastRegenUse > 3500L) && (now - lastPotion > 3500L)
             val handsFree = !Mouse.isUsingProjectile() && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !eatingGap
             if (noGapSince30s && cdsOk && handsFree) {
-                feetSplash(regenDamage) {
+                feetSplash(regenDamage, onComplete = {
                     regenPotsLeft--
                     lastRegenUse = System.currentTimeMillis()
-                }
+                })
             }
         }
 
