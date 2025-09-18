@@ -516,7 +516,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     }
 
     // ---- GAP fiable (corrigée) ----
-    private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean) {
+    private fun eatGoldenApple(distance: Float, facingAway: Boolean) {
         val now = System.currentTimeMillis()
         val p = mc.thePlayer ?: return
 
@@ -672,7 +672,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         enemyBackpedalUntil = now + duration + 220
     }
 
-    private fun punishEnemyGapWithBow(distance: Float) {
+    private fun punishEnemyGapWithBow() {
         if (bowShotsThisEat >= 2) return
         if (Mouse.isUsingProjectile() || Mouse.isUsingPotion() || takingPotion || retreating || eatingGap) return
         if (!Inventory.hasItem("bow")) return
@@ -883,8 +883,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             val now = System.currentTimeMillis()
             val distance = EntityUtils.getDistanceNoY(p, opp)
 
-            val oppPlayer = if (opp is EntityPlayer) opp else null
-            val usingItem = if (oppPlayer != null) isUsingItemSafe(oppPlayer) else opp.isUsingItem
+            val usingItem = isUsingItemSafe(opp)
             val holdingGap = oppHoldingGoldenApple(opp)
             val eatingSignal = (usingItem && holdingGap) || (usingItem && horizontalSpeed(opp) <= 0.05)
 
@@ -1004,9 +1003,9 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                 val canGapNow = gapsLeft > 0 && now >= gapLockUntil && !Mouse.isUsingProjectile() &&
                         !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !eatingGap && !takingPotion && !retreating
                 if (effectiveHp <= 14f && distance >= 3.0f && canGapNow) {
-                    eatGoldenApple(distance, distance < 2f, EntityUtils.entityFacingAway(p, opp))
+                    eatGoldenApple(distance, EntityUtils.entityFacingAway(p, opp))
                 } else if (distance in 5.0f..20.0f && bowShotsThisEat < 2) {
-                    punishEnemyGapWithBow(distance)
+                    punishEnemyGapWithBow()
                 } else if (distance < 3.0f) {
                     if (!eatingGap && isRodReady(now)) {
                         castRodNow(distance)
@@ -1019,7 +1018,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                     !eatingGap && !takingPotion && now - lastPotion > 3500) {
 
                     if (gapsLeft > 0 && now >= gapLockUntil) {
-                        eatGoldenApple(distance, distance < 2f, EntityUtils.entityFacingAway(p, opp))
+                        eatGoldenApple(distance, EntityUtils.entityFacingAway(p, opp))
                     } else if (regenPotsLeft > 0 && now - gameStartAt >= 120000 && now - lastRegenUse > 3500 && !openingRegenPending) {
                         // Optionnel : regen tardive si pas de gap dispo ou lock
                         feetSplash(regenDamage) {
