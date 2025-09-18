@@ -12,7 +12,12 @@ interface Potion {
 
     var lastPotion: Long
 
-    fun useSplashPotion(damage: Int, run: Boolean, facingAway: Boolean) {
+    fun useSplashPotion(
+        damage: Int,
+        run: Boolean,
+        facingAway: Boolean,
+        doubleClick: Boolean = false
+    ) {
         lastPotion = System.currentTimeMillis()
         fun pot(dmg: Int) {
             Mouse.stopLeftAC()
@@ -26,11 +31,8 @@ interface Potion {
                 TimeUtils.setTimeout(fun() {
                     Mouse.setUsingPotion(true)
 
-                    TimeUtils.setTimeout(fun () {
-                        val r = RandomUtils.randomIntInRange(80, 120)
-                        Mouse.rClick(r)
-
-                        TimeUtils.setTimeout(fun () {
+                    fun finishAfter(delay: Int) {
+                        TimeUtils.setTimeout(fun() {
                             Mouse.setUsingPotion(false)
                             TimeUtils.setTimeout(fun() {
                                 Inventory.setInvItem("sword")
@@ -39,7 +41,26 @@ interface Potion {
                                     Mouse.setRunningAway(false)
                                 }, RandomUtils.randomIntInRange(500, 700))
                             }, RandomUtils.randomIntInRange(80, 120))
-                        }, r + RandomUtils.randomIntInRange(80, 120))
+                        }, delay)
+                    }
+
+                    TimeUtils.setTimeout(fun() {
+                        val firstHold = RandomUtils.randomIntInRange(80, 120)
+                        Mouse.rClick(firstHold)
+
+                        val afterFirst = firstHold + RandomUtils.randomIntInRange(80, 120)
+
+                        if (doubleClick) {
+                            val betweenClicks = RandomUtils.randomIntInRange(40, 70)
+                            TimeUtils.setTimeout(fun() {
+                                val secondHold = RandomUtils.randomIntInRange(70, 110)
+                                Mouse.rClick(secondHold)
+                                val afterSecond = secondHold + RandomUtils.randomIntInRange(80, 120)
+                                finishAfter(afterSecond)
+                            }, afterFirst + betweenClicks)
+                        } else {
+                            finishAfter(afterFirst)
+                        }
                     }, RandomUtils.randomIntInRange(100, 200))
                 }, RandomUtils.randomIntInRange(50, 100))
             }

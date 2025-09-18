@@ -408,18 +408,26 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         takingPotion = true
         Mouse.stopTracking()
         Movement.stopJumping()
+        val player = mc.thePlayer
+        val opp = opponent()
+        if (player != null && opp != null) {
+            val distance = EntityUtils.getDistanceNoY(player, opp)
+            if (distance > 5f && Movement.forward()) {
+                Movement.stopForward()
+            }
+        }
         waitUntilOnGround(maxWaitMs = 420) {
             val down = pickDownwardPitch()
             setPitchInstant(down)
             TimeUtils.setTimeout({
-                useSplashPotion(damage, false, false)
+                useSplashPotion(damage, false, false, doubleClick = true)
                 if (Mouse.rClickDown) Mouse.rClickUp()
                 lastPotion = System.currentTimeMillis()
-                setPitchLock(down, lockMs = RandomUtils.randomIntInRange(130, 170))
+                setPitchLock(down, lockMs = RandomUtils.randomIntInRange(360, 440))
                 takingPotion = false
                 Mouse.startTracking()
                 onComplete?.invoke()
-            }, RandomUtils.randomIntInRange(80, 140))
+            }, RandomUtils.randomIntInRange(100, 160))
         }
     }
 
