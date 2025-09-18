@@ -489,7 +489,7 @@ private fun performPreGapActionStrict(initialDistance: Float, onComplete: () -> 
 }
 
 // ---- GAP fiable (corrigée + enveloppe de recul) + hard-gates anti-misfire ----
-private fun eatGoldenApple(distance: Float, close: Boolean, facingAway: Boolean) {
+private fun eatGoldenApple(distance: Float, facingAway: Boolean) {
     val now = System.currentTimeMillis()
     if (eatingGap || now < lastGap + MIN_GAP_INTERVAL_MS) return
 
@@ -658,7 +658,7 @@ private fun effectiveHp(player: net.minecraft.entity.player.EntityPlayer): Float
     return player.health + player.absorptionAmount
 }
 
-private fun bowPunishShot(distance: Float) {
+private fun bowPunishShot() {
     val now = System.currentTimeMillis()
     if (!Inventory.hasItem("bow")) return
     if (Mouse.isUsingPotion() || Mouse.isUsingProjectile() || eatingGap || takingPotion || retreating) return
@@ -935,10 +935,10 @@ override fun onTick() {
         // ===== 2e SPEED : cast aux pieds (robuste) =====
         if (openingDone && now >= openingPhaseUntil && !hasSpeed && speedPotsLeft > 0 && now - lastSpeedUse > 15000 &&
             now - lastPotion > 3500 && !takingPotion) {
-            feetSplash(speedDamage) {
+            feetSplash(speedDamage, onComplete = {
                 speedPotsLeft--
                 lastSpeedUse = System.currentTimeMillis()
-            }
+            })
         }
 
         if (WorldUtils.blockInFront(p, 3f, 1.5f) != Blocks.air) {
@@ -957,13 +957,13 @@ override fun onTick() {
                 !eatingGap && !takingPotion && now - lastPotion > 3500) {
 
                 if (gapsLeft > 0 && now >= gapLockUntil) {
-                    eatGoldenApple(distance, distance < 2f, EntityUtils.entityFacingAway(p, opp))
+                    eatGoldenApple(distance, EntityUtils.entityFacingAway(p, opp))
                 } else if (regenPotsLeft > 0 && now - gameStartAt >= 120000 && now - lastRegenUse > 3500 && !openingRegenPending) {
                     // Optionnel : regen tardive si pas de gap dispo ou lock
-                    feetSplash(regenDamage) {
+                    feetSplash(regenDamage, onComplete = {
                         regenPotsLeft--
                         lastRegenUse = System.currentTimeMillis()
-                    }
+                    })
                 }
             }
         }
@@ -974,10 +974,10 @@ override fun onTick() {
             val cdsOk = (now - lastRegenUse > 3500L) && (now - lastPotion > 3500L)
             val handsFree = !Mouse.isUsingProjectile() && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !eatingGap
             if (noGapSince30s && cdsOk && handsFree) {
-                feetSplash(regenDamage) {
+                feetSplash(regenDamage, onComplete = {
                     regenPotsLeft--
                     lastRegenUse = System.currentTimeMillis()
-                }
+                })
             }
         }
 
@@ -1026,10 +1026,10 @@ override fun onTick() {
 
             if (!fullHp && canEatNow && !eatingGap && !takingPotion && !retreating && !preGapLock) {
                 // lancer notre propre séquence de pomme (avec enveloppe)
-                eatGoldenApple(distance, distance < 2f, EntityUtils.entityFacingAway(p, opp))
+                eatGoldenApple(distance, EntityUtils.entityFacingAway(p, opp))
             } else if (hasBow && inBowRange && bowLoS && bowShotsThisEat < 2 && !eatingGap && !takingPotion && !retreating) {
                 // punir à l'arc (1 à 2 flèches chargées ~0.9s)
-                bowPunishShot(distance)
+                bowPunishShot()
             } else if (distance < 3.0f) {
                 // créer de l'espace si trop proche
                 val rodReady = Inventory.hasItem("rod") && now >= rodHoldUntil && now >= rodAntiSpamUntil && !Mouse.isUsingProjectile() && !Mouse.isUsingPotion() && !Mouse.rClickDown
