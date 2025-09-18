@@ -623,26 +623,36 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     private fun performPreGapActionStrict(initialDistance: Float, onComplete: () -> Unit) {
         val distance = initialDistance
-        val canUseFlint = flintUses > 0 && Inventory.hasItem("flintandsteel")
-        if (distance <= 3.5f && canUseFlint) {
-            useFlint(distance) {
-                onComplete()
-            }
-            return
-        }
-
         val now = System.currentTimeMillis()
-        if (distance > 3.5f && distance <= 6.0f && isRodReady(now)) {
-            castRodNow(distance)
-            val remaining = (rodHoldUntil - System.currentTimeMillis()).coerceAtLeast(0L)
-            val wait = (remaining + RandomUtils.randomIntInRange(90, 140)).toInt()
-            TimeUtils.setTimeout({
-                onComplete()
-            }, wait)
-            return
+        val canUseFlint = flintUses > 0 && Inventory.hasItem("flintandsteel")
+
+        fun restoreBackwardLock() {
+            if (!preGapLock) return
+            Movement.stopForward()
+            Movement.startBackward()
+            Movement.clearLeftRight()
         }
 
-        onComplete()
+        when {
+            distance <= 3.5f && canUseFlint -> {
+                useFlint(distance) {
+                    restoreBackwardLock()
+                    onComplete()
+                }
+            }
+
+            distance > 3.5f && distance <= 6.0f && isRodReady(now) -> {
+                castRodNow(distance)
+                val remaining = (rodHoldUntil - System.currentTimeMillis()).coerceAtLeast(0L)
+                val wait = (remaining + RandomUtils.randomIntInRange(90, 140)).toInt()
+                TimeUtils.setTimeout({
+                    restoreBackwardLock()
+                    onComplete()
+                }, wait)
+            }
+
+            else -> onComplete()
+        }
     }
 
     private fun triggerShortBackpedal(now: Long) {
