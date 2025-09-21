@@ -53,6 +53,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private var strafeDir = 1
     private var stagnantSince = 0L
 
+    private var touchedGroundSinceStart = false
+    private var initialJumpTriggered = false
+    private var strafeUnlockAt = 0L
+
     private var centerX = 0.0
     private var centerZ = 0.0
 
@@ -79,9 +83,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             centerZ = p.posZ
         }
 
-        // Saut immédiat de départ pour prendre le milieu (le 1er saut est safe)
-        Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
-
         prevDistance = -1f
         lastStrafeSwitch = 0L
         strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
@@ -95,6 +96,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         stoppedSprintForBait = false
 
         canDistanceJump = true
+
+        touchedGroundSinceStart = false
+        initialJumpTriggered = false
+        strafeUnlockAt = 0L
     }
 
     override fun onGameEnd() {
@@ -106,6 +111,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             Movement.clearAll()
             Combat.stopRandomStrafe()
         }, RandomUtils.randomIntInRange(200, 400))
+
+        touchedGroundSinceStart = false
+        initialJumpTriggered = false
+        strafeUnlockAt = 0L
     }
 
     override fun onAttack() {
@@ -141,6 +150,16 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val now = System.currentTimeMillis()
         val distance = EntityUtils.getDistanceNoY(p, opp)
         val approaching = (prevDistance > 0f) && (prevDistance - distance >= 0.10f)
+
+        if (!touchedGroundSinceStart && p.onGround) {
+            touchedGroundSinceStart = true
+        }
+
+        if (touchedGroundSinceStart && !initialJumpTriggered) {
+            Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
+            initialJumpTriggered = true
+            strafeUnlockAt = now + 320
+        }
 
         // ---- Latch d’attaque & pré-fire (plus tôt) ----
         val inAttackLatch = (!Mouse.isUsingPotion() && !Mouse.isUsingProjectile()
@@ -231,11 +250,15 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         // =================== STRAFE & DIRECTION ===================
         val movePriority = arrayListOf(0, 0)
         var clear = false
+        val strafeLocked = (!initialJumpTriggered || now < strafeUnlockAt)
         // valeur de base : pas de random strafe près d’un bord, sinon selon la distance
         var randomStrafe = (distance >= 3.2f && distance <= 7.5f && !isHitselecting && !(voidNear || voidFar))
 
-        // Si on est proche d'un bord (air devant), forcer le strafe vers le centre
-        if (voidNear || voidFar) {
+        if (strafeLocked) {
+            clear = true
+            randomStrafe = false
+        } else if (voidNear || voidFar) {
+            // Si on est proche d'un bord (air devant), forcer le strafe vers le centre
             val toLeft = preferLeftTowardCenter()
             val w = 10
             if (toLeft) movePriority[0] += w else movePriority[1] += w
