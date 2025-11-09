@@ -51,117 +51,111 @@ object EntityUtils {
      * @return float[] - {yaw, pitch}
      */
     fun getRotations(player: EntityPlayer?, target: Entity?, raw: Boolean, center: Boolean = false): FloatArray? {
-        return if (target == null || player == null) {
-            null
+        val activePlayer = player ?: return null
+        val activeTarget = target ?: return null
+
+        val pos: Vec3 = if (center) {
+            Vec3(activeTarget.posX, activeTarget.posY + activeTarget.eyeHeight, activeTarget.posZ)
         } else {
-            val pos: Vec3?
-            if (center) {
-                pos = Vec3(target.posX, target.posY + target.eyeHeight, target.posZ)
-            } else {
-                if (!Mouse.isUsingProjectile()) {
-                    val box = target.entityBoundingBox
+            if (!Mouse.isUsingProjectile()) {
+                val box = activeTarget.entityBoundingBox
 
-                    // get the four corners of the hitbox
-                    var yPos = player.posY + player.eyeHeight
+                // get the four corners of the hitbox
+                var yPos = activePlayer.posY + activePlayer.eyeHeight
 
-                    if (!player.onGround) {
-                        yPos = target.posY + target.eyeHeight
-                    } else if (abs(target.posY - player.posY) > player.eyeHeight) {
-                        yPos = target.posY + target.eyeHeight / 2f
-                    } else if (player.posY - target.posY > 0.3) {
-                        yPos = target.posY + target.eyeHeight
+                if (!activePlayer.onGround) {
+                    yPos = activeTarget.posY + activeTarget.eyeHeight
+                } else if (abs(activeTarget.posY - activePlayer.posY) > activePlayer.eyeHeight) {
+                    yPos = activeTarget.posY + activeTarget.eyeHeight / 2f
+                } else if (activePlayer.posY - activeTarget.posY > 0.3) {
+                    yPos = activeTarget.posY + activeTarget.eyeHeight
+                }
+
+                val corner1 = Vec3(box.minX, yPos, box.minZ)
+                val corner2 = Vec3(box.maxX, yPos, box.minZ)
+                val corner3 = Vec3(box.minX, yPos, box.maxZ)
+                val corner4 = Vec3(box.maxX, yPos, box.maxZ)
+
+                // get the closest 2 corners
+                val closest = getClosestCorner(activePlayer, corner1, corner2, corner3, corner4)
+                var a = closest[0]
+                var b = closest[1]
+
+                val p = Vec3(activePlayer.posX, activePlayer.posY + activePlayer.eyeHeight, activePlayer.posZ)
+
+                // since the two corners are either always on the same X or same Z position, we don't need complicated math
+                if (a.zCoord == b.zCoord) {
+                    if (a.xCoord > b.xCoord) {
+                        val temp = a
+                        a = b
+                        b = temp
                     }
-
-                    val corner1 = Vec3(box.minX, yPos, box.minZ)
-                    val corner2 = Vec3(box.maxX, yPos, box.minZ)
-                    val corner3 = Vec3(box.minX, yPos, box.maxZ)
-                    val corner4 = Vec3(box.maxX, yPos, box.maxZ)
-
-                    // get the closest 2 corners
-                    val closest = getClosestCorner(corner1, corner2, corner3, corner4)
-                    var a = closest[0]
-                    var b = closest[1]
-
-                    val p = Vec3(player.posX, player.posY + player.eyeHeight, player.posZ)
-
-                    // since the two corners are either always on the same X or same Z position, we don't need complicated math
-                    if (a.zCoord == b.zCoord) {
-                        if (a.xCoord > b.xCoord) {
-                            val temp = a
-                            a = b
-                            b = temp
-                        }
-                        if (p.xCoord < a.xCoord) {
-                            pos = a
-                        } else if (p.xCoord > b.xCoord) {
-                            pos = b
-                        } else {
-                            pos = Vec3(p.xCoord, a.yCoord, a.zCoord)
-                        }
-                    } else {
-                        if (a.zCoord > b.zCoord) {
-                            val temp = a
-                            a = b
-                            b = temp
-                        }
-                        if (p.zCoord < a.zCoord) {
-                            pos = a
-                        } else if (p.zCoord > b.zCoord) {
-                            pos = b
-                        } else {
-                            pos = Vec3(a.xCoord, a.yCoord, p.zCoord)
-                        }
+                    when {
+                        p.xCoord < a.xCoord -> a
+                        p.xCoord > b.xCoord -> b
+                        else -> Vec3(p.xCoord, a.yCoord, a.zCoord)
                     }
                 } else {
-                    val dist = getDistanceNoY(player, target)
-                    val tickPredict = when (dist) {
-                        in 0f..8f -> dist.toDouble()
-                        in 8f..15f -> 15.0
-                        else -> 20.0
-                    } * if (player.isPotionActive(Potion.moveSpeed)) 1.3 else 1.0
-                    val velocity = target.getVelocity().scale(tickPredict)
-                    val flatVelo = Vec3(velocity.xCoord, 0.0, velocity.zCoord)
-                    val isPearl = player.heldItem?.item == Items.ender_pearl
-                    val height = when (dist) {
-                        in 0f..8f -> if (isPearl) 0.0f else target.eyeHeight / 2f
-                        in 8f..15f -> target.eyeHeight
-                        in 15f..25f -> target.eyeHeight * 1.45f
-                        else -> target.eyeHeight * 1.7f
+                    if (a.zCoord > b.zCoord) {
+                        val temp = a
+                        a = b
+                        b = temp
                     }
-                    pos = target.positionVector.add(flatVelo).add(Vec3(0.0, height.toDouble(), 0.0)) ?: Vec3(target.posX, target.posY + target.eyeHeight, target.posZ)
+                    when {
+                        p.zCoord < a.zCoord -> a
+                        p.zCoord > b.zCoord -> b
+                        else -> Vec3(a.xCoord, a.yCoord, p.zCoord)
+                    }
                 }
+            } else {
+                val dist = getDistanceNoY(activePlayer, activeTarget)
+                val tickPredict = when (dist) {
+                    in 0f..8f -> dist.toDouble()
+                    in 8f..15f -> 15.0
+                    else -> 20.0
+                } * if (activePlayer.isPotionActive(Potion.moveSpeed)) 1.3 else 1.0
+                val velocity = activeTarget.getVelocity().scale(tickPredict)
+                val flatVelo = Vec3(velocity.xCoord, 0.0, velocity.zCoord)
+                val isPearl = activePlayer.heldItem?.item == Items.ender_pearl
+                val height = when (dist) {
+                    in 0f..8f -> if (isPearl) 0.0f else activeTarget.eyeHeight / 2f
+                    in 8f..15f -> activeTarget.eyeHeight
+                    in 15f..25f -> activeTarget.eyeHeight * 1.45f
+                    else -> activeTarget.eyeHeight * 1.7f
+                }
+                activeTarget.positionVector.add(flatVelo).add(Vec3(0.0, height.toDouble(), 0.0)) ?: Vec3(activeTarget.posX, activeTarget.posY + activeTarget.eyeHeight, activeTarget.posZ)
             }
+        }
 
-            // Not originally my code, but I forgot where I found it
+        // Not originally my code, but I forgot where I found it
 
-            val diffX = pos.xCoord - player.posX
-            val diffY: Double = pos.yCoord - (player.posY + player.getEyeHeight().toDouble())
-            val diffZ = pos.zCoord - player.posZ
-            val dist = MathHelper.sqrt_double(diffX * diffX + diffZ * diffZ).toDouble()
-            val yaw = (Math.atan2(diffZ, diffX) * 180.0 / 3.141592653589793).toFloat() - 90.0f
-            val pitch = (-(Math.atan2(diffY, dist) * 180.0 / 3.141592653589793)).toFloat()
+        val diffX = pos.xCoord - activePlayer.posX
+        val diffY: Double = pos.yCoord - (activePlayer.posY + activePlayer.getEyeHeight().toDouble())
+        val diffZ = pos.zCoord - activePlayer.posZ
+        val dist = MathHelper.sqrt_double(diffX * diffX + diffZ * diffZ).toDouble()
+        val yaw = (Math.atan2(diffZ, diffX) * 180.0 / 3.141592653589793).toFloat() - 90.0f
+        val pitch = (-(Math.atan2(diffY, dist) * 180.0 / 3.141592653589793)).toFloat()
 
-            if ((crossHairDistance(yaw, pitch, player) > 6 || dist in 2.5..4.0) || Mouse.isUsingProjectile() || Mouse.isUsingPotion()) {
-                if (raw) {
-                    floatArrayOf(
-                        MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw),
-                        MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
-                    )
-                } else floatArrayOf(
-                    player.rotationYaw + MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw),
-                    player.rotationPitch + MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch)
+        if ((crossHairDistance(yaw, pitch, activePlayer) > 6 || dist in 2.5..4.0) || Mouse.isUsingProjectile() || Mouse.isUsingPotion()) {
+            if (raw) {
+                floatArrayOf(
+                    MathHelper.wrapAngleTo180_float(yaw - activePlayer.rotationYaw),
+                    MathHelper.wrapAngleTo180_float(pitch - activePlayer.rotationPitch)
+                )
+            } else floatArrayOf(
+                activePlayer.rotationYaw + MathHelper.wrapAngleTo180_float(yaw - activePlayer.rotationYaw),
+                activePlayer.rotationPitch + MathHelper.wrapAngleTo180_float(pitch - activePlayer.rotationPitch)
+            )
+        } else {
+            if (raw) {
+                floatArrayOf(
+                    0F, 0F
                 )
             } else {
-                if (raw) {
-                    floatArrayOf(
-                        0F, 0F
-                    )
-                } else {
-                    floatArrayOf(
-                        player.rotationYaw,
-                        player.rotationPitch
-                    )
-                }
+                floatArrayOf(
+                    activePlayer.rotationYaw,
+                    activePlayer.rotationPitch
+                )
             }
         }
     }
@@ -211,8 +205,8 @@ object EntityUtils {
         return angle in 20f..70f
     }
 
-    private fun getClosestCorner(corner1: Vec3, corner2: Vec3, corner3: Vec3, corner4: Vec3): ArrayList<Vec3> {
-        val pos = Vec3(kira.mc.thePlayer.posX, kira.mc.thePlayer.posY + kira.mc.thePlayer.eyeHeight, kira.mc.thePlayer.posZ)
+    private fun getClosestCorner(player: EntityPlayer, corner1: Vec3, corner2: Vec3, corner3: Vec3, corner4: Vec3): ArrayList<Vec3> {
+        val pos = Vec3(player.posX, player.posY + player.eyeHeight, player.posZ)
 
         val smallest = arrayListOf(corner1, corner2, corner3, corner4)
         smallest.sortBy { abs(pos.distanceTo(it)) }
