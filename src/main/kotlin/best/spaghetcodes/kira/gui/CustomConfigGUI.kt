@@ -503,6 +503,7 @@ class CustomConfigGUI : GuiScreen() {
 
         y = drawSectionHeader("Misc", x, y, width); y += SECTION_SPACING
         toggle("Boxing: Use Fish", x, y, width, { cfg.boxingFish }, { cfg.boxingFish = it }); y += ROW_HEIGHT
+        toggle("Anti Detection", x, y, width, { cfg.antiDetection }, { cfg.antiDetection = it }); y += ROW_HEIGHT
 
         return y
     }
