@@ -18,22 +18,24 @@ import kotlin.math.sin
 object EntityUtils {
 
     fun getOpponentEntity(): EntityPlayer? {
-        if (kira.mc.theWorld != null) {
-            for (entity in kira.mc.theWorld.playerEntities) {
-                if (entity.displayName != kira.mc.thePlayer.displayName && shouldTarget(entity)) {
-                    return entity
-                }
+        val world = kira.mc.theWorld ?: return null
+        val player = kira.mc.thePlayer ?: return null
+
+        for (entity in world.playerEntities) {
+            if (entity !== player && entity.displayName != player.displayName && shouldTarget(player, entity)) {
+                return entity
             }
         }
+
         return null
     }
 
-    private fun shouldTarget(entity: EntityPlayer?): Boolean {
+    private fun shouldTarget(player: EntityPlayer, entity: EntityPlayer?): Boolean {
         return if (entity == null) {
             false
-        } else if (kira.mc.thePlayer.isEntityAlive && entity.isEntityAlive) {
+        } else if (player.isEntityAlive && entity.isEntityAlive) {
             if (!entity.isInvisible /*&& !entity.isInvisibleToPlayer(mc.thePlayer)*/) {
-                kira.mc.thePlayer.getDistanceToEntity(entity) <= 64.0f
+                player.getDistanceToEntity(entity) <= 64.0f
             } else {
                 false
             }
