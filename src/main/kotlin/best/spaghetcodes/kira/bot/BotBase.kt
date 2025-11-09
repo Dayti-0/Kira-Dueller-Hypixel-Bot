@@ -26,6 +26,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent
+import java.util.Collections
 import java.util.Timer
 
 open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
@@ -34,7 +35,12 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private var toggled = false
     fun toggled() = toggled
-    fun toggle() { toggled = !toggled }
+    fun toggle() {
+        toggled = !toggled
+        if (!toggled) {
+            resetAntiDetection()
+        }
+    }
 
     private var attackedID = -1
 
@@ -63,6 +69,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
+
+    private var antiDetectionStage = 0
+    private var antiDetectionNextActionAt = 0L
+    private val antiDetectionTimers = Collections.synchronizedList(mutableListOf<Timer>())
 
     fun opponent() = opponent
 
@@ -160,6 +170,114 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         hbLastHitAt = now
     }
 
+    private fun scheduleAntiDetection(delay: Int, action: () -> Unit) {
+        var timerRef: Timer? = null
+        timerRef = TimeUtils.setTimeout({
+            action()
+            timerRef?.let { timer ->
+                synchronized(antiDetectionTimers) { antiDetectionTimers.remove(timer) }
+            }
+        }, delay)
+        timerRef?.let { timer ->
+            synchronized(antiDetectionTimers) { antiDetectionTimers.add(timer) }
+        }
+    }
+
+    private fun resetAntiDetection() {
+        synchronized(antiDetectionTimers) {
+            antiDetectionTimers.forEach { it.cancel() }
+            antiDetectionTimers.clear()
+        }
+        antiDetectionStage = 0
+        antiDetectionNextActionAt = 0L
+        if (Movement.sneaking()) {
+            Movement.stopSneaking()
+        }
+    }
+
+    private fun handleAntiDetection() {
+        val cfg = kira.config
+        if (cfg?.antiDetection != true) {
+            if (antiDetectionStage != 0 || antiDetectionNextActionAt != 0L) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        if (StateManager.state != StateManager.States.PLAYING) {
+            if (antiDetectionStage != 0 || antiDetectionNextActionAt != 0L) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        val player = mc.thePlayer ?: run {
+            if (antiDetectionStage != 0 || antiDetectionNextActionAt != 0L) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        val opp = opponent ?: run {
+            if (antiDetectionStage != 0 || antiDetectionNextActionAt != 0L) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        val ticksWithoutHit = ticksSinceHit
+        if (ticksWithoutHit < 20 * 30) {
+            if (antiDetectionStage != 0 || antiDetectionNextActionAt != 0L) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        val distance = player.getDistanceToEntity(opp)
+        if (distance <= 7f) {
+            if (antiDetectionStage != 0 || antiDetectionNextActionAt != 0L) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        when (antiDetectionStage) {
+            0 -> {
+                var delay = 0
+                val cycles = RandomUtils.randomIntInRange(2, 3)
+                repeat(cycles) {
+                    scheduleAntiDetection(delay) { Movement.startSneaking() }
+                    delay += RandomUtils.randomIntInRange(200, 320)
+                    scheduleAntiDetection(delay) { Movement.stopSneaking() }
+                    delay += RandomUtils.randomIntInRange(200, 320)
+                }
+
+                val messageDelay = delay + RandomUtils.randomIntInRange(120, 240)
+                scheduleAntiDetection(messageDelay) { ChatUtils.sendAsPlayer("/ac ??") }
+
+                antiDetectionStage = 1
+                antiDetectionNextActionAt = now + 20000
+            }
+
+            1 -> {
+                if (now >= antiDetectionNextActionAt) {
+                    ChatUtils.sendAsPlayer("/ac what are you doing?")
+                    antiDetectionStage = 2
+                    antiDetectionNextActionAt = now + 20000
+                }
+            }
+
+            2 -> {
+                if (now >= antiDetectionNextActionAt) {
+                    ChatUtils.sendAsPlayer("/ac You're wasting your time.")
+                    antiDetectionStage = 3
+                    antiDetectionNextActionAt = 0L
+                }
+            }
+        }
+    }
+
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
             when (packet) {
@@ -173,6 +291,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 combo++
                                 opponentCombo = 0
                                 ticksSinceHit = 0
+                                resetAntiDetection()
                                 maybeHitBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
@@ -275,6 +394,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                     ChatUtils.info("combo reset")
                 }
             }
+
+            handleAntiDetection()
         }
 
         if (KeyBindings.toggleBotKeyBinding.isPressed) {
@@ -411,6 +532,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
+        resetAntiDetection()
     }
 
     private fun gameStart() {

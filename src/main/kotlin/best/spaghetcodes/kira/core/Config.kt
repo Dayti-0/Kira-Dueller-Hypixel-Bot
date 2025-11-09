@@ -162,6 +162,14 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     @Property(type = PropertyType.SWITCH, name = "Boxing Fish", description = "Switch between the sword and the fish in boxing.", category = "Misc")
     var boxingFish = false
 
+    @Property(
+        type = PropertyType.SWITCH,
+        name = "Anti Detection",
+        description = "Perform subtle actions when no hits land for a while to look more human.",
+        category = "Misc"
+    )
+    var antiDetection = false
+
     // --- Typage explicite + ordre conservé (utile pour l'UI) ---
     val bots: Map<Int, BotBase> = linkedMapOf(
         0 to Classic(),
