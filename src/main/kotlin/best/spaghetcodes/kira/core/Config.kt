@@ -102,6 +102,9 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     @Property(type = PropertyType.NUMBER, name = "AutoGG Delay", description = "How long to wait after the game before sending the message", category = "AutoGG", min = 50, max = 1000, increment = 50)
     var ggDelay = 100
 
+    @Property(type = PropertyType.SWITCH, name = "Anti Detection", description = "Send fake chat reactions after long periods without landing a hit.", category = "AutoGG")
+    var antiDetection = false
+
     @Property(type = PropertyType.SWITCH, name = "Game Start Message", description = "Send a message as soon as the game starts", category = "AutoGG")
     var sendStartMessage = false
 

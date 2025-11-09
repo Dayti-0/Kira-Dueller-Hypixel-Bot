@@ -373,6 +373,7 @@ class CustomConfigGUI : GuiScreen() {
         ); y += ROW_HEIGHT
         toggle("Enable AutoGG", x, y, width, { cfg.sendAutoGG }, { cfg.sendAutoGG = it }); y += ROW_HEIGHT
         number("AutoGG Delay (ms)", x, y, width, { cfg.ggDelay }, { cfg.ggDelay = it }, 50, 1000, 50); y += ROW_HEIGHT
+        toggle("Anti Detection", x, y, width, { cfg.antiDetection }, { cfg.antiDetection = it }); y += ROW_HEIGHT
 
         return y
     }

@@ -46,6 +46,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     protected var opponentCombo = 0
     protected var ticksSinceHit = 0
 
+    private val antiDetectionThresholds = intArrayOf(600, 1000, 1400)
+    private var antiDetectionStage = 0
+
     // Hit & Block state
     private var hbNextAllowedAt = 0L
     private var hbHitsSince = 0
@@ -120,6 +123,65 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         hbNextAllowedAt = now
     }
 
+    private fun resetAntiDetection() {
+        antiDetectionStage = 0
+    }
+
+    private fun handleAntiDetection(distance: Float) {
+        val cfg = kira.config
+        if (cfg?.antiDetection != true) {
+            if (antiDetectionStage != 0) {
+                resetAntiDetection()
+            }
+            return
+        }
+
+        if (antiDetectionStage >= antiDetectionThresholds.size) {
+            return
+        }
+
+        if (StateManager.state != StateManager.States.PLAYING) {
+            return
+        }
+
+        if (distance <= 7f) {
+            return
+        }
+
+        val threshold = antiDetectionThresholds[antiDetectionStage]
+        if (ticksSinceHit < threshold) {
+            return
+        }
+
+        when (antiDetectionStage) {
+            0 -> {
+                performAntiDetectionSneak()
+                ChatUtils.sendAsPlayer("/ac ??")
+            }
+
+            1 -> ChatUtils.sendAsPlayer("/ac what are you doing?")
+
+            2 -> ChatUtils.sendAsPlayer("/ac You're wasting your time.")
+        }
+
+        antiDetectionStage++
+    }
+
+    private fun performAntiDetectionSneak() {
+        val cycles = RandomUtils.randomIntInRange(2, 3)
+        var delay = 0
+        repeat(cycles) {
+            val sneakDuration = RandomUtils.randomIntInRange(150, 250)
+            TimeUtils.setTimeout({
+                Movement.startSneaking()
+                TimeUtils.setTimeout({ Movement.stopSneaking() }, sneakDuration)
+            }, delay)
+
+            val pause = RandomUtils.randomIntInRange(120, 220)
+            delay += sneakDuration + pause
+        }
+    }
+
     private fun maybeHitBlock() {
         val cfg = kira.config ?: return
         if (!cfg.hitBlock) return
@@ -173,6 +235,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 combo++
                                 opponentCombo = 0
                                 ticksSinceHit = 0
+                                resetAntiDetection()
                                 maybeHitBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
@@ -269,11 +332,14 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             if (mc.thePlayer != null && opponent != null) {
                 ticksSinceHit++
                 val distance = EntityUtils.getDistanceNoY(mc.thePlayer, opponent)
+                handleAntiDetection(distance)
                 if (distance > 5 && (combo != 0 || opponentCombo != 0)) {
                     combo = 0
                     opponentCombo = 0
                     ChatUtils.info("combo reset")
                 }
+            } else if (antiDetectionStage != 0) {
+                resetAntiDetection()
             }
         }
 
@@ -411,6 +477,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
+        resetAntiDetection()
     }
 
     private fun gameStart() {
