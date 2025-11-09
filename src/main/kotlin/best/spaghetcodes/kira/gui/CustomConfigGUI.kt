@@ -638,11 +638,15 @@ class CustomConfigGUI : GuiScreen() {
         GlStateManager.disableTexture2D()
         GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0)
         GlStateManager.shadeModel(GL11.GL_SMOOTH)
-        block()
-        GlStateManager.shadeModel(GL11.GL_FLAT)
-        GlStateManager.enableTexture2D()
-        GlStateManager.disableBlend()
-        GlStateManager.popMatrix()
+        try {
+            block()
+        } finally {
+            GlStateManager.color(1f, 1f, 1f, 1f)
+            GlStateManager.shadeModel(GL11.GL_FLAT)
+            GlStateManager.enableTexture2D()
+            GlStateManager.disableBlend()
+            GlStateManager.popMatrix()
+        }
     }
 
 }
