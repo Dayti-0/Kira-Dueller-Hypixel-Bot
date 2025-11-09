@@ -57,6 +57,7 @@ class CustomConfigGUI : GuiScreen() {
         super.onGuiClosed()
         Keyboard.enableRepeatEvents(false)
         saveConfig()
+        GlStateManager.color(1f, 1f, 1f, 1f)
     }
 
     override fun handleMouseInput() {
@@ -105,6 +106,7 @@ class CustomConfigGUI : GuiScreen() {
         addHotspot(saveX, footerY, saveW, 12) { this.mc.displayGuiScreen(null) }
 
         super.drawScreen(mouseX, mouseY, partialTicks)
+        GlStateManager.color(1f, 1f, 1f, 1f)
     }
 
     private fun isHovered(x: Int, y: Int, w: Int, h: Int) = hoverX in x..(x + w) && hoverY in y..(y + h)
@@ -634,17 +636,20 @@ class CustomConfigGUI : GuiScreen() {
 
     private inline fun glSettings(block: () -> Unit) {
         GlStateManager.pushMatrix()
-        GlStateManager.enableBlend()
-        GlStateManager.disableTexture2D()
-        GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0)
-        GlStateManager.shadeModel(GL11.GL_SMOOTH)
         try {
-            block()
+            GlStateManager.enableBlend()
+            GlStateManager.disableTexture2D()
+            GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0)
+            GlStateManager.shadeModel(GL11.GL_SMOOTH)
+            try {
+                block()
+            } finally {
+                GlStateManager.color(1f, 1f, 1f, 1f)
+                GlStateManager.shadeModel(GL11.GL_FLAT)
+                GlStateManager.enableTexture2D()
+                GlStateManager.disableBlend()
+            }
         } finally {
-            GlStateManager.color(1f, 1f, 1f, 1f)
-            GlStateManager.shadeModel(GL11.GL_FLAT)
-            GlStateManager.enableTexture2D()
-            GlStateManager.disableBlend()
             GlStateManager.popMatrix()
         }
     }
