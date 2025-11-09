@@ -11,7 +11,6 @@ import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
-import java.util.*
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -35,7 +34,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
 
     // --- Etat général
     private var tapping = false
-    private var fishTimer: Timer? = null
+    private var fishTimer: TimeUtils.TaskHandle? = null
 
     // --- Strafe machine
     private var strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1

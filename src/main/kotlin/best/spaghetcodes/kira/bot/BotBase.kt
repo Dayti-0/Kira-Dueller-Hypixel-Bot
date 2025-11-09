@@ -26,7 +26,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent
-import java.util.Timer
 
 open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
@@ -45,7 +44,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var attackedID = -1
 
     private var opponent: EntityPlayer? = null
-    private var opponentTimer: Timer? = null
+    private var opponentTimer: TimeUtils.TaskHandle? = null
     private var calledFoundOpponent = false
 
     protected var combo = 0
@@ -59,7 +58,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var hbLastHitAt = 0L
     protected var hbActiveUntil = 0L
 
-    private var reconnectTimer: Timer? = null
+    private var reconnectTimer: TimeUtils.TaskHandle? = null
 
     private var ticksSinceGameStart = 0
 

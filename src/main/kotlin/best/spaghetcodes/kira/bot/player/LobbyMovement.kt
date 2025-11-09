@@ -4,9 +4,9 @@ import best.spaghetcodes.kira.core.Config
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.RandomUtils
 import best.spaghetcodes.kira.utils.TimeUtils
+import best.spaghetcodes.kira.utils.TimeUtils.TaskHandle
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
-import java.util.*
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -20,7 +20,7 @@ object LobbyMovement {
     // === commun ===
     private var tickYawChange = 0f
     private var desiredPitch: Float? = null
-    private var intervals: ArrayList<Timer?> = ArrayList()
+    private var intervals: ArrayList<TaskHandle?> = ArrayList()
     private var activeMovementType: Config.LobbyMovementType? = null
 
     private fun canActivateAndRunAnyMovement(): Boolean {

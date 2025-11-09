@@ -2,7 +2,7 @@ package best.spaghetcodes.kira.bot.player
 
 import best.spaghetcodes.kira.utils.RandomUtils
 import best.spaghetcodes.kira.utils.TimeUtils
-import java.util.Timer
+import best.spaghetcodes.kira.utils.TimeUtils.TaskHandle
 
 object Combat {
 
@@ -10,7 +10,7 @@ object Combat {
     private var randomStrafeMin = 0
     private var randomStrafeMax = 0
 
-    private var wTapTimer: Timer? = null
+    private var wTapTimer: TaskHandle? = null
 
     fun wTap(duration: Int) {
         Movement.stopForward()
