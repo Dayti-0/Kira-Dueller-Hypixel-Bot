@@ -24,7 +24,7 @@ class StatsOverlay {
         val ratio = if (losses == 0) wins.toFloat() else wins.toFloat() / losses
         val winrate = if (total == 0) 0f else (wins.toFloat() / total) * 100f
 
-        val elapsed = if (Session.startTime > 0) System.currentTimeMillis() - Session.startTime else 0L
+        val elapsed = Session.getActiveDurationMs()
         val hours = elapsed / 1000.0 / 3600.0
         val winsPerHour = if (hours > 0) wins / hours else 0.0
         val minutes = elapsed / 1000 / 60

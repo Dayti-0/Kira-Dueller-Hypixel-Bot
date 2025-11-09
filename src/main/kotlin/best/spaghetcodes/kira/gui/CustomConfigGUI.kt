@@ -524,8 +524,7 @@ class CustomConfigGUI : GuiScreen() {
         val total = wins + losses
         val wlr = if (losses == 0) wins.toFloat() else wins.toFloat() / losses
         val winrate = if (total == 0) 0f else (wins.toFloat() / total) * 100f
-        val minutes =
-            if (Session.startTime > 0) max(0L, (System.currentTimeMillis() - Session.startTime) / 1000 / 60) else 0
+        val minutes = (Session.getActiveDurationMs() / 1000 / 60).coerceAtLeast(0L)
 
         fun drawStat(label: String, value: String, valueColor: Int) {
             val yPos = y - scroll

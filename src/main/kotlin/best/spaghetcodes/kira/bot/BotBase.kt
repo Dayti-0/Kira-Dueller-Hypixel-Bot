@@ -36,6 +36,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun toggled() = toggled
     fun toggle() {
         toggled = !toggled
+        Session.updateBotEnabled(toggled)
         if (!toggled) {
             resetAntiDetection()
         }
@@ -284,7 +285,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                     }
 
                                     if ((kira.config?.disconnectAfterMinutes ?: 0) > 0) {
-                                        if (System.currentTimeMillis() - Session.startTime >= kira.config?.disconnectAfterMinutes!! * 60 * 1000) {
+                                        val activeDuration = Session.getActiveDurationMs()
+                                        if (activeDuration >= kira.config?.disconnectAfterMinutes!! * 60 * 1000) {
                                             ChatUtils.info("Played for ${kira.config?.disconnectAfterMinutes} minutes, disconnecting...")
                                             TimeUtils.setTimeout({
                                                 ChatUtils.sendAsPlayer("/l duels")
@@ -353,9 +355,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                     force = true
                 )
                 joinGame()
-                if (Session.startTime <= 0L) {
-                    Session.startTime = System.currentTimeMillis()
-                }
                 resultCounted = false
             }
         }
