@@ -36,6 +36,12 @@ class CustomConfigGUI : GuiScreen() {
 
     private data class Rect(val x1: Int, val y1: Int, val x2: Int, val y2: Int, val onClick: () -> Unit)
 
+    private data class ToggleSpec(
+        val label: String,
+        val getter: () -> Boolean,
+        val setter: (Boolean) -> Unit
+    )
+
     private val hotspots = mutableListOf<Rect>()
 
     override fun initGui() {
@@ -201,6 +207,28 @@ class CustomConfigGUI : GuiScreen() {
             drawCircle(controlEdgeX.toFloat(), circleY, radius, if (v) primaryColor else accentColor)
         }
         addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) { set(!v) }
+    }
+
+    private fun drawToggleSection(
+        label: String,
+        x: Int,
+        yStart: Int,
+        width: Int,
+        toggles: List<ToggleSpec>
+    ): Int {
+        if (toggles.isEmpty()) return yStart
+
+        var y = drawSectionHeader(label, x, yStart, width)
+        y += SECTION_SPACING
+
+        toggles.forEach { spec ->
+            toggle(spec.label, x, y, width, spec.getter, spec.setter)
+            y += ROW_HEIGHT
+        }
+
+        y += SECTION_SPACING / 2
+
+        return y
     }
 
     private fun numberControl(
@@ -501,9 +529,16 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader("Misc", x, y, width); y += SECTION_SPACING
-        toggle("Boxing: Use Fish", x, y, width, { cfg.boxingFish }, { cfg.boxingFish = it }); y += ROW_HEIGHT
-        toggle("Anti Detection", x, y, width, { cfg.antiDetection }, { cfg.antiDetection = it }); y += ROW_HEIGHT
+        y = drawToggleSection(
+            "Misc",
+            x,
+            y,
+            width,
+            listOf(
+                ToggleSpec("Boxing: Use Fish", { cfg.boxingFish }, { cfg.boxingFish = it }),
+                ToggleSpec("Anti Detection", { cfg.antiDetection }, { cfg.antiDetection = it })
+            )
+        )
 
         return y
     }
