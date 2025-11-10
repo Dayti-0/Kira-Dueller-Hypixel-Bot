@@ -5,6 +5,7 @@ import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.utils.ChatUtils
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.ScaledResolution
+import net.minecraft.client.renderer.GlStateManager
 import org.lwjgl.input.Keyboard
 import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.GL11
