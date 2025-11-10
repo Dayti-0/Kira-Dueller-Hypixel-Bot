@@ -3,7 +3,6 @@ package best.spaghetcodes.kira.gui
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.GlStateManager
 import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.entity.RenderManager
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
@@ -16,44 +15,44 @@ object NametagRenderer {
 
     @SubscribeEvent
     fun onRenderLivingSpecial(event: RenderLivingEvent.Specials.Pre<EntityLivingBase>) {
-        val mc: Minecraft? = Minecraft.getMinecraft()
-        if (mc == null) {
-            return
-        }
-
-        val renderManager: RenderManager? = mc.renderManager
-        if (renderManager == null) {
-            return
-        }
-
+        val mc = Minecraft.getMinecraft() ?: return
+        val renderManager = mc.renderManager ?: return
         val fontRenderer = mc.fontRendererObj ?: return
-        val viewer: EntityPlayer = mc.thePlayer ?: return
-        val entityPlayer = event.entity as? EntityPlayer ?: return
-        val world = entityPlayer.worldObj ?: return
+
+        val baseEntity: EntityLivingBase = event.entity
+        if (baseEntity !is EntityPlayer) {
+            return
+        }
+
+        val entity = baseEntity
+
+        val viewer = (renderManager.livingPlayer ?: mc.thePlayer) ?: return
+        val world = entity.worldObj ?: return
         val scoreboard = world.scoreboard ?: return
-        val team = entityPlayer.team ?: scoreboard.getPlayersTeam(entityPlayer.commandSenderName)
+        val team = entity.team ?: scoreboard.getPlayersTeam(entity.commandSenderName)
 
-        if (!entityPlayer.isEntityAlive) {
+        if (!entity.isEntityAlive || entity.isInvisible) {
             return
         }
 
-        if (entityPlayer.isInvisible) {
+        if (!event.renderer.canRenderName(entity)) {
             return
         }
 
-        if (entityPlayer.getDistanceSqToEntity(viewer) > 64.0 * 64.0) {
+        if (entity.getDistanceSqToEntity(viewer) > 64.0 * 64.0) {
             return
         }
 
-        if (entityPlayer === viewer && mc.gameSettings.thirdPersonView == 0) {
+        if (entity === viewer && mc.gameSettings.thirdPersonView == 0) {
             return
         }
 
         val name = if (team != null) {
-            ScorePlayerTeam.formatPlayerName(team, entityPlayer.commandSenderName)
+            ScorePlayerTeam.formatPlayerName(team, entity.commandSenderName)
         } else {
-            entityPlayer.displayName.formattedText
+            entity.displayName.formattedText
         }
+
         event.isCanceled = true
 
         val x = event.x
@@ -62,7 +61,7 @@ object NametagRenderer {
 
         GlStateManager.pushMatrix()
         try {
-            GlStateManager.translate(x, y + entityPlayer.height + 0.5f, z)
+            GlStateManager.translate(x, y + entity.height + 0.5f, z)
             GlStateManager.rotate(-renderManager.playerViewY, 0f, 1f, 0f)
             GlStateManager.rotate(renderManager.playerViewX, 1f, 0f, 0f)
             GlStateManager.scale(-0.025f, -0.025f, 0.025f)
