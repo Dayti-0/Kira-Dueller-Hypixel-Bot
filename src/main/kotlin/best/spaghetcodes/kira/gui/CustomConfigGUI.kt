@@ -10,7 +10,10 @@ import org.lwjgl.input.Keyboard
 import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.GL11
 import java.awt.Color
-import kotlin.math.*
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.cos
 
 class CustomConfigGUI : GuiScreen() {
 
@@ -196,16 +199,18 @@ class CustomConfigGUI : GuiScreen() {
 
         val radius = 4f
         val circleY = yPos + fontRendererObj.FONT_HEIGHT / 2f - 1
+        val circleX = controlEdgeX.toFloat()
 
         glSettings {
             drawCircle(
-                controlEdgeX.toFloat(),
+                circleX,
                 circleY,
-                radius + 1,
+                radius + 1f,
                 if (v) Color(primaryColor).darker().darker().rgb else darkGrayColor
             )
-            drawCircle(controlEdgeX.toFloat(), circleY, radius, if (v) primaryColor else accentColor)
+            drawCircle(circleX, circleY, radius, if (v) primaryColor else accentColor)
         }
+
         addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) { set(!v) }
     }
 
@@ -638,11 +643,14 @@ class CustomConfigGUI : GuiScreen() {
         GlStateManager.disableTexture2D()
         GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0)
         GlStateManager.shadeModel(GL11.GL_SMOOTH)
-        block()
-        GlStateManager.shadeModel(GL11.GL_FLAT)
-        GlStateManager.enableTexture2D()
-        GlStateManager.disableBlend()
-        GlStateManager.popMatrix()
+        try {
+            block()
+        } finally {
+            GlStateManager.shadeModel(GL11.GL_FLAT)
+            GlStateManager.enableTexture2D()
+            GlStateManager.disableBlend()
+            GlStateManager.popMatrix()
+        }
     }
 
 }
