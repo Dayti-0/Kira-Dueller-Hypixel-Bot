@@ -34,7 +34,13 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private var toggled = false
     fun toggled() = toggled
-    fun toggle() { toggled = !toggled }
+    fun toggle() {
+        toggled = !toggled
+        Session.updateBotEnabled(toggled)
+        if (!toggled) {
+            resetAntiDetection()
+        }
+    }
 
     private var attackedID = -1
 
@@ -63,6 +69,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
+
+    private var antiDetectionStage = 0
 
     fun opponent() = opponent
 
@@ -120,6 +128,61 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         hbNextAllowedAt = now
     }
 
+    private fun resetAntiDetection() {
+        antiDetectionStage = 0
+    }
+
+    private fun performSneakCycles(cycles: Int) {
+        var delay = 0
+        repeat(cycles) { index ->
+            TimeUtils.setTimeout(Movement::startSneaking, delay)
+            val hold = RandomUtils.randomIntInRange(120, 240)
+            TimeUtils.setTimeout(Movement::stopSneaking, delay + hold)
+            delay += hold
+            if (index < cycles - 1) {
+                val pause = RandomUtils.randomIntInRange(120, 260)
+                delay += pause
+            }
+        }
+    }
+
+    private fun sendAntiDetectionMessage(message: String) {
+        ChatUtils.sendAsPlayer("/ac $message")
+    }
+
+    private fun handleAntiDetection(distance: Float) {
+        val cfg = kira.config ?: return
+        if (!cfg.antiDetection) {
+            resetAntiDetection()
+            return
+        }
+
+        if (StateManager.state != StateManager.States.PLAYING) {
+            resetAntiDetection()
+            return
+        }
+
+        if (distance <= 7f) {
+            return
+        }
+
+        when (antiDetectionStage) {
+            0 -> if (ticksSinceHit >= 30 * 20) {
+                performSneakCycles(RandomUtils.randomIntInRange(2, 3))
+                sendAntiDetectionMessage("??")
+                antiDetectionStage = 1
+            }
+            1 -> if (ticksSinceHit >= 50 * 20) {
+                sendAntiDetectionMessage("what are you doing?")
+                antiDetectionStage = 2
+            }
+            2 -> if (ticksSinceHit >= 70 * 20) {
+                sendAntiDetectionMessage("You're wasting your time.")
+                antiDetectionStage = 3
+            }
+        }
+    }
+
     private fun maybeHitBlock() {
         val cfg = kira.config ?: return
         if (!cfg.hitBlock) return
@@ -173,6 +236,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 combo++
                                 opponentCombo = 0
                                 ticksSinceHit = 0
+                                resetAntiDetection()
                                 maybeHitBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
@@ -221,7 +285,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                     }
 
                                     if ((kira.config?.disconnectAfterMinutes ?: 0) > 0) {
-                                        if (System.currentTimeMillis() - Session.startTime >= kira.config?.disconnectAfterMinutes!! * 60 * 1000) {
+                                        val activeDuration = Session.getActiveDurationMs()
+                                        if (activeDuration >= kira.config?.disconnectAfterMinutes!! * 60 * 1000) {
                                             ChatUtils.info("Played for ${kira.config?.disconnectAfterMinutes} minutes, disconnecting...")
                                             TimeUtils.setTimeout({
                                                 ChatUtils.sendAsPlayer("/l duels")
@@ -269,6 +334,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             if (mc.thePlayer != null && opponent != null) {
                 ticksSinceHit++
                 val distance = EntityUtils.getDistanceNoY(mc.thePlayer, opponent)
+                handleAntiDetection(distance)
                 if (distance > 5 && (combo != 0 || opponentCombo != 0)) {
                     combo = 0
                     opponentCombo = 0
@@ -289,9 +355,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                     force = true
                 )
                 joinGame()
-                if (Session.startTime <= 0L) {
-                    Session.startTime = System.currentTimeMillis()
-                }
                 resultCounted = false
             }
         }
@@ -411,6 +474,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
+        resetAntiDetection()
     }
 
     private fun gameStart() {

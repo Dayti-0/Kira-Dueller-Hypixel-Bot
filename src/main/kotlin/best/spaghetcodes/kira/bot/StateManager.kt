@@ -18,9 +18,17 @@ object StateManager {
     }
 
     var state = States.LOBBY
+        private set(value) {
+            field = value
+            Session.updateBotState(value)
+        }
     var gameFull = false
     var gameStartedAt = -1L
     var lastGameDuration = 0L
+
+    init {
+        Session.updateBotState(state)
+    }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     fun onChat(ev: ClientChatReceivedEvent) {
