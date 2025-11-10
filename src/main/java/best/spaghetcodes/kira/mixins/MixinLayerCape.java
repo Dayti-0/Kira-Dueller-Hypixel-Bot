@@ -25,7 +25,7 @@ public abstract class MixinLayerCape {
 
     @Shadow
     @Final
-    private RenderPlayer field_177167_a;
+    private RenderPlayer playerRenderer;
 
     @Unique
     private static final Logger KIRA$LOGGER = LogManager.getLogger("Kira");
@@ -34,9 +34,9 @@ public abstract class MixinLayerCape {
     private static final Set<UUID> KIRA$FAILED_CAPES = new HashSet<>();
 
     @Overwrite
-    public void func_177141_a(AbstractClientPlayer player, float limbSwing, float limbSwingAmount, float partialTicks,
+    public void doRenderLayer(AbstractClientPlayer player, float limbSwing, float limbSwingAmount, float partialTicks,
                               float ageInTicks, float netHeadYaw, float headPitch, float scale) {
-        if (player == null || player.func_82150_aj() || !player.func_175148_a(EnumPlayerModelParts.CAPE)) {
+        if (player == null || !player.hasPlayerInfo() || player.isInvisible() || !player.isWearing(EnumPlayerModelParts.CAPE)) {
             return;
         }
 
@@ -45,7 +45,7 @@ public abstract class MixinLayerCape {
             return;
         }
 
-        RenderPlayer renderer = this.field_177167_a;
+        RenderPlayer renderer = this.playerRenderer;
         if (renderer == null) {
             return;
         }
