@@ -9,12 +9,10 @@ import org.lwjgl.input.Keyboard
 import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.GL11
 import java.awt.Color
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
+import kotlin.math.sin
+import kotlin.math.cos
 
 class CustomConfigGUI : GuiScreen() {
 
@@ -198,84 +196,21 @@ class CustomConfigGUI : GuiScreen() {
         val v = get()
         drawString(fontRendererObj, label, x, yPos, highlightColor)
 
-        val trackWidth = 32
-        val trackHeight = 14
-        val trackX = controlEdgeX - trackWidth
-        val trackY = yPos - trackHeight / 2
-        val hovered = isHovered(trackX, trackY, trackWidth, trackHeight)
-        val pressed = hovered && Mouse.isButtonDown(0)
+        val radius = 4f
+        val circleY = yPos + fontRendererObj.FONT_HEIGHT / 2f - 1
+        val circleX = controlEdgeX.toFloat()
 
-        val baseTrack = if (v) primaryColor else accentColor
-        val baseBorder = if (v) lighten(primaryColor, 0.15f) else darkGrayColor
-        val knobBase = if (v) Color(230, 255, 245).rgb else Color(215, 220, 235).rgb
-
-        var trackColor = baseTrack
-        var borderColor = baseBorder
-        var knobColor = knobBase
-
-        if (hovered) {
-            trackColor = lighten(trackColor, 0.12f)
-            borderColor = lighten(borderColor, 0.08f)
-            knobColor = lighten(knobColor, 0.08f)
+        glSettings {
+            drawCircle(
+                circleX,
+                circleY,
+                radius + 1f,
+                if (v) Color(primaryColor).darker().darker().rgb else darkGrayColor
+            )
+            drawCircle(circleX, circleY, radius, if (v) primaryColor else accentColor)
         }
 
-        if (pressed) {
-            trackColor = darken(trackColor, 0.10f)
-            borderColor = darken(borderColor, 0.06f)
-            knobColor = darken(knobColor, 0.10f)
-        }
-
-        drawCapsule(trackX, trackY, trackWidth, trackHeight, borderColor)
-        drawCapsule(trackX + 1, trackY + 1, trackWidth - 2, trackHeight - 2, trackColor)
-
-        val knobDiameter = trackHeight - 4
-        val knobX = trackX + 2 + if (v) trackWidth - knobDiameter - 4 else 0
-        val knobY = trackY + 2
-
-        val knobBorder = if (v) lighten(borderColor, 0.25f) else lighten(darkGrayColor, 0.2f)
-        drawCapsule(knobX, knobY, knobDiameter, knobDiameter, knobBorder)
-        drawCapsule(knobX + 1, knobY + 1, knobDiameter - 2, knobDiameter - 2, knobColor)
-
-        if (!v && hovered) {
-            val indicatorY = knobY + knobDiameter / 2
-            drawRect(trackX + 4, indicatorY, trackX + trackWidth - 4, indicatorY + 1, lighten(trackColor, 0.25f))
-        }
-
-        addHotspot(trackX, trackY, trackWidth, trackHeight) { set(!v) }
-    }
-
-    private fun drawCapsule(x: Int, y: Int, width: Int, height: Int, color: Int) {
-        if (width <= 0 || height <= 0) return
-
-        val radius = min(width, height) / 2f
-        val leftCenter = x + radius
-        val rightCenter = x + width - radius
-
-        for (row in 0 until height) {
-            val dy = radius - (row + 0.5f)
-            val dx = sqrt(max(0f, radius * radius - dy * dy))
-            val left = floor(leftCenter - dx).toInt()
-            val right = ceil(rightCenter + dx).toInt()
-            if (right > left) {
-                drawRect(left, y + row, right, y + row + 1, color)
-            }
-        }
-    }
-
-    private fun lighten(color: Int, amount: Float): Int = blend(color, -0x1, amount)
-
-    private fun darken(color: Int, amount: Float): Int = blend(color, 0xFF000000.toInt(), amount)
-
-    private fun blend(color: Int, target: Int, amount: Float): Int {
-        val ratio = amount.coerceIn(0f, 1f)
-        val inverse = 1f - ratio
-
-        val a = ((color ushr 24) and 0xFF) * inverse + ((target ushr 24) and 0xFF) * ratio
-        val r = ((color ushr 16) and 0xFF) * inverse + ((target ushr 16) and 0xFF) * ratio
-        val g = ((color ushr 8) and 0xFF) * inverse + ((target ushr 8) and 0xFF) * ratio
-        val b = (color and 0xFF) * inverse + (target and 0xFF) * ratio
-
-        return (a.roundToInt() shl 24) or (r.roundToInt() shl 16) or (g.roundToInt() shl 8) or b.roundToInt()
+        addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) { set(!v) }
     }
 
     private fun drawToggleSection(
@@ -678,6 +613,43 @@ class CustomConfigGUI : GuiScreen() {
         GL11.glScissor(x * sf, (sr.scaledHeight - (y + h)) * sf, w * sf, h * sf)
         draw()
         GL11.glDisable(GL11.GL_SCISSOR_TEST)
+    }
+
+    private fun setColor(color: Int, alphaMultiplier: Float = 1f) {
+        val a = (color shr 24 and 255).toFloat() / 255.0f
+        val r = (color shr 16 and 255).toFloat() / 255.0f
+        val g = (color shr 8 and 255).toFloat() / 255.0f
+        val b = (color and 255).toFloat() / 255.0f
+        GlStateManager.color(r, g, b, a * fadeIn * alphaMultiplier)
+    }
+
+    private fun drawCircle(x: Float, y: Float, radius: Float, color: Int) {
+        setColor(color)
+        GL11.glBegin(GL11.GL_TRIANGLE_FAN)
+        GL11.glVertex2f(x, y)
+        for (i in 0..360 step 10) {
+            GL11.glVertex2f(
+                x + sin(Math.toRadians(i.toDouble())).toFloat() * radius,
+                y + cos(Math.toRadians(i.toDouble())).toFloat() * radius
+            )
+        }
+        GL11.glEnd()
+    }
+
+    private inline fun glSettings(block: () -> Unit) {
+        GlStateManager.pushMatrix()
+        GlStateManager.enableBlend()
+        GlStateManager.disableTexture2D()
+        GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0)
+        GlStateManager.shadeModel(GL11.GL_SMOOTH)
+        try {
+            block()
+        } finally {
+            GlStateManager.shadeModel(GL11.GL_FLAT)
+            GlStateManager.enableTexture2D()
+            GlStateManager.disableBlend()
+            GlStateManager.popMatrix()
+        }
     }
 
 }
