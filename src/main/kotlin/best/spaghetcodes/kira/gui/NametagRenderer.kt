@@ -28,14 +28,10 @@ object NametagRenderer {
 
         val viewer = (renderManager.livingPlayer ?: mc.thePlayer) ?: return
         val world = entity.worldObj ?: return
-        val scoreboard = world.scoreboard ?: return
-        val team = entity.team ?: scoreboard.getPlayersTeam(entity.commandSenderName)
+        val scoreboard = world.scoreboard
+        val team = entity.team ?: scoreboard?.getPlayersTeam(entity.name)
 
         if (!entity.isEntityAlive || entity.isInvisible) {
-            return
-        }
-
-        if (!event.renderer.canRenderName(entity)) {
             return
         }
 
@@ -48,7 +44,7 @@ object NametagRenderer {
         }
 
         val name = if (team != null) {
-            ScorePlayerTeam.formatPlayerName(team, entity.commandSenderName)
+            ScorePlayerTeam.formatPlayerName(team, entity.name)
         } else {
             entity.displayName.formattedText
         }
