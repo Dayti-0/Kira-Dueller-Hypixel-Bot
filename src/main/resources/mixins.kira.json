@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.7",
+  "compatibilityLevel": "JAVA_8",
+  "package": "best.spaghetcodes.kira.mixins",
+  "refmap": "mixins.kira.refmap.json",
+  "mixins": [
+    "MixinModList",
+    "MixinEffectRenderer",
+    "MixinLayerCape"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
