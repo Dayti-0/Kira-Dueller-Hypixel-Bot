@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.commands.ConfigCommand
 import best.spaghetcodes.kira.core.Config
 import best.spaghetcodes.kira.core.KeyBindings
+import best.spaghetcodes.kira.gui.NametagRenderer
 import best.spaghetcodes.kira.gui.StatsOverlay
 import best.spaghetcodes.kira.events.packet.PacketListener
 import com.google.gson.Gson
@@ -59,6 +60,7 @@ class kira {
         MinecraftForge.EVENT_BUS.register(LobbyMovement)
         MinecraftForge.EVENT_BUS.register(KeyBindings)
         MinecraftForge.EVENT_BUS.register(StatsOverlay())
+        MinecraftForge.EVENT_BUS.register(NametagRenderer)
 
         // Utilise l’accès typé -> aucun Any ici.
         val idx = config?.currentBot ?: 0
