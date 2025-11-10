@@ -5,12 +5,12 @@ import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.utils.ChatUtils
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.ScaledResolution
-import net.minecraft.client.renderer.GlStateManager
 import org.lwjgl.input.Keyboard
 import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.GL11
 import java.awt.Color
-import kotlin.math.*
+import kotlin.math.max
+import kotlin.math.min
 
 class CustomConfigGUI : GuiScreen() {
 
@@ -194,19 +194,27 @@ class CustomConfigGUI : GuiScreen() {
         val v = get()
         drawString(fontRendererObj, label, x, yPos, highlightColor)
 
-        val radius = 4f
-        val circleY = yPos + fontRendererObj.FONT_HEIGHT / 2f - 1
+        val boxSize = 10
+        val boxX = controlEdgeX - boxSize
+        val boxY = yPos - boxSize / 2 - 1
+        val hovered = isHovered(boxX, boxY, boxSize, boxSize)
 
-        glSettings {
-            drawCircle(
-                controlEdgeX.toFloat(),
-                circleY,
-                radius + 1,
-                if (v) Color(primaryColor).darker().darker().rgb else darkGrayColor
-            )
-            drawCircle(controlEdgeX.toFloat(), circleY, radius, if (v) primaryColor else accentColor)
+        val borderColor = if (v) primaryColor else darkGrayColor
+        val fillColor = when {
+            v -> primaryColor
+            hovered -> highlightColor
+            else -> accentColor
         }
-        addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) { set(!v) }
+
+        drawRect(boxX, boxY, boxX + boxSize, boxY + boxSize, borderColor)
+        drawRect(boxX + 1, boxY + 1, boxX + boxSize - 1, boxY + boxSize - 1, fillColor)
+
+        if (v) {
+            val checkY = boxY + boxSize / 2
+            drawRect(boxX + 2, checkY, boxX + boxSize - 2, checkY + 1, Color(0, 0, 0, 120).rgb)
+        }
+
+        addHotspot(boxX, boxY, boxSize, boxSize) { set(!v) }
     }
 
     private fun drawToggleSection(
@@ -609,40 +617,6 @@ class CustomConfigGUI : GuiScreen() {
         GL11.glScissor(x * sf, (sr.scaledHeight - (y + h)) * sf, w * sf, h * sf)
         draw()
         GL11.glDisable(GL11.GL_SCISSOR_TEST)
-    }
-
-    private fun setColor(color: Int, alphaMultiplier: Float = 1f) {
-        val a = (color shr 24 and 255).toFloat() / 255.0f
-        val r = (color shr 16 and 255).toFloat() / 255.0f
-        val g = (color shr 8 and 255).toFloat() / 255.0f
-        val b = (color and 255).toFloat() / 255.0f
-        GlStateManager.color(r, g, b, a * fadeIn * alphaMultiplier)
-    }
-
-    private fun drawCircle(x: Float, y: Float, radius: Float, color: Int) {
-        setColor(color)
-        GL11.glBegin(GL11.GL_TRIANGLE_FAN)
-        GL11.glVertex2f(x, y)
-        for (i in 0..360 step 10) {
-            GL11.glVertex2f(
-                x + sin(Math.toRadians(i.toDouble())).toFloat() * radius,
-                y + cos(Math.toRadians(i.toDouble())).toFloat() * radius
-            )
-        }
-        GL11.glEnd()
-    }
-
-    private inline fun glSettings(block: () -> Unit) {
-        GlStateManager.pushMatrix()
-        GlStateManager.enableBlend()
-        GlStateManager.disableTexture2D()
-        GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0)
-        GlStateManager.shadeModel(GL11.GL_SMOOTH)
-        block()
-        GlStateManager.shadeModel(GL11.GL_FLAT)
-        GlStateManager.enableTexture2D()
-        GlStateManager.disableBlend()
-        GlStateManager.popMatrix()
     }
 
 }
