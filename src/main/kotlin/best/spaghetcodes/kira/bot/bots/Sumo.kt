@@ -20,13 +20,33 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     override fun getName(): String = "Sumo"
 
-    // ================== Réglages généraux ==================
-    private val startSafeDelayMs = 40L
+    // ================== Start-hop : modes ==================
+    private enum class StartHopMode { TIMER, GROUND, HYBRID }
+    // Choix du mode : TIMER (≈300ms), GROUND (au toucher-sol), HYBRID (recommandé)
+    private val startHopMode = StartHopMode.HYBRID
 
-    // ---- Saut #1 exactement à 0.3 s (sans check onGround) ----
+    // TIMER (cible ≈0.30s ; on tire un peu plus tôt pour compenser la latence de tick)
+    private val START_HOP_TIMER_MS = 300L
+    private val START_HOP_TIMER_FUDGE_MS = 40L      // → déclenche ~260–300 ms selon jitter
+
+    // GROUND (déclenche dès qu’on a bien "touché" le sol)
+    private val GROUND_TICKS_REQUIRED = 2           // 2 ticks onGround d’affilée
+    private val GROUND_MAX_WAIT_MS = 290L           // filets : si pas onGround avant ~0.29s → on force
+
+    // Ré-assertions d’avance autour du saut (évite “saut sur place”)
+    private val REASSERT_FWD_1_MS = 30L
+    private val REASSERT_FWD_2_MS = 90L
+
+    // Anti-void neutralisé au tout début (évite de couper l’avance juste avant le 1er saut)
+    private val START_ANTIVOID_DISABLE_MS = 600L
+
+    // ================== Réglages généraux ==================
+    private val startSafeDelayMs = 40L // micro-décalage de sécurité pour les premiers ticks
+
+    // ---- Saut #1 exactement à ~0.3 s (ou touché-sol) ----
     private val startHopAtMs = 300L
     // AUTOTUNE BEGIN
-    private var blockZoneJumpsForMsAfterStart = 600L  // verrou "anti double-saut" après le saut à 0,3 s
+    private var blockZoneJumpsForMsAfterStart = 600L  // verrou "anti double-saut" après le start-hop
     // AUTOTUNE END
 
     // ---- Saut "zone" ----
@@ -97,12 +117,8 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     // AUTOTUNE BEGIN
     private fun attemptLongStrafe(now: Long): Boolean {
-        if (longStrafeChance <= 0 || longStrafeDurationMs <= 0L) {
-            return false
-        }
-        if (RandomUtils.randomIntInRange(1, 100) > longStrafeChance) {
-            return false
-        }
+        if (longStrafeChance <= 0 || longStrafeDurationMs <= 0L) return false
+        if (RandomUtils.randomIntInRange(1, 100) > longStrafeChance) return false
         longStrafeUntil = now + longStrafeDurationMs
         lastStrafeFlip = now
         return true
@@ -120,6 +136,8 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     // Start hop
     private var startHopDone = false
+    private var startHopFiredAt = 0L
+    private var groundTicksSinceStart = 0
 
     // Zone jump
     private var zoneArmed = true
@@ -183,6 +201,17 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     private fun rFromCenter(x: Double, z: Double): Double = hypot(x - centerX, z - centerZ)
 
+    private fun performStartHop(now: Long) {
+        Movement.startForward(); Movement.startSprinting()
+        Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
+        startHopDone = true
+        startHopFiredAt = now
+        lastZoneJumpAt = now // empêche un jump "zone" immédiat
+        // ré-assertions d’avance pour éviter "saut sur place"
+        TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_1_MS.toInt())
+        TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_2_MS.toInt())
+    }
+
     // ================== Hooks ==================
     override fun onGameStart() {
         Mouse.startTracking()
@@ -206,6 +235,8 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // Start-hop
         startHopDone = false
+        startHopFiredAt = 0L
+        groundTicksSinceStart = 0
 
         // Zone jump
         zoneArmed = true
@@ -334,7 +365,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // Sprint permanent
         if (!p.isSprinting) Movement.startSprinting()
-        Mouse.startTracking()
+        Movement.startForward() // re-assert doux à chaque tick
 
         // Évite chase suicidaire si l’ennemi tombe
         val isOppActuallyOffEdge = WorldUtils.entityOffEdge(o)
@@ -348,19 +379,38 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val distance = EntityUtils.getDistanceNoY(p, o)
         val approaching = (prevDistance > 0f) && (prevDistance - distance >= 0.10f)
 
-        // Anti-void devant
-        val voidNear = edgeAhead(edgeProbeNear)
-        val voidFar = edgeAhead(edgeProbeFar)
+        // Anti-void devant (désactivé pendant les premières ms)
+        val enableAntivoid = now - gameStartedAt >= START_ANTIVOID_DISABLE_MS
+        val voidNear = if (enableAntivoid) edgeAhead(edgeProbeNear) else false
+        val voidFar  = if (enableAntivoid) edgeAhead(edgeProbeFar)  else false
         val voidFront = voidNear || voidFar
         if (voidFront) { Movement.stopForward(); Movement.startSneaking() } else { Movement.stopSneaking() }
 
-        // ===== Saut #1 exact à 0.3 s (pas de check onGround) =====
-        if (!startHopDone && (now - gameStartedAt) >= (startHopAtMs + startSafeDelayMs)) {
-            Movement.clearLeftRight()
-            Movement.startForward(); Movement.startSprinting()
-            Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
-            startHopDone = true
-            lastZoneJumpAt = now  // protège contre un double saut immédiat
+        // ======= START-HOP (TIMER / GROUND / HYBRID) =======
+        if (!startHopDone && now - gameStartedAt >= startSafeDelayMs) {
+            when (startHopMode) {
+                StartHopMode.TIMER -> {
+                    if (now - gameStartedAt >= (START_HOP_TIMER_MS - START_HOP_TIMER_FUDGE_MS)) {
+                        performStartHop(now)
+                    }
+                }
+                StartHopMode.GROUND -> {
+                    if (p.onGround) groundTicksSinceStart++ else groundTicksSinceStart = 0
+                    if (groundTicksSinceStart >= GROUND_TICKS_REQUIRED) {
+                        performStartHop(now)
+                    }
+                }
+                StartHopMode.HYBRID -> {
+                    val since = now - gameStartedAt
+                    if (p.onGround) groundTicksSinceStart++ else groundTicksSinceStart = 0
+                    val canGroundHop = groundTicksSinceStart >= GROUND_TICKS_REQUIRED
+                    val timerSafety = since >= (START_HOP_TIMER_MS - START_HOP_TIMER_FUDGE_MS)
+                    val timeoutForce = since >= GROUND_MAX_WAIT_MS
+                    if (canGroundHop || timerSafety || timeoutForce) {
+                        performStartHop(now)
+                    }
+                }
+            }
         }
 
         // ===== AC latch / Prefire =====
@@ -373,22 +423,19 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             Mouse.stopLeftAC()
         }
 
-        // ===== Saut "zone" (règle stricte > 7.0f, jamais ≤ 7.0f) =====
-        val postStartLockActive = startHopDone && (now - gameStartedAt) < (startHopAtMs + blockZoneJumpsForMsAfterStart)
+        // ===== Saut "zone" : > 7.0 => jump, ≤ 7.0 => jamais =====
+        val postStartLockActive = startHopDone && (now - startHopFiredAt) < blockZoneJumpsForMsAfterStart
         val overZone = distance > jumpZoneThreshold
 
         if (zoneArmed && !postStartLockActive && !voidFront && overZone) {
-            if (distance <= jumpZoneThreshold) {
-                // AUTOTUNE BEGIN
-                autoTuneMistakes++
-                // AUTOTUNE END
-            } else {
-                // on saute dès qu'on est > 7.0 blocs
-                Movement.clearLeftRight(); Movement.startForward()
-                Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
-                zoneArmed = false
-                lastZoneJumpAt = now
-            }
+            Movement.startForward(); Movement.startSprinting()
+            Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
+            // ré-assertions pour garantir un jump en mouvement
+            TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_1_MS.toInt())
+            TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_2_MS.toInt())
+
+            zoneArmed = false
+            lastZoneJumpAt = now
         } else if (!zoneArmed) {
             // réarmer seulement après être bien rentré ≤ rearmInnerDist ET avoir attendu un petit délai
             if (distance <= rearmInnerDist && (now - lastZoneJumpAt) >= zoneRearmDelayMs) {
@@ -414,9 +461,8 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             }
         }
 
-        // 2) Micro-bursts irréguliers
+        // 2) Micro-bursts irréguliers (avec option long-strafe du tuner)
         if (sMode == SMode.BURST && now >= nextBurstFlipAt) {
-            // AUTOTUNE BEGIN
             nextBurstFlipAt = now + RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
             if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) > BURST_SKIP_PROBA) {
                 if (!attemptLongStrafe(now)) {
@@ -424,13 +470,11 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                 }
                 lastStrafeFlip = now
             }
-            // AUTOTUNE END
         }
 
         // 3) Close-strafe tenu plus longtemps quand collés
         val closeCtrl = distance <= 2.6f && p.onGround
         if (closeCtrl && now >= nextCloseStrafeAt) {
-            // AUTOTUNE BEGIN
             nextCloseStrafeAt = now + closeStrafeDelay(distance)
             if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) <= 35) {
                 if (!attemptLongStrafe(now)) {
@@ -438,7 +482,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                 }
                 lastStrafeFlip = now
             }
-            // AUTOTUNE END
         }
 
         // 4) Anti-stagnation
@@ -446,7 +489,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         else {
             val d = abs(distance - antiStallRef)
             if (d < ANTI_STALL_EPS) {
-                // AUTOTUNE BEGIN
                 if (now - antiStallAt >= ANTI_STALL_DELAY && now >= longStrafeUntil) {
                     if (!attemptLongStrafe(now)) {
                         strafeDir = -strafeDir
@@ -455,7 +497,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                     antiStallRef = distance
                     antiStallAt = now
                 }
-                // AUTOTUNE END
             } else {
                 antiStallRef = distance
                 antiStallAt = now
@@ -464,7 +505,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // 5) Biais centre (léger) + anti-edge
         if (centerReady) {
-            // AUTOTUNE BEGIN
             val wantLeft = preferLeftToward(centerX, centerZ)
             val enforceCenter = RandomUtils.randomIntInRange(1, 100) <= centerBiasStrength
             if (voidFront) {
@@ -474,7 +514,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                 if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
                 if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
             }
-            // AUTOTUNE END
         }
 
         // Anti-vide latéral
@@ -486,7 +525,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         else { Movement.stopLeft(); Movement.startRight() }
 
         // ===== Avant / arrière =====
-        if (distance < stopForwardDist || edgeAhead(1.0f)) {
+        if (distance < stopForwardDist || (enableAntivoid && edgeAhead(1.0f))) {
             Movement.stopForward()
         } else if (!voidFront) {
             if (distance > reForwardDist) Movement.startForward()
