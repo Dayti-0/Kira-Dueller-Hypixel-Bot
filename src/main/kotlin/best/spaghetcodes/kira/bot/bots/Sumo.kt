@@ -10,6 +10,7 @@ import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
 
 class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
@@ -18,22 +19,21 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     // ================= Réglages généraux =================
     private val startGroundTicksRequired = 3
-    private val startSafeDelayMs = 80L
+    private val startSafeDelayMs = 60L
 
-    // Start-hop (tôt, mais jamais si menace proche)
+    // --- Start Center-Hop (FORCÉ au début pour gratter le centre) ---
     private val startHopEnabled = true
-    private val startHopEarliestMs = 120L
-    private val startHopLatestMs = 280L
-    private val startHopDistMin = 7.8f
-    private val startHopDistMax = 10.5f
+    private val startHopEarliestMs = 70L     // plus tôt
+    private val startHopLatestMs = 160L
+    private val startHopMinForwardTicks = 1  // nombre de ticks de forward avant saut
 
-    // Fenêtre du saut d’engagement (second) – resserrée
+    // --- Fenêtre du saut d’engagement (second) – resserrée ---
     private val engageJumpMin = 6.4f
     private val engageJumpMax = 7.2f
-    private val djumpCdMin = 600
+    private val djumpCdMin = 650
     private val djumpCdMax = 1000
 
-    // Pas de saut si ennemi proche/menaçant
+    // Pas de saut si ennemi proche/menaçant (s’applique au DEUXIÈME saut, pas au start-hop)
     private val noJumpCloseDist = 5.8f
 
     // AC / Prefire
@@ -52,41 +52,41 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     // Hitselecting léger (sans couper le sprint)
     private val enableHitselecting = true
-    private val hitselectChance = 0.28
+    private val hitselectChance = 0.26
     private val hitselectMinDist = 3.6f
-    private val hitselectMaxDist = 6.2f
+    private val hitselectMaxDist = 6.0f
     private val hitselectCooldown = 1200..1800
     private val baitDurationMin = 240
     private val baitDurationMax = 420
     private val stopSprintDuringBait = false
 
-    // ================= Strafe ralenti (inspiré Boxing/OP/Classic) =================
+    // ================= Strafe ralenti (HOLD/BURST + long-strafe rare) =================
     private enum class Mode { HOLD, BURST }
 
-    // Fenêtres HOLD/BURST (larges => cadence lente)
-    private val BURST_FLIP_MIN = 120        // ms
-    private val BURST_FLIP_MAX = 200
-    private val BURST_WINDOW_MIN = 420L     // ms
-    private val BURST_WINDOW_MAX = 700L
-    private val HOLD_WINDOW_MIN = 480L      // ms
-    private val HOLD_WINDOW_MAX = 900L
+    // Fenêtres HOLD/BURST (encore plus larges => cadence encore plus lente)
+    private val BURST_FLIP_MIN = 180        // ms
+    private val BURST_FLIP_MAX = 280
+    private val BURST_WINDOW_MIN = 700L     // ms
+    private val BURST_WINDOW_MAX = 1100L
+    private val HOLD_WINDOW_MIN = 900L      // ms
+    private val HOLD_WINDOW_MAX = 1400L
 
-    // Long strafe opportuniste (rare et doux)
-    private val LONG_STRAFE_MIN = 1000L
+    // Long strafe opportuniste (rare et long)
+    private val LONG_STRAFE_MIN = 1200L
     private val LONG_STRAFE_MAX = 1800L
     private val LONG_STRAFE_DISTANCE_CAP = 3.2f
-    private val LONG_STRAFE_BASE_CHANCE = 22 // %
+    private val LONG_STRAFE_BASE_CHANCE = 16 // %
 
     // Close-strafe : délai de bascule dépendant de la distance (plus près -> plus tenu)
     private fun computeCloseStrafeDelay(distance: Float): Long = when {
-        distance < 1.8f -> RandomUtils.randomIntInRange(260, 340).toLong()
-        distance < 2.6f -> RandomUtils.randomIntInRange(320, 440).toLong()
-        else            -> RandomUtils.randomIntInRange(380, 520).toLong()
+        distance < 1.8f -> RandomUtils.randomIntInRange(360, 520).toLong()
+        distance < 2.6f -> RandomUtils.randomIntInRange(420, 600).toLong()
+        else            -> RandomUtils.randomIntInRange(520, 700).toLong()
     }
 
     // Anti-stagnation (si la distance ne varie pas)
     private val ANTI_STALL_EPS = 0.010f
-    private val ANTI_STALL_DELAY = 360L
+    private val ANTI_STALL_DELAY = 380L
 
     // ================= États =================
     private var gameStartedAt = 0L
@@ -106,6 +106,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     private var canDistanceJump = true
     private var didStartHop = false
+    private var forwardTicksSinceStart = 0
 
     private var isHitselecting = false
     private var hitselectCooldownUntil = 0L
@@ -125,6 +126,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private var closeStrafeNextAt = 0L
     private var antiStallStamp = 0L
     private var antiStallDistRef = -1f
+
+    // Radial control
+    private var lastRadialMode = "neutral"
+    private var radialLockUntil = 0L
 
     // ================= Utils =================
     private fun edgeAhead(dist: Float): Boolean {
@@ -149,6 +154,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             centerZ = (mySpawnZ + oppSpawnZ!!) / 2.0
             centerReady = true
         }
+    }
+
+    private fun distFromCenter(x: Double, z: Double): Double {
+        return hypot(x - centerX, z - centerZ)
     }
 
     private fun isThreatClose(distance: Float, approaching: Boolean): Boolean {
@@ -183,6 +192,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         canDistanceJump = true
         didStartHop = false
+        forwardTicksSinceStart = 0
 
         isHitselecting = false
         hitselectCooldownUntil = 0L
@@ -202,6 +212,9 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         closeStrafeNextAt = 0L
         antiStallStamp = 0L
         antiStallDistRef = -1f
+
+        lastRadialMode = "neutral"
+        radialLockUntil = 0L
     }
 
     override fun onGameEnd() {
@@ -277,18 +290,23 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val voidFront = voidNear || voidFar
         if (voidFront) { Movement.stopForward(); Movement.startSneaking() } else { Movement.stopSneaking() }
 
-        // ===== Start-hop EARLY (bloqué si menace proche) =====
+        // ===== Start Center-Hop (FORCÉ, tôt) =====
         if (startHopEnabled && !didStartHop && startLatched && p.onGround && !voidFront) {
+            // On attend 1-2 ticks de forward pour avoir la vélocité horizontale avant le saut
+            forwardTicksSinceStart++
             val sinceStart = now - gameStartedAt
             if (sinceStart in startHopEarliestMs..startHopLatestMs &&
-                distance in startHopDistMin..startHopDistMax &&
-                !isThreatClose(distance, approaching)
+                forwardTicksSinceStart >= startHopMinForwardTicks
             ) {
-                Movement.clearLeftRight(); Combat.stopRandomStrafe(); Movement.startForward()
+                Movement.clearLeftRight(); Combat.stopRandomStrafe(); Movement.startForward(); Movement.startSprinting()
                 Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
                 didStartHop = true
+                // Verrouille le second saut un court moment pour éviter double-bond instantané
                 canDistanceJump = false
                 TimeUtils.setTimeout({ canDistanceJump = true }, RandomUtils.randomIntInRange(1100, 1400))
+                // Petit lock radial "pressure" post-hop
+                lastRadialMode = "pressure"
+                radialLockUntil = now + 420L
             }
         }
 
@@ -323,7 +341,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             TimeUtils.setTimeout({
                 if (!isHitselecting) return@setTimeout
                 isHitselecting = false
-                // FIX ICI: hiselectCooldown -> hitselectCooldown
                 hitselectCooldownUntil = System.currentTimeMillis() +
                         RandomUtils.randomIntInRange(hitselectCooldown.first, hitselectCooldown.last)
                 if (stoppedSprintForBait && !p.isSprinting) Movement.startSprinting()
@@ -340,7 +357,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             }
         }
 
-        // ===== Second saut d’engagement (bloqué si menace proche) =====
+        // ===== Deuxième saut d’engagement (bloqué si menace proche) =====
         var performedJump = false
         val allowSecondJump = (!didStartHop || (now - gameStartedAt) > 1800)
         if (allowSecondJump && !isHitselecting && !voidFront && p.onGround &&
@@ -354,24 +371,48 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             performedJump = true
         }
 
-        // ===== Strafe ralenti : machine d’états + biais centre =====
-        val centerBias = centerReady
-        val goLeftToCenter = if (centerBias) preferLeftToward(centerX, centerZ) else null
-
-        // 1) Long strafe opportuniste (rare)
-        val canLongStrafe = !isHitselecting && !performedJump && distance <= LONG_STRAFE_DISTANCE_CAP && p.onGround
-        if (canLongStrafe && now >= longStrafeUntil) {
-            if (RandomUtils.randomIntInRange(1, 100) <= LONG_STRAFE_BASE_CHANCE) {
-                longStrafeUntil = now + RandomUtils.randomIntInRange(LONG_STRAFE_MIN.toInt(), LONG_STRAFE_MAX.toInt())
-                strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
-                lastStrafeFlip = now
+        // ===== Radial Center Control =====
+        var biasLeftScore = 0
+        var biasRightScore = 0
+        if (centerReady) {
+            val myR = distFromCenter(p.posX, p.posZ)
+            val opR = distFromCenter(o.posX, o.posZ)
+            val deltaR = myR - opR
+            // Mode "pressure" si je suis plus au centre, "recover" si je suis plus extérieur
+            val newMode = when {
+                deltaR <= -0.7 -> "pressure"
+                deltaR >=  0.7 -> "recover"
+                else -> "neutral"
             }
-        }
-        val inLongStrafe = now < longStrafeUntil
+            // petite hystérésis pour éviter spam de changements
+            if (now >= radialLockUntil || newMode == lastRadialMode) {
+                lastRadialMode = newMode
+                radialLockUntil = now + 260L
+            }
 
-        // 2) Choix/renouvellement HOLD/BURST (fenêtres larges => lenteur)
+            val goLeftToCenter = preferLeftToward(centerX, centerZ)
+            when (lastRadialMode) {
+                "pressure" -> {
+                    // je suis côté centre -> je maintiens le biais centre pour rester “entre lui et le centre”
+                    if (goLeftToCenter) biasLeftScore += 10 else biasRightScore += 10
+                }
+                "recover" -> {
+                    // je suis trop extérieur -> je force très fort vers le centre
+                    if (goLeftToCenter) biasLeftScore += 16 else biasRightScore += 16
+                }
+                else -> {
+                    // léger biais centre par défaut
+                    if (goLeftToCenter) biasLeftScore += 6 else biasRightScore += 6
+                }
+            }
+        } else {
+            // centre inconnu tout début : rien de spécial (on garde la machine lente)
+        }
+
+        // ===== Strafe ralenti : machine d’états + corrections =====
+        val inLongStrafe = now < longStrafeUntil
         if (!inLongStrafe && now >= modeUntil) {
-            mode = if (RandomUtils.randomIntInRange(0, 99) < 55) Mode.BURST else Mode.HOLD
+            mode = if (RandomUtils.randomIntInRange(0, 99) < 50) Mode.BURST else Mode.HOLD
             modeUntil = now + if (mode == Mode.HOLD)
                 RandomUtils.randomIntInRange(HOLD_WINDOW_MIN.toInt(), HOLD_WINDOW_MAX.toInt())
             else
@@ -385,19 +426,29 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             burstToggleAt = now + RandomUtils.randomIntInRange(BURST_FLIP_MIN, BURST_FLIP_MAX)
         }
 
-        // 3) Close-strafe contrôlé (tenu plus longtemps quand très proche)
+        // Long-strafe opportuniste (rare), seulement très proche
+        val canLongStrafe = !isHitselecting && !performedJump && distance <= LONG_STRAFE_DISTANCE_CAP && p.onGround
+        if (canLongStrafe && now >= longStrafeUntil &&
+            RandomUtils.randomIntInRange(1, 100) <= LONG_STRAFE_BASE_CHANCE
+        ) {
+            longStrafeUntil = now + RandomUtils.randomIntInRange(LONG_STRAFE_MIN.toInt(), LONG_STRAFE_MAX.toInt())
+            // fixe une direction et la tient
+            strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
+            lastStrafeFlip = now
+        }
+
+        // Close-strafe tenu plus longtemps
         val closeCtrl = distance <= 2.6f && p.onGround && !inLongStrafe
-        if (closeCtrl) {
-            if (now >= closeStrafeNextAt) {
-                closeStrafeNextAt = now + computeCloseStrafeDelay(distance)
-                if (RandomUtils.randomIntInRange(1, 100) <= 35) {
-                    strafeDir = -strafeDir
-                    lastStrafeFlip = now
-                }
+        if (closeCtrl && now >= closeStrafeNextAt) {
+            closeStrafeNextAt = now + computeCloseStrafeDelay(distance)
+            // petite proba de flip
+            if (RandomUtils.randomIntInRange(1, 100) <= 30) {
+                strafeDir = -strafeDir
+                lastStrafeFlip = now
             }
         }
 
-        // 4) Anti-stagnation de distance
+        // Anti-stagnation de distance
         if (antiStallDistRef < 0f) {
             antiStallDistRef = distance; antiStallStamp = now
         } else {
@@ -415,23 +466,22 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             }
         }
 
-        // 5) Biais centre & anti-edge
-        if (voidFront && centerBias) {
-            val wantLeft = goLeftToCenter == true
-            if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
-            if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
-        } else if (centerBias && now - lastStrafeFlip > 260L) {
-            val wantLeft = goLeftToCenter == true
-            if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
-            if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
+        // Biais centre additionnel + anti-edge
+        if (voidFront && centerReady) {
+            val wantLeft = preferLeftToward(centerX, centerZ)
+            if (wantLeft) { biasLeftScore += 6 } else { biasRightScore += 6 }
         }
 
         // Anti-vide latéral
         if (Movement.left() && WorldUtils.airOnLeft(p, 1.5f) && p.onGround) Movement.stopLeft()
         if (Movement.right() && WorldUtils.airOnRight(p, 1.5f) && p.onGround) Movement.stopRight()
 
-        // 6) Application du strafe final
+        // Application du strafe final (aucun random-strafe)
         if (!isHitselecting) {
+            // Injecte le biais centre dans la décision (doucement)
+            if (biasLeftScore > biasRightScore && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
+            if (biasRightScore > biasLeftScore && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
+
             if (strafeDir < 0) { Movement.stopRight(); Movement.startLeft() }
             else { Movement.stopLeft(); Movement.startRight() }
         } else {
