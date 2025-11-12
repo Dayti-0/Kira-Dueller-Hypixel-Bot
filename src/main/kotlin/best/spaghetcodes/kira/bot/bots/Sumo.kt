@@ -64,11 +64,11 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private enum class Mode { HOLD, BURST }
 
     // Fenêtres HOLD/BURST (larges => cadence lente)
-    private val BURST_FLIP_MIN = 120        // ms — flips ponctuels en BURST (plus lent que Boxing)
+    private val BURST_FLIP_MIN = 120        // ms
     private val BURST_FLIP_MAX = 200
-    private val BURST_WINDOW_MIN = 420L     // ms — fenêtre BURST plus longue => moins de flips
+    private val BURST_WINDOW_MIN = 420L     // ms
     private val BURST_WINDOW_MAX = 700L
-    private val HOLD_WINDOW_MIN = 480L      // ms — HOLD plus “stable”
+    private val HOLD_WINDOW_MIN = 480L      // ms
     private val HOLD_WINDOW_MAX = 900L
 
     // Long strafe opportuniste (rare et doux)
@@ -77,14 +77,14 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private val LONG_STRAFE_DISTANCE_CAP = 3.2f
     private val LONG_STRAFE_BASE_CHANCE = 22 // %
 
-    // Close-strafe : délai de bascule dépendant de la distance (plus près -> plus lent/tenu)
+    // Close-strafe : délai de bascule dépendant de la distance (plus près -> plus tenu)
     private fun computeCloseStrafeDelay(distance: Float): Long = when {
         distance < 1.8f -> RandomUtils.randomIntInRange(260, 340).toLong()
         distance < 2.6f -> RandomUtils.randomIntInRange(320, 440).toLong()
         else            -> RandomUtils.randomIntInRange(380, 520).toLong()
     }
 
-    // Anti-stagnation (si distance ne varie pas)
+    // Anti-stagnation (si la distance ne varie pas)
     private val ANTI_STALL_EPS = 0.010f
     private val ANTI_STALL_DELAY = 360L
 
@@ -323,8 +323,9 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             TimeUtils.setTimeout({
                 if (!isHitselecting) return@setTimeout
                 isHitselecting = false
+                // FIX ICI: hiselectCooldown -> hitselectCooldown
                 hitselectCooldownUntil = System.currentTimeMillis() +
-                        RandomUtils.randomIntInRange(hiselectCooldown.first, hitselectCooldown.last)
+                        RandomUtils.randomIntInRange(hitselectCooldown.first, hitselectCooldown.last)
                 if (stoppedSprintForBait && !p.isSprinting) Movement.startSprinting()
             }, baitDur)
         }
@@ -357,12 +358,11 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val centerBias = centerReady
         val goLeftToCenter = if (centerBias) preferLeftToward(centerX, centerZ) else null
 
-        // 1) Long strafe opportuniste (rare), uniquement si distance courte et pas d’action spéciale
+        // 1) Long strafe opportuniste (rare)
         val canLongStrafe = !isHitselecting && !performedJump && distance <= LONG_STRAFE_DISTANCE_CAP && p.onGround
         if (canLongStrafe && now >= longStrafeUntil) {
             if (RandomUtils.randomIntInRange(1, 100) <= LONG_STRAFE_BASE_CHANCE) {
                 longStrafeUntil = now + RandomUtils.randomIntInRange(LONG_STRAFE_MIN.toInt(), LONG_STRAFE_MAX.toInt())
-                // on fixe une direction et on la tient
                 strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
                 lastStrafeFlip = now
             }
@@ -389,9 +389,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val closeCtrl = distance <= 2.6f && p.onGround && !inLongStrafe
         if (closeCtrl) {
             if (now >= closeStrafeNextAt) {
-                // on autorise un flip lent
                 closeStrafeNextAt = now + computeCloseStrafeDelay(distance)
-                // flip conditionnel (petite proba) pour éviter l’abus
                 if (RandomUtils.randomIntInRange(1, 100) <= 35) {
                     strafeDir = -strafeDir
                     lastStrafeFlip = now
@@ -417,13 +415,12 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             }
         }
 
-        // 5) Biais centre & anti-edge : si vide devant, forcer direction qui ramène centre
+        // 5) Biais centre & anti-edge
         if (voidFront && centerBias) {
             val wantLeft = goLeftToCenter == true
             if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
             if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
         } else if (centerBias && now - lastStrafeFlip > 260L) {
-            // “couple” doux vers le centre si on s’éloigne
             val wantLeft = goLeftToCenter == true
             if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
             if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
@@ -433,7 +430,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         if (Movement.left() && WorldUtils.airOnLeft(p, 1.5f) && p.onGround) Movement.stopLeft()
         if (Movement.right() && WorldUtils.airOnRight(p, 1.5f) && p.onGround) Movement.stopRight()
 
-        // 6) Application du strafe final (aucun random-strafe)
+        // 6) Application du strafe final
         if (!isHitselecting) {
             if (strafeDir < 0) { Movement.stopRight(); Movement.startLeft() }
             else { Movement.stopLeft(); Movement.startRight() }
