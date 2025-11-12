@@ -46,11 +46,11 @@ object SumoTuner {
         val centerBiasStrength: Int,
         val centerBiasIntervalMs: Long,
 
-        // === Nouveaux paramètres pour le start-hop ===
+        // === Nouveaux paramètres Start-Hop ===
         val startHopModeInt: Int,          // 0=TIMER, 1=GROUND, 2=HYBRID
         val startHopTimerFudgeMs: Long,    // compensation autour de 300ms
-        val groundTicksRequired: Int,      // ticks onGround à enchaîner
-        val groundMaxWaitMs: Long,         // filet: force le saut à ~0.29-0.32s
+        val groundTicksRequired: Int,      // nb de ticks onGround à enchaîner
+        val groundMaxWaitMs: Long,         // filet de sécurité si onGround tarde
         val startAntivoidDisableMs: Long   // anti-void désactivé X ms au tout début
     )
 
@@ -88,7 +88,7 @@ object SumoTuner {
     private const val MISTAKE_PENALTY = 0.1
 
     private val specs = listOf(
-        // ----- Existant -----
+        // ----- Réglages existants -----
         ParamSpec("blockZoneLockMs", 400.0, 900.0, 10.0, 600.0, ParamType.LONG),
         ParamSpec("rearmInnerDist", 5.6, 6.8, 0.05, 6.2, ParamType.FLOAT),
         ParamSpec("zoneRearmDelayMs", 1000.0, 2400.0, 20.0, 1400.0, ParamType.LONG),
@@ -122,7 +122,7 @@ object SumoTuner {
         ParamSpec("centerBiasStrength", 60.0, 100.0, 1.0, 100.0, ParamType.INT),
         ParamSpec("centerBiasIntervalMs", 200.0, 420.0, 10.0, 300.0, ParamType.LONG),
 
-        // ----- Nouveaux pour le start-hop -----
+        // ----- Nouveaux pour le Start-Hop -----
         ParamSpec("startHopModeInt", 0.0, 2.0, 1.0, 2.0, ParamType.INT),            // 2 = HYBRID par défaut
         ParamSpec("startHopTimerFudgeMs", 20.0, 60.0, 5.0, 40.0, ParamType.LONG),
         ParamSpec("groundTicksRequired", 1.0, 3.0, 1.0, 2.0, ParamType.INT),
@@ -192,7 +192,7 @@ object SumoTuner {
             centerBiasStrength = chosen.int("centerBiasStrength"),
             centerBiasIntervalMs = chosen.long("centerBiasIntervalMs"),
 
-            // Nouveaux
+            // Nouveaux (Start-Hop)
             startHopModeInt = chosen.int("startHopModeInt"),
             startHopTimerFudgeMs = chosen.long("startHopTimerFudgeMs"),
             groundTicksRequired = chosen.int("groundTicksRequired"),
