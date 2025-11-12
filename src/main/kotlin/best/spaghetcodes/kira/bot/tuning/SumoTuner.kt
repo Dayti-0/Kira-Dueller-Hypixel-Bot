@@ -44,7 +44,14 @@ object SumoTuner {
         val antiStallEps: Float,
         val antiStallDelayMs: Long,
         val centerBiasStrength: Int,
-        val centerBiasIntervalMs: Long
+        val centerBiasIntervalMs: Long,
+
+        // === Nouveaux paramètres pour le start-hop ===
+        val startHopModeInt: Int,          // 0=TIMER, 1=GROUND, 2=HYBRID
+        val startHopTimerFudgeMs: Long,    // compensation autour de 300ms
+        val groundTicksRequired: Int,      // ticks onGround à enchaîner
+        val groundMaxWaitMs: Long,         // filet: force le saut à ~0.29-0.32s
+        val startAntivoidDisableMs: Long   // anti-void désactivé X ms au tout début
     )
 
     private enum class ParamType { FLOAT, INT, LONG }
@@ -81,6 +88,7 @@ object SumoTuner {
     private const val MISTAKE_PENALTY = 0.1
 
     private val specs = listOf(
+        // ----- Existant -----
         ParamSpec("blockZoneLockMs", 400.0, 900.0, 10.0, 600.0, ParamType.LONG),
         ParamSpec("rearmInnerDist", 5.6, 6.8, 0.05, 6.2, ParamType.FLOAT),
         ParamSpec("zoneRearmDelayMs", 1000.0, 2400.0, 20.0, 1400.0, ParamType.LONG),
@@ -112,7 +120,14 @@ object SumoTuner {
         ParamSpec("antiStallEps", 0.005, 0.03, 0.001, 0.01, ParamType.FLOAT),
         ParamSpec("antiStallDelayMs", 260.0, 520.0, 10.0, 380.0, ParamType.LONG),
         ParamSpec("centerBiasStrength", 60.0, 100.0, 1.0, 100.0, ParamType.INT),
-        ParamSpec("centerBiasIntervalMs", 200.0, 420.0, 10.0, 300.0, ParamType.LONG)
+        ParamSpec("centerBiasIntervalMs", 200.0, 420.0, 10.0, 300.0, ParamType.LONG),
+
+        // ----- Nouveaux pour le start-hop -----
+        ParamSpec("startHopModeInt", 0.0, 2.0, 1.0, 2.0, ParamType.INT),            // 2 = HYBRID par défaut
+        ParamSpec("startHopTimerFudgeMs", 20.0, 60.0, 5.0, 40.0, ParamType.LONG),
+        ParamSpec("groundTicksRequired", 1.0, 3.0, 1.0, 2.0, ParamType.INT),
+        ParamSpec("groundMaxWaitMs", 260.0, 340.0, 10.0, 290.0, ParamType.LONG),
+        ParamSpec("startAntivoidDisableMs", 400.0, 900.0, 50.0, 600.0, ParamType.LONG)
     )
 
     private val specByKey = specs.associateBy { it.key }
@@ -175,7 +190,14 @@ object SumoTuner {
             antiStallEps = chosen.float("antiStallEps"),
             antiStallDelayMs = chosen.long("antiStallDelayMs"),
             centerBiasStrength = chosen.int("centerBiasStrength"),
-            centerBiasIntervalMs = chosen.long("centerBiasIntervalMs")
+            centerBiasIntervalMs = chosen.long("centerBiasIntervalMs"),
+
+            // Nouveaux
+            startHopModeInt = chosen.int("startHopModeInt"),
+            startHopTimerFudgeMs = chosen.long("startHopTimerFudgeMs"),
+            groundTicksRequired = chosen.int("groundTicksRequired"),
+            groundMaxWaitMs = chosen.long("groundMaxWaitMs"),
+            startAntivoidDisableMs = chosen.long("startAntivoidDisableMs")
         )
     }
 
@@ -256,9 +278,7 @@ object SumoTuner {
     private fun valueKey(value: Double): String = "%.4f".format(value)
 
     private fun Map<String, Double>.float(key: String): Float = (this[key] ?: specByKey[key]?.default ?: 0.0).toFloat()
-
     private fun Map<String, Double>.int(key: String): Int = clampNumeric(this[key], key).toInt()
-
     private fun Map<String, Double>.long(key: String): Long = clampNumeric(this[key], key).toLong()
 
     private fun clampNumeric(value: Double?, key: String): Double {
