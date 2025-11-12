@@ -1,6 +1,8 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
+import best.spaghetcodes.kira.bot.tuning.SumoTuner
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Mouse
@@ -11,6 +13,8 @@ import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
 
 class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
@@ -21,49 +25,95 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     // ---- Saut #1 exactement à 0.3 s (sans check onGround) ----
     private val startHopAtMs = 300L
-    private val blockZoneJumpsForMsAfterStart = 600L  // verrou "anti double-saut" après le saut à 0,3 s
+    // AUTOTUNE BEGIN
+    private var blockZoneJumpsForMsAfterStart = 600L  // verrou "anti double-saut" après le saut à 0,3 s
+    // AUTOTUNE END
 
     // ---- Saut "zone" ----
     // Règle: SAUTER si distance > 7.0f ; ne jamais sauter si distance ≤ 7.0f
     private val jumpZoneThreshold = 7.0f
     // réarmement anti re-spam: revenir bien à l'intérieur + attendre un délai
-    private val rearmInnerDist = 6.2f
-    private val zoneRearmDelayMs = 1400L
+    // AUTOTUNE BEGIN
+    private var rearmInnerDist = 6.2f
+    private var zoneRearmDelayMs = 1400L
+    // AUTOTUNE END
 
     // AC / Prefire
-    private val attackStartDist = 4.05f
-    private val attackLatchMs = 220L
-    private val prefireFastApproachDist = 4.6f
-    private val prefireLatchMs = 160L
+    // AUTOTUNE BEGIN
+    private var attackStartDist = 4.05f
+    private var attackLatchMs = 220L
+    private var prefireFastApproachDist = 4.6f
+    private var prefireLatchMs = 160L
+    // AUTOTUNE END
 
     // Avance / stop court
-    private val stopForwardDist = 1.18f
-    private val reForwardDist = 2.0f
+    // AUTOTUNE BEGIN
+    private var stopForwardDist = 1.18f
+    private var reForwardDist = 2.0f
+    // AUTOTUNE END
 
     // Détection vide
-    private val edgeProbeNear = 1.6f
-    private val edgeProbeFar = 2.6f
+    // AUTOTUNE BEGIN
+    private var edgeProbeNear = 1.6f
+    private var edgeProbeFar = 2.6f
+    // AUTOTUNE END
 
     // ================== Strafe "Burst Sumo" ==================
     private enum class SMode { HOLD, BURST, COAST }
 
     // Phases : HOLD (ligne stable) → BURST (micro-basculements irréguliers) → COAST (repos)
-    private val HOLD_MS = 900..1500
-    private val COAST_MS = 500..900
-    private val BURST_MS = 300..520
-    private val BURST_FLIP_EVERY_MS = 120..200  // cadence des flips pendant BURST (mais on skip parfois)
-    private val BURST_SKIP_PROBA = 30           // % de chance de sauter un flip (rend le pattern imprévisible)
+    // AUTOTUNE BEGIN
+    private var HOLD_MS = 900..1500
+    private var COAST_MS = 500..900
+    private var BURST_MS = 300..520
+    private var BURST_FLIP_EVERY_MS = 120..200  // cadence des flips pendant BURST (mais on skip parfois)
+    private var BURST_SKIP_PROBA = 30           // % de chance de sauter un flip (rend le pattern imprévisible)
+    private var longStrafeChance = 0
+    private var longStrafeDurationMs = 0L
+    private var centerBiasStrength = 100
+    private var centerBiasIntervalMs = 300L
+    // AUTOTUNE END
 
     // Close-strafe (tenir davantage la direction quand on est collés)
-    private fun closeStrafeDelay(distance: Float): Long = when {
-        distance < 1.8f -> 360L..520L
-        distance < 2.6f -> 420L..600L
-        else            -> 520L..700L
-    }.let { RandomUtils.randomIntInRange(it.start.toInt(), it.endInclusive.toInt()).toLong() }
+    // AUTOTUNE BEGIN
+    private var closeInnerMin = 360L
+    private var closeInnerMax = 520L
+    private var closeMidMin = 420L
+    private var closeMidMax = 600L
+    private var closeFarMin = 520L
+    private var closeFarMax = 700L
+
+    private fun closeStrafeDelay(distance: Float): Long {
+        val (minDelay, maxDelay) = when {
+            distance < 1.8f -> closeInnerMin to closeInnerMax
+            distance < 2.6f -> closeMidMin to closeMidMax
+            else -> closeFarMin to closeFarMax
+        }
+        val minVal = min(minDelay, maxDelay).toInt()
+        val maxVal = max(minDelay, maxDelay).toInt()
+        return RandomUtils.randomIntInRange(minVal, maxVal).toLong()
+    }
+    // AUTOTUNE END
+
+    // AUTOTUNE BEGIN
+    private fun attemptLongStrafe(now: Long): Boolean {
+        if (longStrafeChance <= 0 || longStrafeDurationMs <= 0L) {
+            return false
+        }
+        if (RandomUtils.randomIntInRange(1, 100) > longStrafeChance) {
+            return false
+        }
+        longStrafeUntil = now + longStrafeDurationMs
+        lastStrafeFlip = now
+        return true
+    }
+    // AUTOTUNE END
 
     // Anti-stagnation
-    private val ANTI_STALL_EPS = 0.010f
-    private val ANTI_STALL_DELAY = 380L
+    // AUTOTUNE BEGIN
+    private var ANTI_STALL_EPS = 0.010f
+    private var ANTI_STALL_DELAY = 380L
+    // AUTOTUNE END
 
     // ================== États ==================
     private var gameStartedAt = 0L
@@ -84,6 +134,12 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private var lastStrafeFlip = 0L
     private var antiStallRef = -1f
     private var antiStallAt = 0L
+    // AUTOTUNE BEGIN
+    private var longStrafeUntil = 0L
+    private var autoTuneMistakes = 0
+    private var sessionWinsAtStart = 0
+    private var sessionLossesAtStart = 0
+    // AUTOTUNE END
 
     // Centre
     private var mySpawnX = 0.0
@@ -164,6 +220,58 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         lastStrafeFlip = 0L
         antiStallRef = -1f
         antiStallAt = 0L
+        // AUTOTUNE BEGIN
+        longStrafeUntil = 0L
+        autoTuneMistakes = 0
+        sessionWinsAtStart = Session.wins
+        sessionLossesAtStart = Session.losses
+
+        val params = SumoTuner.pickParams()
+
+        blockZoneJumpsForMsAfterStart = params.blockZoneLockMs
+        rearmInnerDist = params.rearmInnerDist
+        zoneRearmDelayMs = params.zoneRearmDelayMs
+        attackStartDist = params.attackStartDist
+        attackLatchMs = params.attackLatchMs
+        prefireFastApproachDist = params.prefireApproachDist
+        prefireLatchMs = params.prefireLatchMs
+        stopForwardDist = params.stopForwardDist
+        reForwardDist = params.reForwardDist
+        edgeProbeNear = params.edgeProbeNear
+        edgeProbeFar = params.edgeProbeFar
+
+        val holdMin = min(params.holdMsMin, params.holdMsMax)
+        val holdMax = max(params.holdMsMin, params.holdMsMax)
+        HOLD_MS = holdMin..holdMax
+
+        val burstMin = min(params.burstMsMin, params.burstMsMax)
+        val burstMax = max(params.burstMsMin, params.burstMsMax)
+        BURST_MS = burstMin..burstMax
+
+        val coastMin = min(params.coastMsMin, params.coastMsMax)
+        val coastMax = max(params.coastMsMin, params.coastMsMax)
+        COAST_MS = coastMin..coastMax
+
+        val flipMin = min(params.burstFlipMin, params.burstFlipMax)
+        val flipMax = max(params.burstFlipMin, params.burstFlipMax)
+        BURST_FLIP_EVERY_MS = flipMin..flipMax
+
+        BURST_SKIP_PROBA = params.burstSkipPercent
+        longStrafeChance = params.longStrafeChance
+        longStrafeDurationMs = params.longStrafeDurationMs
+
+        closeInnerMin = min(params.closeInnerMin, params.closeInnerMax)
+        closeInnerMax = max(params.closeInnerMin, params.closeInnerMax)
+        closeMidMin = min(params.closeMidMin, params.closeMidMax)
+        closeMidMax = max(params.closeMidMin, params.closeMidMax)
+        closeFarMin = min(params.closeFarMin, params.closeFarMax)
+        closeFarMax = max(params.closeFarMin, params.closeFarMax)
+
+        ANTI_STALL_EPS = params.antiStallEps
+        ANTI_STALL_DELAY = params.antiStallDelayMs
+        centerBiasStrength = params.centerBiasStrength
+        centerBiasIntervalMs = params.centerBiasIntervalMs
+        // AUTOTUNE END
 
         prevDistance = -1f
         keepACUntil = 0L
@@ -173,6 +281,14 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     }
 
     override fun onGameEnd() {
+        // AUTOTUNE BEGIN
+        val win = when {
+            Session.wins > sessionWinsAtStart -> true
+            Session.losses > sessionLossesAtStart -> false
+            else -> opponentOffEdge
+        }
+        SumoTuner.report(win, autoTuneMistakes)
+        // AUTOTUNE END
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({
@@ -261,12 +377,18 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val postStartLockActive = startHopDone && (now - gameStartedAt) < (startHopAtMs + blockZoneJumpsForMsAfterStart)
         val overZone = distance > jumpZoneThreshold
 
-        if (zoneArmed && !postStartLockActive && overZone && !voidFront) {
-            // on saute dès qu'on est > 7.0 blocs
-            Movement.clearLeftRight(); Movement.startForward()
-            Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
-            zoneArmed = false
-            lastZoneJumpAt = now
+        if (zoneArmed && !postStartLockActive && !voidFront && overZone) {
+            if (distance <= jumpZoneThreshold) {
+                // AUTOTUNE BEGIN
+                autoTuneMistakes++
+                // AUTOTUNE END
+            } else {
+                // on saute dès qu'on est > 7.0 blocs
+                Movement.clearLeftRight(); Movement.startForward()
+                Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
+                zoneArmed = false
+                lastZoneJumpAt = now
+            }
         } else if (!zoneArmed) {
             // réarmer seulement après être bien rentré ≤ rearmInnerDist ET avoir attendu un petit délai
             if (distance <= rearmInnerDist && (now - lastZoneJumpAt) >= zoneRearmDelayMs) {
@@ -294,21 +416,29 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // 2) Micro-bursts irréguliers
         if (sMode == SMode.BURST && now >= nextBurstFlipAt) {
-            if (RandomUtils.randomIntInRange(1, 100) > BURST_SKIP_PROBA) {
-                strafeDir = -strafeDir
+            // AUTOTUNE BEGIN
+            nextBurstFlipAt = now + RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
+            if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) > BURST_SKIP_PROBA) {
+                if (!attemptLongStrafe(now)) {
+                    strafeDir = -strafeDir
+                }
                 lastStrafeFlip = now
             }
-            nextBurstFlipAt = now + RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
+            // AUTOTUNE END
         }
 
         // 3) Close-strafe tenu plus longtemps quand collés
         val closeCtrl = distance <= 2.6f && p.onGround
         if (closeCtrl && now >= nextCloseStrafeAt) {
+            // AUTOTUNE BEGIN
             nextCloseStrafeAt = now + closeStrafeDelay(distance)
-            if (RandomUtils.randomIntInRange(1, 100) <= 35) {
-                strafeDir = -strafeDir
+            if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) <= 35) {
+                if (!attemptLongStrafe(now)) {
+                    strafeDir = -strafeDir
+                }
                 lastStrafeFlip = now
             }
+            // AUTOTUNE END
         }
 
         // 4) Anti-stagnation
@@ -316,12 +446,16 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         else {
             val d = abs(distance - antiStallRef)
             if (d < ANTI_STALL_EPS) {
-                if (now - antiStallAt >= ANTI_STALL_DELAY) {
-                    strafeDir = -strafeDir
+                // AUTOTUNE BEGIN
+                if (now - antiStallAt >= ANTI_STALL_DELAY && now >= longStrafeUntil) {
+                    if (!attemptLongStrafe(now)) {
+                        strafeDir = -strafeDir
+                    }
                     lastStrafeFlip = now
                     antiStallRef = distance
                     antiStallAt = now
                 }
+                // AUTOTUNE END
             } else {
                 antiStallRef = distance
                 antiStallAt = now
@@ -330,14 +464,17 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // 5) Biais centre (léger) + anti-edge
         if (centerReady) {
+            // AUTOTUNE BEGIN
             val wantLeft = preferLeftToward(centerX, centerZ)
+            val enforceCenter = RandomUtils.randomIntInRange(1, 100) <= centerBiasStrength
             if (voidFront) {
                 if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
                 if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
-            } else if (now - lastStrafeFlip > 300) {
+            } else if (now - lastStrafeFlip > centerBiasIntervalMs && enforceCenter) {
                 if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
                 if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
             }
+            // AUTOTUNE END
         }
 
         // Anti-vide latéral
