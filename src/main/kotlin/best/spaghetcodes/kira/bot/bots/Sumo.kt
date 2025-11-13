@@ -21,55 +21,60 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private enum class StartHopMode { TIMER, GROUND, HYBRID }
     private var startHopMode: StartHopMode = StartHopMode.HYBRID
 
-    // TIMER (cible ≈0.30s) — désormais tuné
-    private var START_HOP_TIMER_MS = 300L          // <- pris au tuner (startHopTimerTargetMs)
-    private var START_HOP_TIMER_FUDGE_MS = 40L     // compensation tick depuis tuner
+    // TIMER (cible ≈0.30s) — tuné par le Tuner
+    private var START_HOP_TIMER_MS = 300L
+    private var START_HOP_TIMER_FUDGE_MS = 40L
 
-    // GROUND (déclenche dès que onGround est vrai X ticks d’affilée)
+    // GROUND
     private var GROUND_TICKS_REQUIRED = 2
-    private var GROUND_MAX_WAIT_MS = 290L
+    private var GROUND_MAX_WAIT_MS = 300L
 
-    // Ré-assertions d’avance autour des jumps (évite “saut sur place”)
+    // Anti “jump sur place”
     private val REASSERT_FWD_1_MS = 30L
     private val REASSERT_FWD_2_MS = 90L
 
-    // Anti-void neutralisé au tout début (pour ne pas couper l’élan du 1er saut)
+    // Anti-void neutralisé au début
     private var START_ANTIVOID_DISABLE_MS = 600L
 
-    // Petite sécu pour ignorer les tout premiers ms
+    // sécurité au tout début
     private val startSafeDelayMs = 40L
 
-    // Verrou “anti double-saut zone” juste après le start-hop
+    // verrou anti double-saut zone juste après le start-hop
     private var blockZoneJumpsForMsAfterStart = 600L
 
-    // ---- Jump "zone" ----
-    private val jumpZoneThreshold = 7.0f       // SAUTER si > 7.0 ; ne jamais sauter si ≤ 7.0
-    private var rearmInnerDist = 6.2f          // rentrer ≤ 6.2 + délai pour réarmer
+    // ---- Zone jump ----
+    private val jumpZoneThreshold = 7.0f            // SAUTER si >7.0 ; ne jamais sauter si ≤7.0
+    private var rearmInnerDist = 6.2f
     private var zoneRearmDelayMs = 1400L
 
-    // ---- Combat / attaque ----
+    // ---- Combat windows (existants) ----
     private var attackStartDist = 4.05f
     private var attackLatchMs = 220L
     private var prefireFastApproachDist = 4.6f
     private var prefireLatchMs = 160L
 
-    // W-tap paramétrable + “post-hit drive”
+    // ---- Pré-fire “long” aim-gated (NOUVEAU) ----
+    private var hardAttackDist = 4.9f         // AC possible jusqu’à ~5 blocs si aim ok
+    private var preAimDot = 0.96              // exigence d’alignement (dot à plat)
+
+    // W-tap + post-hit drive
     private var wTapShortMs = 50L
     private var wTapLongMs = 100L
     private var postHitDriveMs = 140L
     private val NO_JUMP_DURING_WTAP_PAD_MS = 25L
 
-    // Avance / stop court
+    // Avant / stop court
     private var stopForwardDist = 1.18f
     private var reForwardDist = 2.0f
 
-    // Détection vide (et prédictive)
+    // Anti-void (no sneak)
     private var edgeProbeNear = 1.6f
     private var edgeProbeFar = 2.6f
-    private var predictiveProbeBonus = 0.6f   // ajouté si on va vite dans l’axe avant
+    private var predictiveProbeBonus = 0.6f
 
-    // ================== Strafe "Burst Sumo" ==================
+    // ================== Strafe v2 ==================
     private enum class SMode { HOLD, BURST, COAST }
+    private enum class StrafeStyle { MINIMAL, BURST, HYBRID }
 
     private var HOLD_MS = 900..1500
     private var COAST_MS = 500..900
@@ -77,17 +82,21 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private var BURST_FLIP_EVERY_MS = 120..200
     private var BURST_SKIP_PROBA = 30
 
-    // Long-strafe option (tuner)
+    // style/intensité (NOUVEAU)
+    private var strafeStyle = StrafeStyle.MINIMAL
+    private var strafeIntensity = 25 // 0..100
+
+    // long-strafe existant
     private var longStrafeChance = 0
     private var longStrafeDurationMs = 0L
 
     // Biais centre / edge
-    private var centerBiasStrength = 100       // probabilité (0..100)
+    private var centerBiasStrength = 100
     private var centerBiasIntervalMs = 300L
-    private var edgeAggroWeight = 20           // +agressif quand l’adversaire est “plus dehors”
-    private var edgeAggroRadiusBonus = 0.8f    // marge radiale pour considérer qu’il est dehors
+    private var edgeAggroWeight = 20
+    private var edgeAggroRadiusBonus = 0.8f
 
-    // Close-strafe (tenir plus longtemps quand collés)
+    // Close-strafe
     private var closeInnerMin = 360L
     private var closeInnerMax = 520L
     private var closeMidMin = 420L
@@ -117,6 +126,20 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     // Anti-stagnation
     private var ANTI_STALL_EPS = 0.010f
     private var ANTI_STALL_DELAY = 380L
+
+    // ================== Hit-Select assist (NOUVEAU) ==================
+    private var hsEnable = true
+    private var hsMinMs = 80L       // fenêtre dès 80 ms après avoir été touché
+    private var hsMaxMs = 180L      // jusqu’à ~180 ms (milieu de KB)
+    private var hsLatchMs = 170L    // durée d’AC pendant HS
+    private var hsMinDist = 3.0f
+    private var hsMaxDist = 4.9f
+    private var hsAimDot = 0.955    // exigence d’alignement (à plat)
+    private var hsOnlyIfOppOutside = true
+
+    // tracking du hurtTime pour dater le dernier coup reçu
+    private var prevHurtTime = 0
+    private var lastGotHitAt = 0L
 
     // ================== États ==================
     private var gameStartedAt = 0L
@@ -167,7 +190,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     private fun edgeAheadDynamic(distBase: Float): Boolean {
         val p = mc.thePlayer ?: return false
-        // Bonus prédictif en fonction de la vitesse avant
         val vz = abs(p.motionZ)
         val vx = abs(p.motionX)
         val speed = hypot(vx, vz).toFloat()
@@ -197,6 +219,22 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     private fun rFromCenter(x: Double, z: Double): Double = hypot(x - centerX, z - centerZ)
 
+    // dot(look, toOpponent) à plat (XZ)
+    private fun aimDotToOpponentFlat(): Double {
+        val p = mc.thePlayer ?: return 0.0
+        val o = opponent() ?: return 0.0
+        val toX = o.posX - p.posX
+        val toZ = o.posZ - p.posZ
+        val toLen = sqrt(toX * toX + toZ * toZ)
+        if (toLen < 1e-6) return 1.0
+        val lx = p.lookVec.xCoord
+        val lz = p.lookVec.zCoord
+        val ll = sqrt(lx * lx + lz * lz)
+        if (ll < 1e-6) return 0.0
+        val dot = (lx / ll) * (toX / toLen) + (lz / ll) * (toZ / toLen)
+        return dot.coerceIn(-1.0, 1.0)
+    }
+
     // Jump robuste: avance+sprint, petit délai si vitesse faible, jump, ré-asserts
     private fun runJumpSmart(preDelayDefaultMs: Int = 12) {
         val p = mc.thePlayer ?: return
@@ -215,7 +253,47 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         runJumpSmart(12)
         startHopDone = true
         startHopFiredAt = now
-        lastZoneJumpAt = now // évite un jump-zone immédiat
+        lastZoneJumpAt = now
+    }
+
+    private fun updateGotHitStamp(now: Long) {
+        val ht = mc.thePlayer?.hurtTime ?: 0
+        if (ht > 0 && prevHurtTime == 0) lastGotHitAt = now
+        prevHurtTime = ht
+    }
+
+    private fun opponentMoreOutside(): Boolean {
+        if (!centerReady) return false
+        val p = mc.thePlayer ?: return false
+        val o = opponent() ?: return false
+        val myR = rFromCenter(p.posX, p.posZ)
+        val oppR = rFromCenter(o.posX, o.posZ)
+        return oppR > myR + edgeAggroRadiusBonus
+    }
+
+    private fun tryHitSelect(now: Long, distance: Float, voidFront: Boolean) {
+        if (!hsEnable || lastGotHitAt <= 0L) return
+        val dt = now - lastGotHitAt
+        if (dt < hsMinMs || dt > hsMaxMs) return
+        if (distance < hsMinDist || distance > hsMaxDist) return
+        if (voidFront) return
+        if (hsOnlyIfOppOutside && !opponentMoreOutside()) return
+        val dot = aimDotToOpponentFlat()
+        if (dot < hsAimDot) return
+
+        // pas de jump/strafe pendant l’impact, on pousse droit
+        Movement.stopJumping()
+        Movement.clearLeftRight()
+        Movement.startForward(); Movement.startSprinting()
+
+        // mini w-tap court si dispo (sinon force sprint)
+        Combat.wTap(max(40, (wTapShortMs - 10)).toInt())
+
+        // ouvre AC pour verrouiller le hit
+        if (kira.config?.kiraHit == true) {
+            keepACUntil = now + hsLatchMs
+            Mouse.startLeftAC()
+        }
     }
 
     // ================== Hooks ==================
@@ -223,9 +301,8 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         Mouse.startTracking()
         Mouse.stopLeftAC()
 
-        // Sprint immédiat
         Movement.clearAll()
-        Movement.stopSneaking()     // NO-SNEAK garantie
+        Movement.stopSneaking()   // NO-SNEAK garanti
         Movement.startSprinting()
         Movement.startForward()
         Movement.stopJumping()
@@ -265,35 +342,36 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         postHitDriveUntil = 0L
         noJumpUntil = 0L
 
-        // ====== PARAMÈTRES AUTO TUNER ======
+        prevHurtTime = mc.thePlayer?.hurtTime ?: 0
+        lastGotHitAt = 0L
+
+        // ====== PARAMS TUNER ======
         val params = SumoTuner.pickParams()
 
-        // Verrou post-start + zone rearm
         blockZoneJumpsForMsAfterStart = params.blockZoneLockMs
         rearmInnerDist = params.rearmInnerDist
         zoneRearmDelayMs = params.zoneRearmDelayMs
 
-        // Combat
         attackStartDist = params.attackStartDist
         attackLatchMs = params.attackLatchMs
         prefireFastApproachDist = params.prefireApproachDist
         prefireLatchMs = params.prefireLatchMs
 
-        // W-tap + post-hit
+        // Pré-fire long
+        hardAttackDist = params.hardAttackDist
+        preAimDot = params.preAimDot.toDouble()
+
         wTapShortMs = params.wTapShortMs
         wTapLongMs = params.wTapLongMs
         postHitDriveMs = params.postHitDriveMs
 
-        // Avance / stop
         stopForwardDist = params.stopForwardDist
         reForwardDist = params.reForwardDist
 
-        // Anti-void probes
         edgeProbeNear = params.edgeProbeNear
         edgeProbeFar = params.edgeProbeFar
         predictiveProbeBonus = params.predictiveProbeBonus
 
-        // Fenêtres de strafe
         val holdMin = min(params.holdMsMin, params.holdMsMax)
         val holdMax = max(params.holdMsMin, params.holdMsMax)
         HOLD_MS = holdMin..holdMax
@@ -309,12 +387,18 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val flipMin = min(params.burstFlipMin, params.burstFlipMax)
         val flipMax = max(params.burstFlipMin, params.burstFlipMax)
         BURST_FLIP_EVERY_MS = flipMin..flipMax
-
         BURST_SKIP_PROBA = params.burstSkipPercent
         longStrafeChance = params.longStrafeChance
         longStrafeDurationMs = params.longStrafeDurationMs
 
-        // Close-strafe ranges
+        // style/intensité de strafe
+        strafeStyle = when (params.strafeStyleInt) {
+            1 -> StrafeStyle.BURST
+            2 -> StrafeStyle.HYBRID
+            else -> StrafeStyle.MINIMAL
+        }
+        strafeIntensity = params.strafeIntensity.coerceIn(0, 100)
+
         closeInnerMin = min(params.closeInnerMin, params.closeInnerMax)
         closeInnerMax = max(params.closeInnerMin, params.closeInnerMax)
         closeMidMin = min(params.closeMidMin, params.closeMidMax)
@@ -322,7 +406,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         closeFarMin = min(params.closeFarMin, params.closeFarMax)
         closeFarMax = max(params.closeFarMin, params.closeFarMax)
 
-        // Anti-stall + biais centre / edge
         ANTI_STALL_EPS = params.antiStallEps
         ANTI_STALL_DELAY = params.antiStallDelayMs
         centerBiasStrength = params.centerBiasStrength
@@ -330,10 +413,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         edgeAggroWeight = params.edgeAggroWeight
         edgeAggroRadiusBonus = params.edgeAggroRadiusBonus
 
-        // ====== Start-hop (depuis le tuner) ======
+        // Start-Hop
         START_ANTIVOID_DISABLE_MS = params.startAntivoidDisableMs
         START_HOP_TIMER_FUDGE_MS  = params.startHopTimerFudgeMs
-        START_HOP_TIMER_MS        = params.startHopTimerTargetMs   // << nouveau : délai cible tuné
+        START_HOP_TIMER_MS        = params.startHopTimerTargetMs
         GROUND_TICKS_REQUIRED     = params.groundTicksRequired
         GROUND_MAX_WAIT_MS        = params.groundMaxWaitMs
         startHopMode = when (params.startHopModeInt) {
@@ -341,6 +424,16 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             1 -> StartHopMode.GROUND
             else -> StartHopMode.HYBRID
         }
+
+        // Hit-Select assist
+        hsEnable = params.hsEnableInt != 0
+        hsMinMs = params.hsMinMs
+        hsMaxMs = params.hsMaxMs
+        hsLatchMs = params.hsLatchMs
+        hsMinDist = params.hsMinDist
+        hsMaxDist = params.hsMaxDist
+        hsAimDot = params.hsAimDot.toDouble()
+        hsOnlyIfOppOutside = params.hsOnlyIfOppOutsideInt != 0
     }
 
     override fun onGameEnd() {
@@ -367,7 +460,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     }
 
     override fun onAttack() {
-        // W-tap paramétré — pas de jump simultané
+        // W-tap — jamais de saut pendant le W-tap
         val now = System.currentTimeMillis()
         val dur = if (tap50) wTapShortMs else wTapLongMs
         tap50 = !tap50
@@ -384,7 +477,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val now = System.currentTimeMillis()
         val o = opponent()
 
-        // Matchmaking : freeze total si Lobby Movement OFF
+        // Matchmaking : freeze si lobbyMovement OFF
         if (o == null) {
             if (kira.config?.lobbyMovement != true) {
                 Combat.stopRandomStrafe()
@@ -397,13 +490,14 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         }
 
         updateCenterOnce()
+        updateGotHitStamp(now)
 
-        // Sprint permanent + NO-SNEAK systématique
+        // Sprint permanent + NO-SNEAK
         Movement.stopSneaking()
         if (!p.isSprinting) Movement.startSprinting()
         Movement.startForward()
 
-        // Stop chase suicidaire si l’ennemi tombe
+        // Stop chase si l’ennemi tombe
         val isOppActuallyOffEdge = WorldUtils.entityOffEdge(o)
         opponentOffEdge = isOppActuallyOffEdge ||
                 (opponentOffEdge && EntityUtils.getDistanceNoY(p, o) > 17)
@@ -416,35 +510,28 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         val distance = EntityUtils.getDistanceNoY(p, o)
         val approaching = (prevDistance > 0f) && (prevDistance - distance >= 0.10f)
 
-        // Anti-void devant (désactivé pendant les premières START_ANTIVOID_DISABLE_MS)
+        // Anti-void devant (no-sneak)
         val enableAntivoid = now - gameStartedAt >= START_ANTIVOID_DISABLE_MS
         val voidNear = if (enableAntivoid) edgeAheadDynamic(edgeProbeNear) else false
         val voidFar  = if (enableAntivoid) edgeAheadDynamic(edgeProbeFar)  else false
         val voidFront = voidNear || voidFar
-
-        // === NO-SNEAK ANTI-VOID: pas de crouch, on reroute latéralement ===
         if (voidFront) {
             Movement.stopForward()
             val goLeft = if (centerReady) preferLeftToward(centerX, centerZ) else (strafeDir < 0)
-            if (goLeft) { Movement.stopRight(); Movement.startLeft() }
-            else { Movement.stopLeft(); Movement.startRight() }
+            if (goLeft) { Movement.stopRight(); Movement.startLeft() } else { Movement.stopLeft(); Movement.startRight() }
         }
 
-        // ======= START-HOP (TIMER / GROUND / HYBRID) =======
+        // ======= START-HOP =======
         if (!startHopDone && now - gameStartedAt >= startSafeDelayMs) {
             when (startHopMode) {
                 StartHopMode.TIMER -> {
-                    if (now - gameStartedAt >= (START_HOP_TIMER_MS - START_HOP_TIMER_FUDGE_MS)) {
-                        performStartHop(now)
-                    }
+                    if (now - gameStartedAt >= (START_HOP_TIMER_MS - START_HOP_TIMER_FUDGE_MS)) performStartHop(now)
                 }
                 StartHopMode.GROUND -> {
                     val since = now - gameStartedAt
                     if (p.onGround) groundTicksSinceStart++ else groundTicksSinceStart = 0
                     val timeoutForce = since >= GROUND_MAX_WAIT_MS
-                    if (groundTicksSinceStart >= GROUND_TICKS_REQUIRED || timeoutForce) {
-                        performStartHop(now)
-                    }
+                    if (groundTicksSinceStart >= GROUND_TICKS_REQUIRED || timeoutForce) performStartHop(now)
                 }
                 StartHopMode.HYBRID -> {
                     val since = now - gameStartedAt
@@ -452,18 +539,30 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                     val canGroundHop = groundTicksSinceStart >= GROUND_TICKS_REQUIRED
                     val timerSafety = since >= (START_HOP_TIMER_MS - START_HOP_TIMER_FUDGE_MS)
                     val timeoutForce = since >= GROUND_MAX_WAIT_MS
-                    if (canGroundHop || timerSafety || timeoutForce) {
-                        performStartHop(now)
-                    }
+                    if (canGroundHop || timerSafety || timeoutForce) performStartHop(now)
                 }
             }
         }
 
-        // ===== AC latch / Prefire =====
+        // ===== Hit-Select assist (s'exécute AVANT le gating AC classique) =====
+        tryHitSelect(now, distance, voidFront)
+
+        // ===== AC latch / Prefire (v2) =====
+        val aimDot = aimDotToOpponentFlat()
+        // (1) fenêtre “courte” classique
         val inAttackLatch = (distance <= attackStartDist)
-        val inPrefire = (approaching && distance <= prefireFastApproachDist && distance > attackStartDist)
-        if (kira.config?.kiraHit == true && (inAttackLatch || inPrefire)) {
-            keepACUntil = now + if (inPrefire) prefireLatchMs else attackLatchMs
+        // (2) pré-fire approche
+        val inPrefireApproach = (approaching && distance <= prefireFastApproachDist && distance > attackStartDist)
+        // (3) pré-fire “long” aim-gated (≤ hardAttackDist ET visée alignée)
+        val inPrefireLong = (distance <= hardAttackDist && aimDot >= preAimDot)
+
+        if (kira.config?.kiraHit == true && (inAttackLatch || inPrefireApproach || inPrefireLong)) {
+            val latch = when {
+                inAttackLatch -> attackLatchMs
+                inPrefireApproach -> prefireLatchMs
+                else -> max(120L, prefireLatchMs - 20L) // pré-fire long: latch un poil plus court
+            }
+            keepACUntil = now + latch
             Mouse.startLeftAC()
         } else if ((now >= keepACUntil) || kira.config?.kiraHit != true) {
             Mouse.stopLeftAC()
@@ -477,63 +576,91 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         // ===== Saut "zone" : > 7.0 => jump, ≤ 7.0 => jamais =====
         val postStartLockActive = startHopDone && (now - startHopFiredAt) < blockZoneJumpsForMsAfterStart
         val overZone = distance > jumpZoneThreshold
-        val jumpAllowed = now >= noJumpUntil && !tapping
+        val jumpAllowed = now >= noJumpUntil && !tapping && !voidFront
 
-        if (zoneArmed && !postStartLockActive && !voidFront) {
-            if (overZone && jumpAllowed) {
-                runJumpSmart(12)
-                zoneArmed = false
-                lastZoneJumpAt = now
-            }
+        if (zoneArmed && !postStartLockActive && jumpAllowed && overZone) {
+            runJumpSmart(12)
+            zoneArmed = false
+            lastZoneJumpAt = now
         } else if (!zoneArmed) {
-            if (distance <= rearmInnerDist && (now - lastZoneJumpAt) >= zoneRearmDelayMs) {
-                zoneArmed = true
+            if (distance <= rearmInnerDist && (now - lastZoneJumpAt) >= zoneRearmDelayMs) zoneArmed = true
+        }
+
+        // ===== Strafe v2 =====
+        val pushing = (kira.config?.kiraHit == true) && (now < keepACUntil || now < postHitDriveUntil)
+        when (strafeStyle) {
+            StrafeStyle.MINIMAL -> {
+                // zéro strafe quand on attaque/pousse : on garde l’axe avant
+                if (pushing || distance < 2.0f) {
+                    Movement.clearLeftRight()
+                } else {
+                    // micro-oscillation très lente, fréquence liée à l’intensité
+                    val period = (650 - (strafeIntensity * 3)).coerceIn(300, 650)
+                    if (now >= sModeUntil) {
+                        sModeUntil = now + period
+                        strafeDir = -strafeDir
+                    }
+                    if (strafeDir < 0) { Movement.stopRight(); Movement.startLeft() }
+                    else { Movement.stopLeft(); Movement.startRight() }
+                }
+            }
+            StrafeStyle.BURST, StrafeStyle.HYBRID -> {
+                // On garde les bursts, mais on les coupe pendant push
+                if (pushing) {
+                    Movement.clearLeftRight()
+                } else {
+                    // 1) Phases
+                    if (now >= sModeUntil) {
+                        sMode = when (sMode) {
+                            SMode.HOLD  -> if (RandomUtils.randomIntInRange(0, 99) < 60) SMode.BURST else SMode.COAST
+                            SMode.BURST -> if (RandomUtils.randomIntInRange(0, 99) < 55) SMode.COAST else SMode.HOLD
+                            SMode.COAST -> if (RandomUtils.randomIntInRange(0, 99) < 55) SMode.HOLD else SMode.BURST
+                        }
+                        val scale = 1.0 - (strafeIntensity.coerceIn(0,100) / 200.0) // intensité basse = fenêtres plus longues
+                        sModeUntil = now + (when (sMode) {
+                            SMode.HOLD  -> RandomUtils.randomIntInRange(HOLD_MS.first, HOLD_MS.last)
+                            SMode.BURST -> RandomUtils.randomIntInRange(BURST_MS.first, BURST_MS.last)
+                            SMode.COAST -> RandomUtils.randomIntInRange(COAST_MS.first, COAST_MS.last)
+                        } * scale).toLong().coerceAtLeast(180L)
+                        if (sMode == SMode.BURST) {
+                            val flipBase = RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
+                            nextBurstFlipAt = now + (flipBase * scale).toLong().coerceAtLeast(80L)
+                        }
+                    }
+                    // 2) Flip
+                    if (sMode == SMode.BURST && now >= nextBurstFlipAt) {
+                        nextBurstFlipAt = now + RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
+                        if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) > BURST_SKIP_PROBA) {
+                            if (!attemptLongStrafe(now)) strafeDir = -strafeDir
+                            lastStrafeFlip = now
+                        }
+                    }
+                    // 3) Application
+                    if (strafeDir < 0) { Movement.stopRight(); Movement.startLeft() }
+                    else { Movement.stopLeft(); Movement.startRight() }
+                }
             }
         }
 
-        // ===== Strafe "Burst Sumo" =====
-        // 1) Phases
-        if (now >= sModeUntil) {
-            sMode = when (sMode) {
-                SMode.HOLD  -> if (RandomUtils.randomIntInRange(0, 99) < 60) SMode.BURST else SMode.COAST
-                SMode.BURST -> if (RandomUtils.randomIntInRange(0, 99) < 55) SMode.COAST else SMode.HOLD
-                SMode.COAST -> if (RandomUtils.randomIntInRange(0, 99) < 55) SMode.HOLD else SMode.BURST
-            }
-            sModeUntil = now + when (sMode) {
-                SMode.HOLD  -> RandomUtils.randomIntInRange(HOLD_MS.first, HOLD_MS.last)
-                SMode.BURST -> RandomUtils.randomIntInRange(BURST_MS.first, BURST_MS.last)
-                SMode.COAST -> RandomUtils.randomIntInRange(COAST_MS.first, COAST_MS.last)
-            }
-            if (sMode == SMode.BURST) {
-                nextBurstFlipAt = now + RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
+        // Biais centre / edge
+        if (centerReady) {
+            val wantLeft = preferLeftToward(centerX, centerZ)
+            val myR = rFromCenter(p.posX, p.posZ)
+            val oppR = rFromCenter(o.posX, o.posZ)
+            val oppMoreOutside = oppR > (myR + edgeAggroRadiusBonus)
+            val enforceCenter = RandomUtils.randomIntInRange(1, 100) <= centerBiasStrength + (if (oppMoreOutside) edgeAggroWeight else 0)
+            if (now - lastStrafeFlip > centerBiasIntervalMs && enforceCenter && !pushing) {
+                if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
+                if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
             }
         }
 
-        // 2) Micro-bursts irréguliers (option long-strafe)
-        if (sMode == SMode.BURST && now >= nextBurstFlipAt) {
-            nextBurstFlipAt = now + RandomUtils.randomIntInRange(BURST_FLIP_EVERY_MS.first, BURST_FLIP_EVERY_MS.last)
-            if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) > BURST_SKIP_PROBA) {
-                if (!attemptLongStrafe(now)) strafeDir = -strafeDir
-                lastStrafeFlip = now
-            }
-        }
-
-        // 3) Close-strafe (tenu plus longtemps quand collés)
-        val closeCtrl = distance <= 2.6f && p.onGround
-        if (closeCtrl && now >= nextCloseStrafeAt) {
-            nextCloseStrafeAt = now + closeStrafeDelay(distance)
-            if (now >= longStrafeUntil && RandomUtils.randomIntInRange(1, 100) <= 35) {
-                if (!attemptLongStrafe(now)) strafeDir = -strafeDir
-                lastStrafeFlip = now
-            }
-        }
-
-        // 4) Anti-stagnation
+        // Anti-stagnation
         if (antiStallRef < 0f) { antiStallRef = distance; antiStallAt = now }
         else {
             val d = abs(distance - antiStallRef)
             if (d < ANTI_STALL_EPS) {
-                if (now - antiStallAt >= ANTI_STALL_DELAY && now >= longStrafeUntil) {
+                if (now - antiStallAt >= ANTI_STALL_DELAY && now >= longStrafeUntil && !pushing) {
                     if (!attemptLongStrafe(now)) strafeDir = -strafeDir
                     lastStrafeFlip = now
                     antiStallRef = distance
@@ -545,39 +672,14 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             }
         }
 
-        // 5) Biais centre & avantage d’angle (edge-aware)
-        if (centerReady) {
-            val wantLeft = preferLeftToward(centerX, centerZ)
-            val myR = rFromCenter(p.posX, p.posZ)
-            val oppR = rFromCenter(o.posX, o.posZ)
-            val oppMoreOutside = oppR > (myR + edgeAggroRadiusBonus)
-            val enforceCenter = RandomUtils.randomIntInRange(1, 100) <= centerBiasStrength + (if (oppMoreOutside) edgeAggroWeight else 0)
-
-            if (voidFront) {
-                if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
-                if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
-            } else if (now - lastStrafeFlip > centerBiasIntervalMs && enforceCenter) {
-                if (wantLeft && strafeDir > 0) { strafeDir = -1; lastStrafeFlip = now }
-                if (!wantLeft && strafeDir < 0) { strafeDir = 1; lastStrafeFlip = now }
-            }
-        }
-
-        // Anti-vide latéral
-        if (Movement.left() && WorldUtils.airOnLeft(p, 1.5f) && p.onGround) Movement.stopLeft()
-        if (Movement.right() && WorldUtils.airOnRight(p, 1.5f) && p.onGround) Movement.stopRight()
-
-        // Application du strafe (sans random-strafe lib)
-        if (strafeDir < 0) { Movement.stopRight(); Movement.startLeft() }
-        else { Movement.stopLeft(); Movement.startRight() }
-
-        // ===== Avant / arrière =====
+        // Avant / arrière
         if (distance < stopForwardDist || (enableAntivoid && edgeAheadDynamic(1.0f))) {
             Movement.stopForward()
         } else if (!voidFront) {
             if (distance > reForwardDist) Movement.startForward()
         }
 
-        // ===== Anti-void arrière =====
+        // Anti-void arrière
         if (WorldUtils.airInBack(p, 2.0f) && p.onGround) {
             Movement.clearLeftRight(); Combat.stopRandomStrafe()
             Movement.startForward()
