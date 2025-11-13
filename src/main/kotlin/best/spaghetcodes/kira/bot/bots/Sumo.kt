@@ -21,9 +21,9 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private enum class StartHopMode { TIMER, GROUND, HYBRID }
     private var startHopMode: StartHopMode = StartHopMode.HYBRID
 
-    // TIMER (cible ≈0.30s)
-    private var START_HOP_TIMER_MS = 300L
-    private var START_HOP_TIMER_FUDGE_MS = 40L
+    // TIMER (cible ≈0.30s) — désormais tuné
+    private var START_HOP_TIMER_MS = 300L          // <- pris au tuner (startHopTimerTargetMs)
+    private var START_HOP_TIMER_FUDGE_MS = 40L     // compensation tick depuis tuner
 
     // GROUND (déclenche dès que onGround est vrai X ticks d’affilée)
     private var GROUND_TICKS_REQUIRED = 2
@@ -57,6 +57,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private var wTapShortMs = 50L
     private var wTapLongMs = 100L
     private var postHitDriveMs = 140L
+    private val NO_JUMP_DURING_WTAP_PAD_MS = 25L
 
     // Avance / stop court
     private var stopForwardDist = 1.18f
@@ -156,6 +157,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     private var tapping = false
     private var tap50 = false
     private var postHitDriveUntil = 0L
+    private var noJumpUntil = 0L
 
     // ================== Utils ==================
     private fun blockInFront(dist: Float): Boolean {
@@ -195,16 +197,22 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
     private fun rFromCenter(x: Double, z: Double): Double = hypot(x - centerX, z - centerZ)
 
-    private fun performStartHop(now: Long) {
-        // Pré-assertion d'avance 1 tick avant le jump
+    // Jump robuste: avance+sprint, petit délai si vitesse faible, jump, ré-asserts
+    private fun runJumpSmart(preDelayDefaultMs: Int = 12) {
+        val p = mc.thePlayer ?: return
         Movement.startForward(); Movement.startSprinting()
+        val speed = hypot(abs(p.motionX), abs(p.motionZ)).toFloat()
+        val minSpeedForJump = 0.08f
+        val pre = if (speed < minSpeedForJump) max(12, preDelayDefaultMs + 12) else preDelayDefaultMs
         TimeUtils.setTimeout({
             Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
-            // Post-assertions pour “coller” l’avancée
             TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_1_MS.toInt())
             TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_2_MS.toInt())
-        }, 12)
+        }, pre)
+    }
 
+    private fun performStartHop(now: Long) {
+        runJumpSmart(12)
         startHopDone = true
         startHopFiredAt = now
         lastZoneJumpAt = now // évite un jump-zone immédiat
@@ -217,7 +225,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // Sprint immédiat
         Movement.clearAll()
-        Movement.stopSneaking()     // <<< NO-SNEAK garantie
+        Movement.stopSneaking()     // NO-SNEAK garantie
         Movement.startSprinting()
         Movement.startForward()
         Movement.stopJumping()
@@ -255,6 +263,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         tapping = false
         tap50 = false
         postHitDriveUntil = 0L
+        noJumpUntil = 0L
 
         // ====== PARAMÈTRES AUTO TUNER ======
         val params = SumoTuner.pickParams()
@@ -321,9 +330,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         edgeAggroWeight = params.edgeAggroWeight
         edgeAggroRadiusBonus = params.edgeAggroRadiusBonus
 
-        // ====== Nouveaux paramètres Start-hop (depuis le tuner) ======
+        // ====== Start-hop (depuis le tuner) ======
         START_ANTIVOID_DISABLE_MS = params.startAntivoidDisableMs
         START_HOP_TIMER_FUDGE_MS  = params.startHopTimerFudgeMs
+        START_HOP_TIMER_MS        = params.startHopTimerTargetMs   // << nouveau : délai cible tuné
         GROUND_TICKS_REQUIRED     = params.groundTicksRequired
         GROUND_MAX_WAIT_MS        = params.groundMaxWaitMs
         startHopMode = when (params.startHopModeInt) {
@@ -346,7 +356,6 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             i?.cancel()
             Mouse.stopTracking()
             Movement.clearAll()
-            // Safety: ensure no sneak state lingers
             Movement.stopSneaking()
             Combat.stopRandomStrafe()
         }, RandomUtils.randomIntInRange(200, 400))
@@ -358,12 +367,14 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     }
 
     override fun onAttack() {
-        // W-tap paramétré
+        // W-tap paramétré — pas de jump simultané
+        val now = System.currentTimeMillis()
         val dur = if (tap50) wTapShortMs else wTapLongMs
         tap50 = !tap50
         Combat.wTap(dur.toInt())
         tapping = true
-        postHitDriveUntil = System.currentTimeMillis() + postHitDriveMs
+        noJumpUntil = now + dur + NO_JUMP_DURING_WTAP_PAD_MS
+        postHitDriveUntil = now + postHitDriveMs
         TimeUtils.setTimeout({ tapping = false }, dur.toInt() + 15)
     }
 
@@ -380,7 +391,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
                 Mouse.stopTracking()
                 Mouse.stopLeftAC()
                 Movement.clearAll()
-                Movement.stopSneaking() // <<< NO-SNEAK garantie
+                Movement.stopSneaking()
             }
             return
         }
@@ -388,7 +399,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         updateCenterOnce()
 
         // Sprint permanent + NO-SNEAK systématique
-        Movement.stopSneaking() // <<< NO-SNEAK chaque tick
+        Movement.stopSneaking()
         if (!p.isSprinting) Movement.startSprinting()
         Movement.startForward()
 
@@ -413,13 +424,10 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
 
         // === NO-SNEAK ANTI-VOID: pas de crouch, on reroute latéralement ===
         if (voidFront) {
-            // On coupe l'élan vers l'avant
             Movement.stopForward()
-            // Rerouting: on se décale vers le centre si connu, sinon côté sûr courant
             val goLeft = if (centerReady) preferLeftToward(centerX, centerZ) else (strafeDir < 0)
             if (goLeft) { Movement.stopRight(); Movement.startLeft() }
             else { Movement.stopLeft(); Movement.startRight() }
-            // (Pas de backpedal ni sneak ici pour conserver l’initiative)
         }
 
         // ======= START-HOP (TIMER / GROUND / HYBRID) =======
@@ -469,12 +477,11 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         // ===== Saut "zone" : > 7.0 => jump, ≤ 7.0 => jamais =====
         val postStartLockActive = startHopDone && (now - startHopFiredAt) < blockZoneJumpsForMsAfterStart
         val overZone = distance > jumpZoneThreshold
+        val jumpAllowed = now >= noJumpUntil && !tapping
+
         if (zoneArmed && !postStartLockActive && !voidFront) {
-            if (overZone) {
-                Movement.startForward(); Movement.startSprinting()
-                Movement.singleJump(RandomUtils.randomIntInRange(120, 160))
-                TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_1_MS.toInt())
-                TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_2_MS.toInt())
+            if (overZone && jumpAllowed) {
+                runJumpSmart(12)
                 zoneArmed = false
                 lastZoneJumpAt = now
             }
