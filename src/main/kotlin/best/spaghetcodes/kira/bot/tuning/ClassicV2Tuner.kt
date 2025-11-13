@@ -2,13 +2,19 @@ package best.spaghetcodes.kira.bot.tuning
 
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.RandomUtils
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
 import kotlin.math.max
 import kotlin.math.round
 
 object ClassicV2Tuner {
 
+    // ==================== PARAMS ====================
     data class ClassicParams(
         val fullDrawMsMin: Int,
         val fullDrawMsMax: Int,
@@ -95,6 +101,7 @@ object ClassicV2Tuner {
     private const val CURRENT_VERSION = 1
     private const val MISTAKE_PENALTY = 0.1
 
+    // ============ Specs (bornes + défauts) ============
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
     private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)
     private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.LONG)
@@ -179,101 +186,47 @@ object ClassicV2Tuner {
 
     private val specByKey = specs.associateBy { it.key }
 
+    // ==================== STATE / IO ====================
     private var loaded = false
     private var state = StoredState()
 
+    private val localGson: Gson by lazy { GsonBuilder().setPrettyPrinting().create() }
+    private val gson: Gson get() = try { kira.gson ?: localGson } catch (_: Throwable) { localGson }
+
+    private fun configDir(): File {
+        return try {
+            val mcDir = kira.mc?.mcDataDir
+            if (mcDir != null) File(mcDir, "config") else File(File(System.getProperty("user.home"), ".kira"), "config")
+        } catch (_: Throwable) {
+            File("config")
+        }
+    }
+
+    private fun file(): File = File(configDir(), "classicv2_tuner.json")
+
+    @Synchronized
     fun pickParams(): ClassicParams {
         ensureLoaded()
         val chosen = mutableMapOf<String, Double>()
         for (spec in specs) {
             val p = state.params.getOrPut(spec.key) { ParamState() }
             val eps = epsilon(p.totalPlays)
-            val explore = exploreNow(eps) || p.values.isEmpty()
-            val value = if (explore) sample(spec) else bestValue(p, spec)
+            val value = when {
+                // Cold-start: première valeur = défauts sûrs
+                p.values.isEmpty() -> spec.def
+                exploreNow(eps) -> sample(spec)
+                else -> bestValue(p, spec)
+            }
             val key = keyOf(value)
             if (!p.values.containsKey(key)) p.values[key] = ValueState(value = value)
             p.lastValue = value
             chosen[spec.key] = value
         }
         save()
-        return ClassicParams(
-            fullDrawMsMin = chosen.int("fullDrawMsMin"),
-            fullDrawMsMax = chosen.int("fullDrawMsMax"),
-            bowCancelCloseDist = chosen.float("bowCancelCloseDist"),
-            bowMinUseDist = chosen.float("bowMinUseDist"),
-            openVolleyMax = chosen.int("openVolleyMax"),
-            openSpacingMin = chosen.long("openSpacingMin"),
-            openSpacingMax = chosen.long("openSpacingMax"),
-            openShotMinDist = chosen.float("openShotMinDist"),
-            reactiveCdMs = chosen.long("reactiveCdMs"),
-
-            stillFrameThreshold = chosen.double("stillFrameThreshold"),
-            stillFramesNeeded = chosen.int("stillFramesNeeded"),
-            bowSlowThreshold = chosen.double("bowSlowThreshold"),
-            bowSlowFramesNeeded = chosen.int("bowSlowFramesNeeded"),
-
-            reserveTightMs = chosen.long("reserveTightMs"),
-            earlyReserve = chosen.int("earlyReserve"),
-            midReserve = chosen.int("midReserve"),
-
-            rodCdCloseMsBase = chosen.long("rodCdCloseMsBase"),
-            rodCdFarMsBase = chosen.long("rodCdFarMsBase"),
-            rodCdBiasMax = chosen.float("rodCdBiasMax"),
-            rodBanMeleeDist = chosen.float("rodBanMeleeDist"),
-            rodCloseMin = chosen.float("rodCloseMin"),
-            rodCloseMax = chosen.float("rodCloseMax"),
-            rodMainMin = chosen.float("rodMainMin"),
-            rodMainMax = chosen.float("rodMainMax"),
-            rodInterceptMin = chosen.float("rodInterceptMin"),
-            rodInterceptMax = chosen.float("rodInterceptMax"),
-            rodMaxRangeHard = chosen.float("rodMaxRangeHard"),
-            rodMidInstantMin = chosen.float("rodMidInstantMin"),
-            rodMidInstantMax = chosen.float("rodMidInstantMax"),
-            farThreshold = chosen.float("farThreshold"),
-            reentryRodGraceMs = chosen.long("reentryRodGraceMs"),
-
-            rodHoldCloseMinMs = chosen.int("rodHoldCloseMinMs"),
-            rodHoldCloseMaxMs = chosen.int("rodHoldCloseMaxMs"),
-            rodHoldMidMinMs = chosen.int("rodHoldMidMinMs"),
-            rodHoldMidMaxMs = chosen.int("rodHoldMidMaxMs"),
-
-            rodAntiSpamClosePassiveMin = chosen.int("rodAntiSpamClosePassiveMin"),
-            rodAntiSpamClosePassiveMax = chosen.int("rodAntiSpamClosePassiveMax"),
-            rodAntiSpamMidPassiveMin = chosen.int("rodAntiSpamMidPassiveMin"),
-            rodAntiSpamMidPassiveMax = chosen.int("rodAntiSpamMidPassiveMax"),
-            rodAntiSpamFarPassiveMin = chosen.int("rodAntiSpamFarPassiveMin"),
-            rodAntiSpamFarPassiveMax = chosen.int("rodAntiSpamFarPassiveMax"),
-
-            rodAntiSpamCloseActiveMin = chosen.int("rodAntiSpamCloseActiveMin"),
-            rodAntiSpamCloseActiveMax = chosen.int("rodAntiSpamCloseActiveMax"),
-            rodAntiSpamMidActiveMin = chosen.int("rodAntiSpamMidActiveMin"),
-            rodAntiSpamMidActiveMax = chosen.int("rodAntiSpamMidActiveMax"),
-            rodAntiSpamFarActiveMin = chosen.int("rodAntiSpamFarActiveMin"),
-            rodAntiSpamFarActiveMax = chosen.int("rodAntiSpamFarActiveMax"),
-
-            parryCloseCancelDist = chosen.float("parryCloseCancelDist"),
-            parryCooldownMs = chosen.long("parryCooldownMs"),
-            parryHoldMinMs = chosen.int("parryHoldMinMs"),
-            parryHoldMaxMs = chosen.int("parryHoldMaxMs"),
-            parryStickMinMs = chosen.int("parryStickMinMs"),
-            parryStickMaxMs = chosen.int("parryStickMaxMs"),
-            parryJumpCd = chosen.long("parryJumpCd"),
-            allowParryDelayMs = chosen.long("allowParryDelayMs"),
-
-            closeBurstWindowMinMs = chosen.int("closeBurstWindowMinMs"),
-            closeBurstWindowMaxMs = chosen.int("closeBurstWindowMaxMs"),
-            closeBurstFlipMinMs = chosen.int("closeBurstFlipMinMs"),
-            closeBurstFlipMaxMs = chosen.int("closeBurstFlipMaxMs"),
-            closeHoldWindowMinMs = chosen.int("closeHoldWindowMinMs"),
-            closeHoldWindowMaxMs = chosen.int("closeHoldWindowMaxMs"),
-
-            forwardStickMinMs = chosen.int("forwardStickMinMs"),
-            forwardStickMaxMs = chosen.int("forwardStickMaxMs"),
-            meleeFocusMinMs = chosen.int("meleeFocusMinMs"),
-            meleeFocusMaxMs = chosen.int("meleeFocusMaxMs")
-        )
+        return buildParams(chosen)
     }
 
+    @Synchronized
     fun report(win: Boolean, mistakes: Int) {
         ensureLoaded()
         val rewardRaw = if (win) 1.0 else 0.0
@@ -290,11 +243,96 @@ object ClassicV2Tuner {
         if (changed) save()
     }
 
-    private fun ensureLoaded() {
-        if (!loaded) {
-            state = load()
-            loaded = true
-        }
+    // Optionnel : pour fallback côté bot si tu veux éviter NO MATTER WHAT un crash
+    fun defaults(): ClassicParams = buildParams(specs.associate { it.key to it.def })
+
+    // ================== CORE / HELPERS ==================
+    private fun buildParams(map: Map<String, Double>): ClassicParams = ClassicParams(
+        fullDrawMsMin = map.int("fullDrawMsMin"),
+        fullDrawMsMax = map.int("fullDrawMsMax"),
+        bowCancelCloseDist = map.float("bowCancelCloseDist"),
+        bowMinUseDist = map.float("bowMinUseDist"),
+        openVolleyMax = map.int("openVolleyMax"),
+        openSpacingMin = map.long("openSpacingMin"),
+        openSpacingMax = map.long("openSpacingMax"),
+        openShotMinDist = map.float("openShotMinDist"),
+        reactiveCdMs = map.long("reactiveCdMs"),
+
+        stillFrameThreshold = map.double("stillFrameThreshold"),
+        stillFramesNeeded = map.int("stillFramesNeeded"),
+        bowSlowThreshold = map.double("bowSlowThreshold"),
+        bowSlowFramesNeeded = map.int("bowSlowFramesNeeded"),
+
+        reserveTightMs = map.long("reserveTightMs"),
+        earlyReserve = map.int("earlyReserve"),
+        midReserve = map.int("midReserve"),
+
+        rodCdCloseMsBase = map.long("rodCdCloseMsBase"),
+        rodCdFarMsBase = map.long("rodCdFarMsBase"),
+        rodCdBiasMax = map.float("rodCdBiasMax"),
+        rodBanMeleeDist = map.float("rodBanMeleeDist"),
+        rodCloseMin = map.float("rodCloseMin"),
+        rodCloseMax = map.float("rodCloseMax"),
+        rodMainMin = map.float("rodMainMin"),
+        rodMainMax = map.float("rodMainMax"),
+        rodInterceptMin = map.float("rodInterceptMin"),
+        rodInterceptMax = map.float("rodInterceptMax"),
+        rodMaxRangeHard = map.float("rodMaxRangeHard"),
+        rodMidInstantMin = map.float("rodMidInstantMin"),
+        rodMidInstantMax = map.float("rodMidInstantMax"),
+        farThreshold = map.float("farThreshold"),
+        reentryRodGraceMs = map.long("reentryRodGraceMs"),
+
+        rodHoldCloseMinMs = map.int("rodHoldCloseMinMs"),
+        rodHoldCloseMaxMs = map.int("rodHoldCloseMaxMs"),
+        rodHoldMidMinMs = map.int("rodHoldMidMinMs"),
+        rodHoldMidMaxMs = map.int("rodHoldMidMaxMs"),
+
+        rodAntiSpamClosePassiveMin = map.int("rodAntiSpamClosePassiveMin"),
+        rodAntiSpamClosePassiveMax = map.int("rodAntiSpamClosePassiveMax"),
+        rodAntiSpamMidPassiveMin = map.int("rodAntiSpamMidPassiveMin"),
+        rodAntiSpamMidPassiveMax = map.int("rodAntiSpamMidPassiveMax"),
+        rodAntiSpamFarPassiveMin = map.int("rodAntiSpamFarPassiveMin"),
+        rodAntiSpamFarPassiveMax = map.int("rodAntiSpamFarPassiveMax"),
+
+        rodAntiSpamCloseActiveMin = map.int("rodAntiSpamCloseActiveMin"),
+        rodAntiSpamCloseActiveMax = map.int("rodAntiSpamCloseActiveMax"),
+        rodAntiSpamMidActiveMin = map.int("rodAntiSpamMidActiveMin"),
+        rodAntiSpamMidActiveMax = map.int("rodAntiSpamMidActiveMax"),
+        rodAntiSpamFarActiveMin = map.int("rodAntiSpamFarActiveMin"),
+        rodAntiSpamFarActiveMax = map.int("rodAntiSpamFarActiveMax"),
+
+        parryCloseCancelDist = map.float("parryCloseCancelDist"),
+        parryCooldownMs = map.long("parryCooldownMs"),
+        parryHoldMinMs = map.int("parryHoldMinMs"),
+        parryHoldMaxMs = map.int("parryHoldMaxMs"),
+        parryStickMinMs = map.int("parryStickMinMs"),
+        parryStickMaxMs = map.int("parryStickMaxMs"),
+        parryJumpCd = map.long("parryJumpCd"),
+        allowParryDelayMs = map.long("allowParryDelayMs"),
+
+        closeBurstWindowMinMs = map.int("closeBurstWindowMinMs"),
+        closeBurstWindowMaxMs = map.int("closeBurstWindowMaxMs"),
+        closeBurstFlipMinMs = map.int("closeBurstFlipMinMs"),
+        closeBurstFlipMaxMs = map.int("closeBurstFlipMaxMs"),
+        closeHoldWindowMinMs = map.int("closeHoldWindowMinMs"),
+        closeHoldWindowMaxMs = map.int("closeHoldWindowMaxMs"),
+
+        forwardStickMinMs = map.int("forwardStickMinMs"),
+        forwardStickMaxMs = map.int("forwardStickMaxMs"),
+        meleeFocusMinMs = map.int("meleeFocusMinMs"),
+        meleeFocusMaxMs = map.int("meleeFocusMaxMs")
+    )
+
+    private fun Map<String, Double>.float(key: String): Float = clampNum(this[key], key).toFloat()
+    private fun Map<String, Double>.int(key: String): Int = clampNum(this[key], key).toInt()
+    private fun Map<String, Double>.long(key: String): Long = clampNum(this[key], key).toLong()
+    private fun Map<String, Double>.double(key: String): Double = clampNum(this[key], key)
+
+    private fun clampNum(v: Double?, key: String): Double {
+        val spec = specByKey[key]
+        val raw = v ?: spec?.def ?: 0.0
+        return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
 
     private fun epsilon(totalPlays: Int): Double {
@@ -303,11 +341,14 @@ object ClassicV2Tuner {
         return max(0.05, base / (1.0 + decay))
     }
 
-    private fun exploreNow(epsilon: Double): Boolean = RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
+    private fun exploreNow(epsilon: Double): Boolean =
+        RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
 
-    private fun bestValue(ps: ParamState, spec: ParamSpec): Double = clamp(ps.values.values.maxByOrNull { it.avg() }?.value ?: spec.def, spec)
+    private fun bestValue(ps: ParamState, spec: ParamSpec): Double =
+        clamp(ps.values.values.maxByOrNull { it.avg() }?.value ?: spec.def, spec)
 
-    private fun sample(spec: ParamSpec): Double = clamp(quantize(RandomUtils.randomDoubleInRange(spec.min, spec.max), spec.step), spec)
+    private fun sample(spec: ParamSpec): Double =
+        clamp(quantize(RandomUtils.randomDoubleInRange(spec.min, spec.max), if (spec.step <= 0.0) 1.0 else spec.step), spec)
 
     private fun clamp(v: Double, spec: ParamSpec): Double {
         val c = v.coerceIn(spec.min, spec.max)
@@ -327,46 +368,59 @@ object ClassicV2Tuner {
 
     private fun keyOf(v: Double): String = "%.4f".format(v)
 
-    private fun Map<String, Double>.float(key: String): Float = clampNum(this[key], key).toFloat()
-    private fun Map<String, Double>.int(key: String): Int = clampNum(this[key], key).toInt()
-    private fun Map<String, Double>.long(key: String): Long = clampNum(this[key], key).toLong()
-    private fun Map<String, Double>.double(key: String): Double = clampNum(this[key], key)
-
-    private fun clampNum(v: Double?, key: String): Double {
-        val spec = specByKey[key]
-        val raw = v ?: spec?.def ?: 0.0
-        return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
+    // ==================== PERSISTENCE ====================
+    @Synchronized
+    private fun ensureLoaded() {
+        if (!loaded) {
+            state = load()
+            loaded = true
+        }
     }
 
+    @Synchronized
     private fun load(): StoredState {
+        val f = file()
+        if (!f.exists()) return StoredState()
         return try {
-            val file = file()
-            if (!file.exists()) {
-                file.parentFile?.mkdirs()
-                StoredState()
-            } else {
-                file.reader().use { reader ->
-                    val type = object : TypeToken<StoredState>() {}.type
-                    kira.gson.fromJson<StoredState>(reader, type) ?: StoredState()
-                }
+            f.reader().use { r ->
+                val type = object : TypeToken<StoredState>() {}.type
+                gson.fromJson<StoredState>(r, type) ?: StoredState()
             }
         } catch (ex: Exception) {
-            ex.printStackTrace()
+            // Sauvegarde un backup et repart propre
+            tryBackupCorrupt(f, ex)
             StoredState()
         }
     }
 
+    @Synchronized
     private fun save() {
+        val f = file()
         try {
-            val f = file()
             f.parentFile?.mkdirs()
-            f.writer().use { writer -> kira.gson.toJson(state, writer) }
+            // écriture atomique : tmp -> rename
+            val tmp = File(f.parentFile, f.name + ".tmp")
+            tmp.writer().use { w -> gson.toJson(state, w) }
+            if (!tmp.renameTo(f)) {
+                // fallback écriture directe si rename échoue (Windows parfois)
+                tmp.copyTo(f, overwrite = true)
+                tmp.delete()
+            }
         } catch (_: Exception) {
+            // ignore : on ne crash jamais à cause du tuner
         }
     }
 
-    private fun file(): File {
-        val base = File(kira.mc.mcDataDir, "config")
-        return File(base, "classicv2_tuner.json")
+    private fun tryBackupCorrupt(f: File, ex: Exception) {
+        try {
+            val sdf = SimpleDateFormat("yyyyMMdd_HHmmss")
+            val bak = File(f.parentFile, f.nameWithoutExtension + "_corrupt_" + sdf.format(Date()) + ".bak.json")
+            f.copyTo(bak, overwrite = true)
+            // on efface l’original corrompu pour repartir propre
+            f.delete()
+        } catch (_: IOException) {
+            // rien
+        }
+        ex.printStackTrace()
     }
 }
