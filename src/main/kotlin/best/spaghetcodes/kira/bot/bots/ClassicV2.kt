@@ -1,6 +1,7 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.Bow
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Rod
@@ -8,6 +9,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.ClassicV2Tuner
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
@@ -31,10 +33,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     }
 
     // =====================  ARC  =====================
-    private val fullDrawMsMin = 820
-    private val fullDrawMsMax = 980
-    private val bowCancelCloseDist = 8.0f
-    private val bowMinUseDist = 9.0f            // ne pas initier un tir < 9 blocs
+    private var fullDrawMsMin = 820
+    private var fullDrawMsMax = 980
+    private var bowCancelCloseDist = 8.0f
+    private var bowMinUseDist = 9.0f            // ne pas initier un tir < 9 blocs
 
     // Ouverture contrôlée (1–2 flèches max, espacées)
     private var openVolleyMax = 1
@@ -42,15 +44,15 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var openWindowUntil = 0L
     private var openStartDelayUntil = 0L
     private var lastShotAt = 0L
-    private val openSpacingMin = 650L
-    private val openSpacingMax = 900L
-    private val openShotMinDist = 9.0f
+    private var openSpacingMin = 650L
+    private var openSpacingMax = 900L
+    private var openShotMinDist = 9.0f
 
     // Détection immobile / slow-bow
-    private val stillFrameThreshold = 0.0125
-    private val stillFramesNeeded = 10
-    private val bowSlowThreshold = 0.06
-    private val bowSlowFramesNeeded = 3
+    private var stillFrameThreshold = 0.0125
+    private var stillFramesNeeded = 10
+    private var bowSlowThreshold = 0.06
+    private var bowSlowFramesNeeded = 3
     private var oppLastX = 0.0
     private var oppLastZ = 0.0
     private var stillFrames = 0
@@ -67,13 +69,13 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val KIND_BOW = 2
 
     private var lastReactiveShotAt = 0L
-    private val reactiveCdMs = 650L
+    private var reactiveCdMs = 650L
 
     // Réserve d’arrows
     private var gameStartAt = 0L
-    private val reserveTightMs = 10_000L
-    private val earlyReserve = 3
-    private val midReserve = 2
+    private var reserveTightMs = 10_000L
+    private var earlyReserve = 3
+    private var midReserve = 2
 
     // Interdiction de rod juste après un tir d’arc
     private var postBowNoRodUntil = 0L
@@ -83,28 +85,41 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodCdCloseMsBase = 340L
     private var rodCdFarMsBase = 480L
     private var rodCdBias = 1.0f // >1 = plus long, <1 = plus court
-    private val rodCdBiasMax = 1.25f // plafonne l’allongement pour garder la réactivité
+    private var rodCdBiasMax = 1.25f // plafonne l’allongement pour garder la réactivité
 
-    private val rodBanMeleeDist = 4.0f // *** BAN ROD en zone de mêlée (3–4 blocs effectifs) ***
+    private var rodBanMeleeDist = 4.0f // *** BAN ROD en zone de mêlée (3–4 blocs effectifs) ***
 
-    private val rodCloseMin = 2.0f
-    private val rodCloseMax = 3.4f
-    private val rodMainMin = 3.0f
-    private val rodMainMax = 6.8f
-    private val rodInterceptMin = 5.8f
-    private val rodInterceptMax = 7.2f
-    private val rodMaxRangeHard = 7.2f // garde-fou dur
+    private var rodCloseMin = 2.0f
+    private var rodCloseMax = 3.4f
+    private var rodMainMin = 3.0f
+    private var rodMainMax = 6.8f
+    private var rodInterceptMin = 5.8f
+    private var rodInterceptMax = 7.2f
+    private var rodMaxRangeHard = 7.2f // garde-fou dur
 
     // Fenêtre mid-range instantanée (supprime toute hésitation à ~5.5–7.0)
-    private val rodMidInstantMin = 5.5f
-    private val rodMidInstantMax = 7.0f
+    private var rodMidInstantMin = 5.5f
+    private var rodMidInstantMax = 7.0f
 
     // Anti-spam rod : espace les essais, surtout contre adversaire "passif rod"
+    private var rodAntiSpamClosePassiveMin = 340
+    private var rodAntiSpamClosePassiveMax = 420
+    private var rodAntiSpamMidPassiveMin = 520
+    private var rodAntiSpamMidPassiveMax = 680
+    private var rodAntiSpamFarPassiveMin = 520
+    private var rodAntiSpamFarPassiveMax = 700
+    private var rodAntiSpamCloseActiveMin = 260
+    private var rodAntiSpamCloseActiveMax = 320
+    private var rodAntiSpamMidActiveMin = 380
+    private var rodAntiSpamMidActiveMax = 520
+    private var rodAntiSpamFarActiveMin = 400
+    private var rodAntiSpamFarActiveMax = 560
     private var rodAntiSpamUntil = 0L
 
     // Détection "éloignement -> retour" pour rod instantanée
     private var farSince = 0L
-    private val farThreshold = 11.0f
+    private var farThreshold = 11.0f
+    private var reentryRodGraceMs = 300L
     private var reentryRodGraceUntil = 0L
 
     // Heuristique hit/miss via hurtTime
@@ -115,6 +130,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodMisses = 0
 
     // Fenêtres “melee focus” & stick avant
+    private var forwardStickMinMs = 220
+    private var forwardStickMaxMs = 280
+    private var meleeFocusMinMs = 300
+    private var meleeFocusMaxMs = 340
     private var meleeFocusUntil = 0L
     private var forwardStickUntil = 0L
 
@@ -122,16 +141,20 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var lastOppRodSeenAt = 0L
 
     // Maintien minimal de la rod APRÈS cast (évite le switch épée prématuré)
+    private var rodHoldCloseMinMs = 118
+    private var rodHoldCloseMaxMs = 142
+    private var rodHoldMidMinMs = 208
+    private var rodHoldMidMaxMs = 232
     private var rodHoldUntil = 0L
 
     // ==================  PARADE ÉPÉE  =================
     private val parryMinDist = 15.0f
-    private val parryCloseCancelDist = 15.0f
-    private val parryCooldownMs = 900L
-    private val parryHoldMinMs = 650
-    private val parryHoldMaxMs = 980
-    private val parryStickMinMs = 900
-    private val parryStickMaxMs = 1500
+    private var parryCloseCancelDist = 15.0f
+    private var parryCooldownMs = 900L
+    private var parryHoldMinMs = 650
+    private var parryHoldMaxMs = 980
+    private var parryStickMinMs = 900
+    private var parryStickMaxMs = 1500
 
     private var lastSwordBlock = 0L
     private var holdBlockUntil = 0L
@@ -143,9 +166,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var parryStrafeDir = 1
     private var parryStrafeFlipAt = 0L
     private var lastParryJumpAt = 0L
-    private val parryJumpCd = 580L
+    private var parryJumpCd = 580L
 
     // Anti-parade précoce
+    private var allowParryDelayMs = 2800L
     private var allowParryAfter = 0L
 
     // ==================  MOUVEMENT  ===================
@@ -173,12 +197,94 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val MODE_BURST = 0
     private val MODE_HOLD_LEFT = 1
     private val MODE_HOLD_RIGHT = 2
+    private var closeBurstWindowMinMs = 280
+    private var closeBurstWindowMaxMs = 420
+    private var closeBurstFlipMinMs = 60
+    private var closeBurstFlipMaxMs = 110
+    private var closeHoldWindowMinMs = 220
+    private var closeHoldWindowMaxMs = 340
     private var closeStrafeNextAt = 0L
     private var closeStrafeToggleAt = 0L
     // --------------------------------------------------
 
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
+        val params = ClassicV2Tuner.pickParams()
+
+        fullDrawMsMin = params.fullDrawMsMin
+        fullDrawMsMax = params.fullDrawMsMax
+        bowCancelCloseDist = params.bowCancelCloseDist
+        bowMinUseDist = params.bowMinUseDist
+        openVolleyMax = params.openVolleyMax
+        openSpacingMin = params.openSpacingMin
+        openSpacingMax = params.openSpacingMax
+        openShotMinDist = params.openShotMinDist
+        reactiveCdMs = params.reactiveCdMs
+
+        stillFrameThreshold = params.stillFrameThreshold
+        stillFramesNeeded = params.stillFramesNeeded
+        bowSlowThreshold = params.bowSlowThreshold
+        bowSlowFramesNeeded = params.bowSlowFramesNeeded
+
+        reserveTightMs = params.reserveTightMs
+        earlyReserve = params.earlyReserve
+        midReserve = params.midReserve
+
+        rodCdCloseMsBase = params.rodCdCloseMsBase
+        rodCdFarMsBase = params.rodCdFarMsBase
+        rodCdBiasMax = params.rodCdBiasMax
+        rodBanMeleeDist = params.rodBanMeleeDist
+        rodCloseMin = params.rodCloseMin
+        rodCloseMax = params.rodCloseMax
+        rodMainMin = params.rodMainMin
+        rodMainMax = params.rodMainMax
+        rodInterceptMin = params.rodInterceptMin
+        rodInterceptMax = params.rodInterceptMax
+        rodMaxRangeHard = params.rodMaxRangeHard
+        rodMidInstantMin = params.rodMidInstantMin
+        rodMidInstantMax = params.rodMidInstantMax
+        farThreshold = params.farThreshold
+        reentryRodGraceMs = params.reentryRodGraceMs
+
+        rodHoldCloseMinMs = params.rodHoldCloseMinMs
+        rodHoldCloseMaxMs = params.rodHoldCloseMaxMs
+        rodHoldMidMinMs = params.rodHoldMidMinMs
+        rodHoldMidMaxMs = params.rodHoldMidMaxMs
+
+        rodAntiSpamClosePassiveMin = params.rodAntiSpamClosePassiveMin
+        rodAntiSpamClosePassiveMax = params.rodAntiSpamClosePassiveMax
+        rodAntiSpamMidPassiveMin = params.rodAntiSpamMidPassiveMin
+        rodAntiSpamMidPassiveMax = params.rodAntiSpamMidPassiveMax
+        rodAntiSpamFarPassiveMin = params.rodAntiSpamFarPassiveMin
+        rodAntiSpamFarPassiveMax = params.rodAntiSpamFarPassiveMax
+        rodAntiSpamCloseActiveMin = params.rodAntiSpamCloseActiveMin
+        rodAntiSpamCloseActiveMax = params.rodAntiSpamCloseActiveMax
+        rodAntiSpamMidActiveMin = params.rodAntiSpamMidActiveMin
+        rodAntiSpamMidActiveMax = params.rodAntiSpamMidActiveMax
+        rodAntiSpamFarActiveMin = params.rodAntiSpamFarActiveMin
+        rodAntiSpamFarActiveMax = params.rodAntiSpamFarActiveMax
+
+        parryCloseCancelDist = params.parryCloseCancelDist
+        parryCooldownMs = params.parryCooldownMs
+        parryHoldMinMs = params.parryHoldMinMs
+        parryHoldMaxMs = params.parryHoldMaxMs
+        parryStickMinMs = params.parryStickMinMs
+        parryStickMaxMs = params.parryStickMaxMs
+        parryJumpCd = params.parryJumpCd
+        allowParryDelayMs = params.allowParryDelayMs
+
+        closeBurstWindowMinMs = params.closeBurstWindowMinMs
+        closeBurstWindowMaxMs = params.closeBurstWindowMaxMs
+        closeBurstFlipMinMs = params.closeBurstFlipMinMs
+        closeBurstFlipMaxMs = params.closeBurstFlipMaxMs
+        closeHoldWindowMinMs = params.closeHoldWindowMinMs
+        closeHoldWindowMaxMs = params.closeHoldWindowMaxMs
+
+        forwardStickMinMs = params.forwardStickMinMs
+        forwardStickMaxMs = params.forwardStickMaxMs
+        meleeFocusMinMs = params.meleeFocusMinMs
+        meleeFocusMaxMs = params.meleeFocusMaxMs
+
         Mouse.startTracking()
         Movement.startSprinting()
         Movement.startForward()
@@ -203,7 +309,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         actionLockUntil = 0L
         projectileKind = KIND_NONE
 
-        openVolleyMax = RandomUtils.randomIntInRange(1, 2)
         openVolleyFired = 0
         openWindowUntil = System.currentTimeMillis() + 4500L
         openStartDelayUntil = System.currentTimeMillis() + RandomUtils.randomIntInRange(700, 1100)
@@ -256,12 +361,18 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         closeStrafeToggleAt = 0L
 
         // Anti-parade prématurée (~2.8 s)
-        allowParryAfter = gameStartAt + 2800L
+        allowParryAfter = gameStartAt + allowParryDelayMs
     }
 
     override fun onGameEnd() {
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        ClassicV2Tuner.report(win, 0)
         TimeUtils.setTimeout({
             i?.cancel()
             Mouse.stopTracking()
@@ -278,8 +389,8 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         TimeUtils.setTimeout({ tapping = false }, 100)
 
         val now = System.currentTimeMillis()
-        forwardStickUntil = now + RandomUtils.randomIntInRange(220, 280)
-        meleeFocusUntil = now + RandomUtils.randomIntInRange(300, 340)
+        forwardStickUntil = now + RandomUtils.randomIntInRange(forwardStickMinMs, forwardStickMaxMs)
+        meleeFocusUntil = now + RandomUtils.randomIntInRange(meleeFocusMinMs, meleeFocusMaxMs)
         TimeUtils.setTimeout({
             Movement.startForward()
             Movement.startSprinting()
@@ -344,9 +455,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             // HOLD DE ROD APRÈS CAST — presets:
             // close ~130ms ; 5-6 blocs ~220ms (±12ms)
             val holdMs = when {
-                distanceNow < 3.0f -> RandomUtils.randomIntInRange(118, 142)           // ~130 ms
+                distanceNow < 3.0f -> RandomUtils.randomIntInRange(rodHoldCloseMinMs, rodHoldCloseMaxMs)           // ~130 ms
                 distanceNow < 4.8f -> RandomUtils.randomIntInRange(160, 190)           // transition
-                distanceNow <= 6.2f -> RandomUtils.randomIntInRange(208, 232)          // ~220 ms
+                distanceNow <= 6.2f -> RandomUtils.randomIntInRange(rodHoldMidMinMs, rodHoldMidMaxMs)          // ~220 ms
                 else               -> RandomUtils.randomIntInRange(210, 235)            // léger maintien
             }
             rodHoldUntil = nowClick + holdMs
@@ -371,9 +482,21 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             // Anti-SPAM dynamique : plus strict si l'adversaire n'utilise pas la rod
             val oppPassive = (nowClick - lastOppRodSeenAt) > 5000L
             val antiSpam = when {
-                distanceNow < 3.0f -> if (oppPassive) RandomUtils.randomIntInRange(340, 420) else RandomUtils.randomIntInRange(260, 320)
-                distanceNow <= 6.2f -> if (oppPassive) RandomUtils.randomIntInRange(520, 680) else RandomUtils.randomIntInRange(380, 520)
-                else -> if (oppPassive) RandomUtils.randomIntInRange(520, 700) else RandomUtils.randomIntInRange(400, 560)
+                distanceNow < 3.0f -> if (oppPassive) {
+                    RandomUtils.randomIntInRange(rodAntiSpamClosePassiveMin, rodAntiSpamClosePassiveMax)
+                } else {
+                    RandomUtils.randomIntInRange(rodAntiSpamCloseActiveMin, rodAntiSpamCloseActiveMax)
+                }
+                distanceNow <= 6.2f -> if (oppPassive) {
+                    RandomUtils.randomIntInRange(rodAntiSpamMidPassiveMin, rodAntiSpamMidPassiveMax)
+                } else {
+                    RandomUtils.randomIntInRange(rodAntiSpamMidActiveMin, rodAntiSpamMidActiveMax)
+                }
+                else -> if (oppPassive) {
+                    RandomUtils.randomIntInRange(rodAntiSpamFarPassiveMin, rodAntiSpamFarPassiveMax)
+                } else {
+                    RandomUtils.randomIntInRange(rodAntiSpamFarActiveMin, rodAntiSpamFarActiveMax)
+                }
             }
             rodAntiSpamUntil = nowClick + antiSpam
 
@@ -455,7 +578,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             if (farSince == 0L) farSince = now
         } else {
             if (farSince != 0L && (now - farSince) >= 500L && approaching) {
-                reentryRodGraceUntil = now + 300L
+                reentryRodGraceUntil = now + reentryRodGraceMs
             }
             farSince = 0L
         }
@@ -834,17 +957,17 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                         else     -> MODE_HOLD_RIGHT          // 25% maintien droit
                     }
                     closeStrafeNextAt = now + when (closeStrafeMode) {
-                        MODE_BURST -> RandomUtils.randomIntInRange(280, 420).toLong()
-                        else       -> RandomUtils.randomIntInRange(220, 340).toLong()
+                        MODE_BURST -> RandomUtils.randomIntInRange(closeBurstWindowMinMs, closeBurstWindowMaxMs).toLong()
+                        else       -> RandomUtils.randomIntInRange(closeHoldWindowMinMs, closeHoldWindowMaxMs).toLong()
                     }
                     if (closeStrafeMode == MODE_BURST) {
-                        closeStrafeToggleAt = now + RandomUtils.randomIntInRange(60, 110)
+                        closeStrafeToggleAt = now + RandomUtils.randomIntInRange(closeBurstFlipMinMs, closeBurstFlipMaxMs)
                     } else {
                         strafeDir = if (closeStrafeMode == MODE_HOLD_LEFT) -1 else 1
                     }
                 } else if (closeStrafeMode == MODE_BURST && now >= closeStrafeToggleAt) {
                     strafeDir = -strafeDir
-                    closeStrafeToggleAt = now + RandomUtils.randomIntInRange(60, 110)
+                    closeStrafeToggleAt = now + RandomUtils.randomIntInRange(closeBurstFlipMinMs, closeBurstFlipMaxMs)
                 }
 
                 // Poids et mouvement
