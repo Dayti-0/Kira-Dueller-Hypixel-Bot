@@ -65,6 +65,7 @@ object SumoTuner {
         // Start-Hop
         val startHopModeInt: Int,        // 0=TIMER, 1=GROUND, 2=HYBRID
         val startHopTimerFudgeMs: Long,
+        val startHopTimerTargetMs: Long, // <<< NOUVEAU : délai cible
         val groundTicksRequired: Int,
         val groundMaxWaitMs: Long,
         val startAntivoidDisableMs: Long
@@ -85,9 +86,7 @@ object SumoTuner {
         var value: Double = 0.0,
         var plays: Int = 0,
         var totalReward: Double = 0.0
-    ) {
-        fun avg(): Double = if (plays > 0) totalReward / plays else Double.NEGATIVE_INFINITY
-    }
+    ) { fun avg(): Double = if (plays > 0) totalReward / plays else Double.NEGATIVE_INFINITY }
 
     private data class ParamState(
         var values: MutableMap<String, ValueState> = mutableMapOf(),
@@ -161,6 +160,7 @@ object SumoTuner {
         // ----- Start-Hop -----
         specI("startHopModeInt", 0.0, 2.0, 1.0, 2.0),      // 2 = HYBRID par défaut
         specL("startHopTimerFudgeMs", 20.0, 60.0, 5.0, 40.0),
+        specL("startHopTimerTargetMs", 280.0, 330.0, 5.0, 300.0), // <<< NOUVEAU
         specI("groundTicksRequired", 1.0, 3.0, 1.0, 2.0),
         specL("groundMaxWaitMs", 260.0, 340.0, 10.0, 290.0),
         specL("startAntivoidDisableMs", 400.0, 900.0, 50.0, 600.0)
@@ -180,8 +180,8 @@ object SumoTuner {
 
     fun pickParams(): Params {
         ensureLoaded()
-
         val chosen = mutableMapOf<String, Double>()
+
         for (spec in specs) {
             val p = state.params.getOrPut(spec.key) { ParamState() }
             val eps = epsilon(p.totalPlays)
@@ -243,6 +243,7 @@ object SumoTuner {
 
             startHopModeInt = chosen.int("startHopModeInt"),
             startHopTimerFudgeMs = chosen.long("startHopTimerFudgeMs"),
+            startHopTimerTargetMs = chosen.long("startHopTimerTargetMs"),
             groundTicksRequired = chosen.int("groundTicksRequired"),
             groundMaxWaitMs = chosen.long("groundMaxWaitMs"),
             startAntivoidDisableMs = chosen.long("startAntivoidDisableMs")
@@ -267,11 +268,7 @@ object SumoTuner {
     }
 
     // ========== internals ==========
-    private fun ensureLoaded() {
-        if (loaded) return
-        state = load()
-        loaded = true
-    }
+    private fun ensureLoaded() { if (!loaded) { state = load(); loaded = true } }
 
     private fun epsilon(totalPlays: Int): Double {
         val base = 0.35
@@ -279,10 +276,8 @@ object SumoTuner {
         return max(0.05, base / (1.0 + decay))
     }
 
-    private fun exploreNow(epsilon: Double): Boolean {
-        val roll = RandomUtils.randomDoubleInRange(0.0, 1.0)
-        return roll < epsilon
-    }
+    private fun exploreNow(epsilon: Double): Boolean =
+        RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
 
     private fun bestValue(ps: ParamState, spec: ParamSpec): Double {
         val best = ps.values.values.maxByOrNull { it.avg() }
