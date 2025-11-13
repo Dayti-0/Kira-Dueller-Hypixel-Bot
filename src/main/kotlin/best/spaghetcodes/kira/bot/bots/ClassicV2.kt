@@ -229,14 +229,16 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
     }
 
-    private fun isBowAiming(now: Long, p: net.minecraft.entity.player.EntityPlayerSP?): Boolean {
-        if (p == null) return false
+    // ⬇⬇⬇ FIX: on ne type plus le paramètre avec EntityPlayerSP
+    private fun isBowAiming(now: Long): Boolean {
+        val p = mc.thePlayer ?: return false
         val holdingBowNow = p.heldItem != null && p.heldItem.unlocalizedName.lowercase().contains("bow")
-        return (projectileKind == KIND_BOW) || (holdingBowNow && Mouse.rClickDown) || (projectileKind == KIND_BOW && now < bowHardLockUntil)
+        return (projectileKind == KIND_BOW) ||
+               (holdingBowNow && Mouse.rClickDown) ||
+               (projectileKind == KIND_BOW && now < bowHardLockUntil)
     }
 
     private fun performSafeStart(now: Long, soft: Boolean) {
-        // Démarrage seulement ici (après stabilité du monde)
         Mouse.startTracking()
         Movement.startSprinting()
         Movement.startForward()
@@ -248,15 +250,14 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         continuousJumping = false
         gameStartAt = now
 
-        // Premier saut temporisé (tunable) et surtout "safe" (hors zone & pas d'arc)
         val delay = startupJumpDelayMs
         TimeUtils.setTimeout({
             val p = mc.thePlayer ?: return@setTimeout
             val opp = opponent() ?: return@setTimeout
             val dist = EntityUtils.getDistanceNoY(p, opp)
-            val aiming = isBowAiming(System.currentTimeMillis(), p)
+            val aiming = isBowAiming(System.currentTimeMillis())
             if (!aiming && dist > antiJumpZoneDist && (System.currentTimeMillis() - lastJumpAt >= continuousJumpMinIntervalMs)) {
-                ClassicV2Tuner.noteCloseJump(dist, aiming) // ne comptera que si "mauvais"
+                ClassicV2Tuner.noteCloseJump(dist, aiming)
                 Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
                 lastJumpAt = System.currentTimeMillis()
             }
@@ -265,11 +266,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
-        // Charger paramètres (safe)
         val params = try { ClassicV2Tuner.pickParams() } catch (_: Throwable) { ClassicV2Tuner.defaults() }
         applyParams(params)
 
-        // Reset & attente "safe start"
         Mouse.stopLeftAC()
         Mouse.rClickUp()
         Movement.clearAll()
@@ -277,7 +276,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         continuousJumping = false
         lastJumpAt = 0L
 
-        // Init états divers
         openVolleyFired = 0
         openWindowUntil = System.currentTimeMillis() + 4500L
         openStartDelayUntil = System.currentTimeMillis() + RandomUtils.randomIntInRange(700, 1100)
@@ -323,9 +321,8 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         closeStrafeNextAt = 0L
         closeStrafeToggleAt = 0L
 
-        allowParryAfter = 0L // sera fixé après start effectif
+        allowParryAfter = 0L
 
-        // Activer la barrière de démarrage
         startGateActive = true
         startGateReady = false
         startGateOkTicks = 0
@@ -431,7 +428,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         meleeFocusMinMs = p.meleeFocusMinMs
         meleeFocusMaxMs = p.meleeFocusMaxMs
 
-        // Nouveaux params de saut
         antiJumpZoneDist = p.antiJumpZoneDist
         startupJumpDelayMs = p.startupJumpDelayMs
         continuousJumpMinIntervalMs = p.continuousJumpMinIntervalMs
@@ -579,11 +575,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         return held != null && held.unlocalizedName.lowercase().contains("rod")
     }
 
-    // >>> Pas de jump si arc, ni si distance ≤ antiJumpZoneDist
     private fun maintainContinuousJump(now: Long, distanceToOpp: Float) {
         if (!startGateReady) return
-        val p = mc.thePlayer ?: return
-        val aiming = isBowAiming(now, p)
+        val aiming = isBowAiming(now)
         if (aiming) {
             continuousJumping = false
             Movement.stopJumping()
@@ -603,7 +597,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     override fun onTick() {
         val now = System.currentTimeMillis()
 
-        // Barrière “Safe Start”
         tryAdvanceStartGate(now)
         if (!startGateReady) return
 
@@ -648,8 +641,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         if (p.hurtTime > 0) lastGotHitAt = now
 
-        // Anti-obstacle protégé (hors zone, pas pendant arc, cadence jump)
-        val aiming = isBowAiming(now, p)
+        val aiming = isBowAiming(now)
         if (!aiming &&
             distance > max(antiJumpZoneDist, 2.2f) &&
             WorldUtils.blockInFront(p, 2f, 0.5f) != Blocks.air &&
@@ -1011,7 +1003,6 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         handle(clear, randomStrafe, movePriority)
         prevDistance = distance
 
-        // Autoriser la parade après un vrai départ effectif
         if (allowParryAfter == 0L) allowParryAfter = gameStartAt + allowParryDelayMs
     }
 }
