@@ -47,6 +47,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var openSpacingMax = 900L
     private var openShotMinDist = 9.0f
 
+    // NOTE: Double (pas Float) pour matcher le calcul avec dx/dz (double)
     private var stillFrameThreshold = 0.0125
     private var stillFramesNeeded = 10
     private var bowSlowThreshold = 0.06
@@ -184,14 +185,14 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var closeStrafeNextAt = 0L
     private var closeStrafeToggleAt = 0L
 
-    // ===== Jump (anti-jump zone + cadence) =====
+    // ===== Jump =====
     private var antiJumpZoneDist = 8.0f
-    private var startupJumpDelayMs = 300      // sera alimenté par tuner.startupJumpForceMs pour compat
+    private var startupJumpDelayMs = 300
     private var continuousJumpMinIntervalMs = 220
     private var continuousJumping = false
     private var lastJumpAt = 0L
 
-    // ====== MID/LONG STRAFE tunables (depuis le tuner) ======
+    // ====== MID/LONG STRAFE (tunable) ======
     private var midStrafeSwitchMinMs = 820
     private var midStrafeSwitchMaxMs = 1100
     private var midTightRangeMin = 1.8f
@@ -372,7 +373,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         openShotMinDist = p.openShotMinDist
         reactiveCdMs = p.reactiveCdMs
 
-        // Détection
+        // Détection (Double)
         stillFrameThreshold = p.stillFrameThreshold
         stillFramesNeeded = p.stillFramesNeeded
         bowSlowThreshold = p.bowSlowThreshold
@@ -455,7 +456,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         // Classic : anti jump & premier saut (optionnels)
         antiJumpZoneDist     = p.antiJumpZoneDist
-        startupJumpDelayMs   = p.startupJumpForceMs   // compat : on injecte vers le champ delay
+        startupJumpDelayMs   = p.startupJumpForceMs
     }
 
     override fun onAttack() {
