@@ -207,6 +207,13 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var closeStrafeToggleAt = 0L
     // --------------------------------------------------
 
+    // ===== Jump continu "hors zone" =====
+    private var antiJumpZoneDist = 7.0f          // zone anti-jump : ne JAMAIS sauter si on est à portée combat
+    private var startupJumpForceMs = 2000L       // pendant X ms au tout début, on force le jump même si l’ennemi n’est pas encore vu
+    private val REASSERT_FWD_1_MS = 30L          // réassertions avant/sprint pour éviter "saut sur place"
+    private val REASSERT_FWD_2_MS = 90L
+    private var continuousJumping = false
+
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
         val params = ClassicV2Tuner.pickParams()
@@ -296,7 +303,13 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Mouse.stopLeftAC()
         }
 
+        // Jump immédiat + réassertions pour éviter "saut sur place"
+        Movement.startJumping()
+        TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_1_MS.toInt())
+        TimeUtils.setTimeout({ Movement.startForward(); Movement.startSprinting() }, REASSERT_FWD_2_MS.toInt())
+
         startupJumping = true
+        continuousJumping = true
 
         prevDistance = -1f
         lastStrafeSwitch = 0L
@@ -380,6 +393,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Combat.stopRandomStrafe()
         }, RandomUtils.randomIntInRange(200, 400))
         startupJumping = false
+        continuousJumping = false
     }
 
     override fun onAttack() {
@@ -548,6 +562,20 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         return held != null && held.unlocalizedName.lowercase().contains("rod")
     }
 
+    // ====== Jump continu (hors zone) ======
+    private fun maintainContinuousJump(now: Long, distanceToOpp: Float) {
+        // Force le jump au tout début, puis continue tant qu'on est hors zone anti-jump
+        val shouldJump = (now - gameStartAt) < startupJumpForceMs || distanceToOpp > antiJumpZoneDist
+        continuousJumping = shouldJump
+        if (shouldJump) {
+            Movement.startForward()
+            Movement.startSprinting()
+            Movement.startJumping()
+        } else {
+            Movement.stopJumping()
+        }
+    }
+
     // ======================  TICK  =====================
     override fun onTick() {
         val p = mc.thePlayer ?: return
@@ -561,16 +589,13 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Mouse.stopLeftAC()
         }
 
-        // Sauts de début : ACTIFS EN CONTINU jusqu'au PREMIER brandissage d'ARC
-        if (startupJumping) {
-            Movement.startJumping()
-        } else {
-            Movement.stopJumping()
-        }
-
         val now = System.currentTimeMillis()
         val hbActive = now < hbActiveUntil
         val distance = EntityUtils.getDistanceNoY(p, opp)
+
+        // Jump continu: actif si début de partie OU hors zone anti-jump
+        maintainContinuousJump(now, distance)
+
         val approaching = (prevDistance > 0f) && (prevDistance - distance >= 0.15f)
 
         // Détecte "loin" -> "ré-entrée" (approche) pour lever la latence de rod
@@ -726,7 +751,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         // ========== JUMPS CONTEXTUELS (hors parade/proj) ==========
-        if (!Mouse.rClickDown && !projectileActive && (now - lastGotHitAt) > 260 && !startupJumping) {
+        if (!Mouse.rClickDown && !projectileActive && (now - lastGotHitAt) > 260 && !continuousJumping) {
             val facingAway = EntityUtils.entityFacingAway(p, opp)
             val oppVeryStill = (stillFrames >= 6)
             if (distance > 8.0f) {
@@ -857,7 +882,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 (now - lastShotAt) >= RandomUtils.randomIntInRange(openSpacingMin.toInt(), openSpacingMax.toInt())) {
 
                 val lock = chargeMsFor(distance, opening = true)
-                startupJumping = false // stop sauts de début au 1er draw
+                startupJumping = false // stop sauts de début au 1er draw (le jump continu reste géré par maintainContinuousJump)
                 bowHardLockUntil = now + lock
                 pendingProjectileUntil = now + 60L
                 actionLockUntil = now + (lock + 120)
