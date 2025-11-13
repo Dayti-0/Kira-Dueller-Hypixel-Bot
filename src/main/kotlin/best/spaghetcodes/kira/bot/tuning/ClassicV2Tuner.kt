@@ -6,16 +6,33 @@ import net.minecraft.client.Minecraft
 import java.io.File
 import kotlin.math.exp
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * Tuner epsilon-greedy persistant pour ClassicV2.
- * - persistance JSON: config/classicv2_tuner.json (dans mcDataDir)
- * - epsilon décroissant avec l'expérience
- * - specs identiques aux valeurs par défaut de ClassicV2 (± bornes réalistes)
+ * Tuner epsilon-greedy persistant (format JSON inchangé).
+ * Ajouts:
+ *  - reportDetailed(GameMetrics) avec récompense enrichie
+ *  - normalisation min/max pour éviter les bornes invalides
+ *  - checkpoints mémoire + rollback doux si régression
+ *  - pruning léger par param pour éviter l’enflure du JSON
  */
 object ClassicV2Tuner {
 
+    // ---------- Métriques détaillées ----------
+    data class GameMetrics(
+        val win: Boolean,
+        val durationMs: Long = 0L,
+        val damageDealt: Int = 0,
+        val damageTaken: Int = 0,
+        val rodAttempts: Int = 0,
+        val rodHits: Int = 0,
+        val bowShots: Int = 0,
+        val bowHits: Int = 0,
+        val mistakes: Int = 0
+    )
+
+    // ---------- Paramètres injectés ----------
     data class ClassicParams(
         // ARC
         val fullDrawMsMin: Int,
@@ -28,13 +45,13 @@ object ClassicV2Tuner {
         val openShotMinDist: Float,
         val reactiveCdMs: Long,
 
-        // Détection mouvement (Double pour matcher ClassicV2)
+        // Détection
         val stillFrameThreshold: Double,
         val stillFramesNeeded: Int,
         val bowSlowThreshold: Double,
         val bowSlowFramesNeeded: Int,
 
-        // Réserves flèches
+        // Réserves
         val reserveTightMs: Long,
         val earlyReserve: Int,
         val midReserve: Int,
@@ -76,7 +93,7 @@ object ClassicV2Tuner {
         val rodAntiSpamFarActiveMin: Int,
         val rodAntiSpamFarActiveMax: Int,
 
-        // PARADE
+        // Parade
         val parryCloseCancelDist: Float,
         val parryCooldownMs: Long,
         val parryHoldMinMs: Int,
@@ -99,7 +116,7 @@ object ClassicV2Tuner {
         val meleeFocusMinMs: Int,
         val meleeFocusMaxMs: Int,
 
-        // MID/LONG strafe + random band + anti-jump Classic
+        // Mid/long + band
         val midStrafeSwitchMinMs: Int,
         val midStrafeSwitchMaxMs: Int,
         val midTightRangeMin: Float,
@@ -109,10 +126,12 @@ object ClassicV2Tuner {
         val randomStrafeBandMin: Float,
         val randomStrafeBandMax: Float,
 
+        // Anti-jump + premier saut
         val antiJumpZoneDist: Float,
         val startupJumpForceMs: Int
     )
 
+    // ---------- Espace de recherche ----------
     private data class Spec(
         val key: String,
         val min: Double,
@@ -132,17 +151,37 @@ object ClassicV2Tuner {
     private var scores: MutableMap<String, MutableMap<String, Double>> = mutableMapOf()
     private var lastPick: MutableMap<String, String> = mutableMapOf()
 
-    // petit compteur d'erreurs rapportées par la partie
-    private var mistakesCounter: Int = 0
+    private var mistakesCounter = 0
 
-    // ===================== Specs =====================
+    // Historique récent & checkpoints (mémoire)
+    private val recent = ArrayDeque<Boolean>() // taille <= 25
+    private data class Checkpoint(val ts: Long, val winRate: Double, val config: Map<String, String>)
+    private val checkpoints = ArrayDeque<Checkpoint>()
+
+    private fun load() {
+        if (!file.exists()) return
+        val type = object : TypeToken<MutableMap<String, MutableMap<String, Double>>>() {}.type
+        scores = gson.fromJson(file.readText(), type) ?: mutableMapOf()
+    }
+    private fun save() {
+        if (!file.parentFile.exists()) file.parentFile.mkdirs()
+        file.writeText(gson.toJson(scores))
+    }
+
+    private fun totalPlays(): Int {
+        var t = 0
+        for (e in scores.values) t += e.size
+        return t
+    }
+
+    // ---------- Spécifications ----------
     private val specs: List<Spec> by lazy {
-        fun i(key: String, min: Int, max: Int, step: Int, def: Int) =
-            Spec(key, min.toDouble(), max.toDouble(), step.toDouble(), def.toDouble(), true)
-        fun f(key: String, min: Float, max: Float, step: Float, def: Float) =
-            Spec(key, min.toDouble(), max.toDouble(), step.toDouble(), def.toDouble(), false)
-        fun l(key: String, min: Long, max: Long, step: Long, def: Long) =
-            Spec(key, min.toDouble(), max.toDouble(), step.toDouble(), def.toDouble(), true)
+        fun i(k: String, mn: Int, mx: Int, st: Int, df: Int) =
+            Spec(k, mn.toDouble(), mx.toDouble(), st.toDouble(), df.toDouble(), true)
+        fun f(k: String, mn: Float, mx: Float, st: Float, df: Float) =
+            Spec(k, mn.toDouble(), mx.toDouble(), st.toDouble(), df.toDouble(), false)
+        fun l(k: String, mn: Long, mx: Long, st: Long, df: Long) =
+            Spec(k, mn.toDouble(), mx.toDouble(), st.toDouble(), df.toDouble(), true)
 
         listOf(
             // ARC
@@ -156,7 +195,7 @@ object ClassicV2Tuner {
             f("openShotMinDist", 7.0f, 12.0f, 0.1f, 9.0f),
             l("reactiveCdMs", 420, 900, 10, 650),
 
-            // Détection (Double côté ClassicV2, mais spec en float OK)
+            // Détection
             f("stillFrameThreshold", 0.008f, 0.02f, 0.0005f, 0.0125f),
             i("stillFramesNeeded", 6, 16, 1, 10),
             f("bowSlowThreshold", 0.03f, 0.10f, 0.005f, 0.06f),
@@ -184,12 +223,13 @@ object ClassicV2Tuner {
             f("farThreshold", 9.0f, 13.0f, 0.1f, 11.0f),
             l("reentryRodGraceMs", 180, 520, 10, 300),
 
-            // ROD hold & anti-spam
+            // Holds
             i("rodHoldCloseMinMs", 100, 160, 2, 118),
             i("rodHoldCloseMaxMs", 130, 200, 2, 142),
             i("rodHoldMidMinMs", 180, 260, 2, 208),
             i("rodHoldMidMaxMs", 210, 280, 2, 232),
 
+            // Anti-spam PASSIF
             i("rodAntiSpamClosePassiveMin", 300, 420, 5, 340),
             i("rodAntiSpamClosePassiveMax", 360, 520, 5, 420),
             i("rodAntiSpamMidPassiveMin", 460, 620, 5, 520),
@@ -197,6 +237,7 @@ object ClassicV2Tuner {
             i("rodAntiSpamFarPassiveMin", 480, 680, 5, 520),
             i("rodAntiSpamFarPassiveMax", 640, 820, 5, 700),
 
+            // Anti-spam ACTIF
             i("rodAntiSpamCloseActiveMin", 220, 320, 5, 260),
             i("rodAntiSpamCloseActiveMax", 280, 380, 5, 320),
             i("rodAntiSpamMidActiveMin", 340, 460, 5, 380),
@@ -227,7 +268,7 @@ object ClassicV2Tuner {
             i("meleeFocusMinMs", 260, 340, 5, 300),
             i("meleeFocusMaxMs", 300, 380, 5, 340),
 
-            // Mid/long strafe + band + anti-jump Classic
+            // Mid/long & band
             i("midStrafeSwitchMinMs", 720, 980, 10, 820),
             i("midStrafeSwitchMaxMs", 1000, 1400, 10, 1100),
             f("midTightRangeMin", 1.6f, 2.2f, 0.02f, 1.8f),
@@ -237,36 +278,44 @@ object ClassicV2Tuner {
             f("randomStrafeBandMin", 7.0f, 9.0f, 0.1f, 8.0f),
             f("randomStrafeBandMax", 14.0f, 17.0f, 0.1f, 15.0f),
 
+            // Anti-jump + premier saut
             f("antiJumpZoneDist", 7.0f, 8.6f, 0.1f, 7.8f),
-            i("startupJumpForceMs", 100, 260, 5, 160)
+            i("startupJumpForceMs", 120, 260, 5, 160)
         )
     }
 
-    // ===================== Persistence =====================
-    private fun load() {
-        if (file.exists()) {
-            val type = object : TypeToken<MutableMap<String, MutableMap<String, Double>>>() {}.type
-            scores = gson.fromJson(file.readText(), type) ?: mutableMapOf()
-        }
+    // ---------- Quantification ----------
+    private fun kQuant(v: Double, step: Double): Double {
+        val r = kotlin.math.round(v / step) * step
+        return if (step >= 1.0) r.toInt().toDouble()
+        else String.format("%.6f", r).toDouble()
     }
 
-    private fun save() {
-        if (!file.parentFile.exists()) file.parentFile.mkdirs()
-        file.writeText(gson.toJson(scores))
+    // ---------- Normalisations min/max ----------
+    private fun fixIntPair(map: MutableMap<String, Double>, kMin: String, kMax: String, gap: Int = 1) {
+        val a = map[kMin]!!.toInt()
+        var b = map[kMax]!!.toInt()
+        if (b <= a) b = a + gap
+        map[kMax] = b.toDouble()
+    }
+    private fun fixLongPair(map: MutableMap<String, Double>, kMin: String, kMax: String, gap: Long = 10L) {
+        val a = map[kMin]!!.toLong()
+        var b = map[kMax]!!.toLong()
+        if (b <= a) b = a + gap
+        map[kMax] = b.toDouble()
+    }
+    private fun fixFloatPair(map: MutableMap<String, Double>, kMin: String, kMax: String, eps: Float = 0.001f) {
+        val a = map[kMin]!!.toFloat()
+        var b = map[kMax]!!.toFloat()
+        if (b < a + eps) b = a + eps
+        map[kMax] = b.toDouble()
     }
 
-    private fun totalPlays(): Int {
-        var t = 0
-        for (entry in scores.values) t += entry.size
-        return t
-    }
-
-    // ===================== Choix & Crédit =====================
+    // ---------- Choix ----------
     fun pickParams(): ClassicParams {
         load()
-
         val plays = totalPlays().coerceAtLeast(1)
-        val eps = max(0.05, 0.30 * exp(-plays / 120.0)) // ~0.30 -> ~0.08 après ~150 choix
+        val eps = max(0.05, 0.30 * exp(-plays / 120.0)) // ~0.30 -> ~0.08
 
         lastPick.clear()
         val picked = mutableMapOf<String, Double>()
@@ -274,10 +323,7 @@ object ClassicV2Tuner {
         for (sp in specs) {
             val candidates = mutableListOf<Double>()
             var v = sp.min
-            while (v <= sp.max + 1e-9) {
-                candidates.add(kQuant(v, sp.step))
-                v += sp.step
-            }
+            while (v <= sp.max + 1e-9) { candidates.add(kQuant(v, sp.step)); v += sp.step }
 
             val table = scores.getOrPut(sp.key) { mutableMapOf() }
             val explore = (Random.nextDouble() < eps) || table.isEmpty()
@@ -285,49 +331,67 @@ object ClassicV2Tuner {
             val choice = if (explore) {
                 candidates.random()
             } else {
-                var bestV = sp.def
+                var best = sp.def
                 var bestS = Double.NEGATIVE_INFINITY
                 for (c in candidates) {
-                    val k = c.toString()
-                    val s = table[k] ?: 0.0
-                    if (s > bestS) { bestS = s; bestV = c }
+                    val s = table[c.toString()] ?: 0.0
+                    if (s > bestS) { bestS = s; best = c }
                 }
-                bestV
+                best
             }
 
             picked[sp.key] = choice
             lastPick[sp.key] = choice.toString()
         }
 
+        // Anti-crash: re-ordonner toutes les paires min/max
+        fixIntPair(picked, "fullDrawMsMin", "fullDrawMsMax", 5)
+        fixLongPair(picked, "openSpacingMin", "openSpacingMax", 10)
+        fixIntPair(picked, "closeBurstWindowMinMs", "closeBurstWindowMaxMs", 2)
+        fixIntPair(picked, "closeBurstFlipMinMs", "closeBurstFlipMaxMs", 1)
+        fixIntPair(picked, "closeHoldWindowMinMs", "closeHoldWindowMaxMs", 2)
+        fixIntPair(picked, "forwardStickMinMs", "forwardStickMaxMs", 2)
+        fixIntPair(picked, "meleeFocusMinMs", "meleeFocusMaxMs", 2)
+        fixIntPair(picked, "rodHoldCloseMinMs", "rodHoldCloseMaxMs", 1)
+        fixIntPair(picked, "rodHoldMidMinMs", "rodHoldMidMaxMs", 1)
+
+        fixIntPair(picked, "rodAntiSpamClosePassiveMin", "rodAntiSpamClosePassiveMax", 5)
+        fixIntPair(picked, "rodAntiSpamMidPassiveMin", "rodAntiSpamMidPassiveMax", 5)
+        fixIntPair(picked, "rodAntiSpamFarPassiveMin", "rodAntiSpamFarPassiveMax", 5)
+        fixIntPair(picked, "rodAntiSpamCloseActiveMin", "rodAntiSpamCloseActiveMax", 5)
+        fixIntPair(picked, "rodAntiSpamMidActiveMin", "rodAntiSpamMidActiveMax", 5)
+        fixIntPair(picked, "rodAntiSpamFarActiveMin", "rodAntiSpamFarActiveMax", 5)
+
+        fixFloatPair(picked, "rodCloseMin", "rodCloseMax", 0.01f)
+        fixFloatPair(picked, "rodMainMin", "rodMainMax", 0.01f)
+        fixFloatPair(picked, "rodInterceptMin", "rodInterceptMax", 0.01f)
+        fixFloatPair(picked, "rodMidInstantMin", "rodMidInstantMax", 0.01f)
+        fixIntPair(picked, "midStrafeSwitchMinMs", "midStrafeSwitchMaxMs", 10)
+        fixFloatPair(picked, "midTightRangeMin", "midTightRangeMax", 0.01f)
+        fixFloatPair(picked, "randomStrafeBandMin", "randomStrafeBandMax", 0.1f)
+
         fun gi(k: String) = picked[k]!!.toInt()
         fun gf(k: String) = picked[k]!!.toFloat()
         fun gl(k: String) = picked[k]!!.toLong()
-        fun gd(k: String) = picked[k]!!              // Double
+        fun gd(k: String) = picked[k]!!
 
         return ClassicParams(
-            // ARC
             gi("fullDrawMsMin"), gi("fullDrawMsMax"),
             gf("bowCancelCloseDist"), gf("bowMinUseDist"),
             gi("openVolleyMax"), gl("openSpacingMin"), gl("openSpacingMax"),
             gf("openShotMinDist"), gl("reactiveCdMs"),
 
-            // Détection (retourne Double)
-            gd("stillFrameThreshold"),
-            gi("stillFramesNeeded"),
-            gd("bowSlowThreshold"),
-            gi("bowSlowFramesNeeded"),
+            gd("stillFrameThreshold"), gi("stillFramesNeeded"),
+            gd("bowSlowThreshold"), gi("bowSlowFramesNeeded"),
 
-            // Réserves
             gl("reserveTightMs"), gi("earlyReserve"), gi("midReserve"),
 
-            // ROD ranges
             gl("rodCdCloseMsBase"), gl("rodCdFarMsBase"), gf("rodCdBiasMax"), gf("rodBanMeleeDist"),
             gf("rodCloseMin"), gf("rodCloseMax"), gf("rodMainMin"), gf("rodMainMax"),
             gf("rodInterceptMin"), gf("rodInterceptMax"), gf("rodMaxRangeHard"),
             gf("rodMidInstantMin"), gf("rodMidInstantMax"), gf("farThreshold"),
             gl("reentryRodGraceMs"),
 
-            // ROD hold & anti-spam
             gi("rodHoldCloseMinMs"), gi("rodHoldCloseMaxMs"),
             gi("rodHoldMidMinMs"), gi("rodHoldMidMaxMs"),
 
@@ -339,13 +403,11 @@ object ClassicV2Tuner {
             gi("rodAntiSpamMidActiveMin"), gi("rodAntiSpamMidActiveMax"),
             gi("rodAntiSpamFarActiveMin"), gi("rodAntiSpamFarActiveMax"),
 
-            // Parade
             gf("parryCloseCancelDist"), gl("parryCooldownMs"),
             gi("parryHoldMinMs"), gi("parryHoldMaxMs"),
             gi("parryStickMinMs"), gi("parryStickMaxMs"),
             gl("parryJumpCd"), gl("allowParryDelayMs"),
 
-            // Close-strafe
             gi("closeBurstWindowMinMs"), gi("closeBurstWindowMaxMs"),
             gi("closeBurstFlipMinMs"), gi("closeBurstFlipMaxMs"),
             gi("closeHoldWindowMinMs"), gi("closeHoldWindowMaxMs"),
@@ -353,7 +415,6 @@ object ClassicV2Tuner {
             gi("forwardStickMinMs"), gi("forwardStickMaxMs"),
             gi("meleeFocusMinMs"), gi("meleeFocusMaxMs"),
 
-            // Mid/long strafe + band + anti-jump
             gi("midStrafeSwitchMinMs"), gi("midStrafeSwitchMaxMs"),
             gf("midTightRangeMin"), gf("midTightRangeMax"),
             gf("midTightEps"), gi("midTightFlipCooldownMs"),
@@ -363,57 +424,107 @@ object ClassicV2Tuner {
         )
     }
 
+    // ---------- Reporting ----------
     fun report(win: Boolean, mistakes: Int) {
-        val base = if (win) 1.0 else -1.0
-        val reward = base - mistakes * 0.1
-        for ((k, v) in lastPick) {
-            val table = scores.getOrPut(k) { mutableMapOf() }
-            val prev = table[v] ?: 0.0
-            table[v] = prev * 0.8 + reward * 0.2
+        reportDetailed(GameMetrics(win = win, mistakes = mistakes))
+    }
+
+    fun takeAndResetMistakes(): Int { val m = mistakesCounter; mistakesCounter = 0; return m }
+    fun addMistakes(n: Int = 1) { mistakesCounter += n }
+
+    private const val TOP_N_KEEP = 16
+    private fun prune(table: MutableMap<String, Double>) {
+        if (table.size <= TOP_N_KEEP) return
+        val top = table.entries.sortedByDescending { it.value }.take(TOP_N_KEEP)
+        table.clear()
+        for (e in top) table[e.key] = e.value
+    }
+
+    fun reportDetailed(m: GameMetrics) {
+        load()
+
+        // --- Score enrichi ---
+        val quickWin = m.win && m.durationMs in 1..30_000
+        val closeLoss = !m.win && (m.damageDealt >= m.damageTaken) // approximation
+
+        val base = when {
+            quickWin -> 1.2
+            m.win    -> 1.0
+            closeLoss -> 0.3
+            else     -> 0.0
         }
+
+        val dmgBonus = if (m.damageTaken == 0) 0.2 else
+            (m.damageDealt.toDouble() / max(1.0, m.damageTaken.toDouble())).coerceIn(0.0, 2.0) * 0.2
+
+        val rodAcc = if (m.rodAttempts > 0) (m.rodHits.toDouble() / m.rodAttempts).coerceIn(0.0, 1.0) else 0.0
+        val bowAcc = if (m.bowShots > 0) (m.bowHits.toDouble() / m.bowShots).coerceIn(0.0, 1.0) else 0.0
+        val accBonus = rodAcc * 0.15 + bowAcc * 0.15
+
+        val mistakePenalty = m.mistakes * 0.08
+        val reward = (base + dmgBonus + accBonus - mistakePenalty).coerceIn(0.0, 2.0)
+
+        // --- Mise à jour pondérée ---
+        for ((k, vStr) in lastPick) {
+            val t = scores.getOrPut(k) { mutableMapOf() }
+            val prev = t[vStr] ?: 0.0
+            val lr = 0.25 // learning rate
+            t[vStr] = prev * (1.0 - lr) + reward * lr
+            prune(t)
+        }
+
+        // --- Historique & checkpoints ---
+        recent.addLast(m.win)
+        if (recent.size > 25) recent.removeFirst()
+        val recentWinRate = recent.count { it }.toDouble() / recent.size.toDouble()
+
+        // checkpoint si amélioration
+        val bestWr = checkpoints.maxByOrNull { it.winRate }?.winRate ?: 0.0
+        if (recent.size >= 10 && recentWinRate > bestWr) {
+            checkpoints.addLast(Checkpoint(System.currentTimeMillis(), recentWinRate, HashMap(lastPick)))
+            if (checkpoints.size > 5) checkpoints.removeFirst()
+        }
+
+        // rollback doux si régression forte
+        if (recent.size >= 12 && recentWinRate < bestWr * 0.7 && checkpoints.isNotEmpty()) {
+            val best = checkpoints.maxByOrNull { it.winRate }!!
+            // On biaise la table vers la config gagnante
+            for ((k, vStr) in best.config) {
+                val t = scores.getOrPut(k) { mutableMapOf() }
+                val prev = t[vStr] ?: 0.0
+                t[vStr] = prev + 0.4
+                prune(t)
+            }
+        }
+
         save()
     }
 
-    fun addMistakes(n: Int = 1) { mistakesCounter += n }
-    fun takeAndResetMistakes(): Int {
-        val m = mistakesCounter
-        mistakesCounter = 0
-        return m
-    }
-
-    fun defaults(): ClassicParams {
-        // Les mêmes valeurs que les "def" des specs ci-dessus
-        return ClassicParams(
-            // ARC
-            820, 980, 8.0f, 9.0f, 1, 650L, 900L, 9.0f, 650L,
-            // Détection
-            0.0125, 10, 0.06, 3,
-            // Réserves
-            10_000L, 3, 2,
-            // ROD ranges
-            340L, 480L, 1.25f, 4.0f,
-            2.0f, 3.4f, 3.0f, 6.8f,
-            5.8f, 7.2f, 7.2f,
-            5.5f, 7.0f, 11.0f, 300L,
-            // ROD hold & anti-spam
-            118, 142, 208, 232,
-            340, 420, 520, 680, 520, 700,
-            260, 320, 380, 520, 400, 560,
-            // Parade
-            15.0f, 900L, 650, 980, 900, 1500, 580L, 2800L,
-            // Close-strafe
-            280, 420, 60, 110, 220, 340,
-            220, 280, 300, 340,
-            // Mid/long strafe + band + anti-jump
-            820, 1100, 1.8f, 3.6f, 0.03f, 260, 8.0f, 15.0f,
-            7.8f, 160
-        )
-    }
-
-    // ===================== Utils =====================
-    private fun kQuant(v: Double, step: Double): Double {
-        val r = kotlin.math.round(v / step) * step
-        return if (step >= 1.0) r.toInt().toDouble()
-        else String.format("%.6f", r).toDouble()
-    }
+    // ---------- Valeurs par défaut sûres ----------
+    fun defaults(): ClassicParams = ClassicParams(
+        // ARC
+        820, 980, 8.0f, 9.0f, 1, 650L, 900L, 9.0f, 650L,
+        // Détection
+        0.0125, 10, 0.06, 3,
+        // Réserves
+        10_000L, 3, 2,
+        // ROD ranges
+        340L, 480L, 1.25f, 4.0f,
+        2.0f, 3.4f, 3.0f, 6.8f,
+        5.8f, 7.2f, 7.2f,
+        5.5f, 7.0f, 11.0f, 300L,
+        // Holds & anti-spam
+        118, 142, 208, 232,
+        340, 420, 520, 680, 520, 700,
+        260, 320, 380, 520, 400, 560,
+        // Parade
+        15.0f, 900L, 650, 980, 900, 1500, 580L, 2800L,
+        // Close-strafe
+        280, 420, 60, 110, 220, 340,
+        220, 280, 300, 340,
+        // Mid/long + band
+        820, 1100, 1.8f, 3.6f, 0.03f, 260, 8.0f, 15.0f,
+        // Anti-jump + premier saut
+        7.8f, 160
+    )
 }
