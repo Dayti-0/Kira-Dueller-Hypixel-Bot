@@ -14,7 +14,9 @@ import kotlin.math.round
 
 object ClassicV2Tuner {
 
+    // -------------------------- PARAMS --------------------------
     data class ClassicParams(
+        // BOW (ouverture & réactif)
         val fullDrawMsMin: Int,
         val fullDrawMsMax: Int,
         val bowCancelCloseDist: Float,
@@ -25,15 +27,18 @@ object ClassicV2Tuner {
         val openShotMinDist: Float,
         val reactiveCdMs: Long,
 
+        // Détection mouvement
         val stillFrameThreshold: Double,
         val stillFramesNeeded: Int,
         val bowSlowThreshold: Double,
         val bowSlowFramesNeeded: Int,
 
+        // Réserves flèches
         val reserveTightMs: Long,
         val earlyReserve: Int,
         val midReserve: Int,
 
+        // ROD (cd, ranges)
         val rodCdCloseMsBase: Long,
         val rodCdFarMsBase: Long,
         val rodCdBiasMax: Float,
@@ -50,6 +55,7 @@ object ClassicV2Tuner {
         val farThreshold: Float,
         val reentryRodGraceMs: Long,
 
+        // ROD (hold + anti-spam)
         val rodHoldCloseMinMs: Int,
         val rodHoldCloseMaxMs: Int,
         val rodHoldMidMinMs: Int,
@@ -69,6 +75,7 @@ object ClassicV2Tuner {
         val rodAntiSpamFarActiveMin: Int,
         val rodAntiSpamFarActiveMax: Int,
 
+        // PARADE épée
         val parryCloseCancelDist: Float,
         val parryCooldownMs: Long,
         val parryHoldMinMs: Int,
@@ -78,6 +85,7 @@ object ClassicV2Tuner {
         val parryJumpCd: Long,
         val allowParryDelayMs: Long,
 
+        // STRAFE proche
         val closeBurstWindowMinMs: Int,
         val closeBurstWindowMaxMs: Int,
         val closeBurstFlipMinMs: Int,
@@ -85,32 +93,45 @@ object ClassicV2Tuner {
         val closeHoldWindowMinMs: Int,
         val closeHoldWindowMaxMs: Int,
 
+        // POST-HIT
         val forwardStickMinMs: Int,
         val forwardStickMaxMs: Int,
         val meleeFocusMinMs: Int,
-        val meleeFocusMaxMs: Int
+        val meleeFocusMaxMs: Int,
+
+        // ---- NOUVEAU : tuning des sauts ----
+        val antiJumpZoneDist: Float,          // Interdit tout saut si distance <= ceci
+        val startupJumpDelayMs: Int,          // Délai du premier saut (ms) ~ 0.3s
+        val continuousJumpMinIntervalMs: Int  // Intervalle mini entre deux "single jumps"
     )
 
+    // -------------------------- STORAGE --------------------------
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
     private data class ParamSpec(val key: String, val min: Double, val max: Double, val step: Double, val def: Double, val type: ParamType)
-    private data class ValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0) { fun avg() = if (plays > 0) totalReward / plays else Double.NEGATIVE_INFINITY }
+    private data class ValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0) {
+        fun avg() = if (plays > 0) totalReward / plays else Double.NEGATIVE_INFINITY
+    }
     private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
-    private const val CURRENT_VERSION = 1
-    private const val MISTAKE_PENALTY = 0.1
+    private const val CURRENT_VERSION = 2
+    private const val MISTAKE_PENALTY = 0.25    // pénalité par "mauvais" saut (proche ou pendant arc)
+    private const val TOP_N_KEEP = 16          // pruning par param pour éviter un JSON obèse
 
+    // -------------------------- SPECS --------------------------
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
     private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)
     private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.LONG)
     private fun specD(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.DOUBLE)
 
+    // NB: on garde des bornes "réalistes" (±20-30%) et on verrouille openVolleyMax=1 (prouvé meilleur).
     private val specs = listOf(
         specI("fullDrawMsMin", 700.0, 1000.0, 10.0, 820.0),
         specI("fullDrawMsMax", 900.0, 1100.0, 10.0, 980.0),
         specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),
         specF("bowMinUseDist", 7.0, 11.0, 0.1, 9.0),
-        specI("openVolleyMax", 1.0, 2.0, 1.0, 1.0),
+        // verrouillage sur 1
+        specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),
         specL("openSpacingMin", 450.0, 850.0, 10.0, 650.0),
         specL("openSpacingMax", 700.0, 1150.0, 10.0, 900.0),
         specF("openShotMinDist", 7.0, 12.0, 0.1, 9.0),
@@ -179,11 +200,17 @@ object ClassicV2Tuner {
         specI("forwardStickMinMs", 160.0, 300.0, 10.0, 220.0),
         specI("forwardStickMaxMs", 220.0, 360.0, 10.0, 280.0),
         specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 300.0),
-        specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 340.0)
+        specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 340.0),
+
+        // >>> NOUVEAUX PARAMS de saut
+        specF("antiJumpZoneDist", 6.8, 8.6, 0.05, 7.8),
+        specI("startupJumpDelayMs", 260.0, 340.0, 5.0, 300.0),
+        specI("continuousJumpMinIntervalMs", 180.0, 260.0, 5.0, 220.0)
     )
 
     private val specByKey = specs.associateBy { it.key }
 
+    // -------------------------- STATE --------------------------
     private var loaded = false
     private var state = StoredState()
 
@@ -198,7 +225,6 @@ object ClassicV2Tuner {
             File("config")
         }
     }
-
     private fun file(): File = File(configDir(), "classicv2_tuner.json")
 
     // ----------- Normalisation anti-crash des paires -----------
@@ -239,6 +265,48 @@ object ClassicV2Tuner {
         chosen.order("rodAntiSpamFarActiveMin", "rodAntiSpamFarActiveMax")
     }
 
+    // ----------- Exploration (epsilon décroissant) -----------
+    private fun epsilon(totalPlays: Int): Double {
+        val base = 0.25
+        val minE = 0.02
+        val decay = totalPlays / 40.0
+        return max(minE, base / (1.0 + decay))
+    }
+    private fun exploreNow(epsilon: Double): Boolean =
+        RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
+
+    // ----------- Pruning des valeurs (top-N) -----------
+    private fun prune() {
+        for ((_, ps) in state.params) {
+            if (ps.values.size <= TOP_N_KEEP) continue
+            val sorted = ps.values.entries.sortedByDescending { it.value.avg() }
+            val keep = sorted.take(TOP_N_KEEP).associate { it.key to it.value }.toMutableMap()
+            // garder aussi la dernière valeur si elle n'est pas déjà conservée
+            val lastKey = keyOf(ps.lastValue)
+            if (!keep.containsKey(lastKey)) {
+                ps.values[lastKey]?.let { keep[lastKey] = it }
+            }
+            ps.values = keep
+        }
+    }
+
+    // ----------- Hooks pour pénaliser les "mauvais sauts" -----------
+    private var currentMistakes: Int = 0
+    private var lastPicked: ClassicParams? = null
+
+    fun noteCloseJump(distance: Float, holdingBow: Boolean) {
+        val zone = lastPicked?.antiJumpZoneDist ?: 7.8f
+        if (holdingBow || distance <= zone) {
+            currentMistakes += 1
+        }
+    }
+    fun takeAndResetMistakes(): Int {
+        val m = currentMistakes
+        currentMistakes = 0
+        return m
+    }
+
+    // -------------------------- API --------------------------
     @Synchronized
     fun pickParams(): ClassicParams {
         ensureLoaded()
@@ -248,25 +316,27 @@ object ClassicV2Tuner {
             val eps = epsilon(p.totalPlays)
             val value = when {
                 p.values.isEmpty() -> spec.def
-                exploreNow(eps) -> sample(spec)
-                else -> bestValue(p, spec)
+                exploreNow(eps)    -> sample(spec)
+                else               -> bestValue(p, spec)
             }
             val key = keyOf(value)
             if (!p.values.containsKey(key)) p.values[key] = ValueState(value = value)
             p.lastValue = value
             chosen[spec.key] = value
         }
-        // <<< Normalisation cruciale (anti IllegalArgument) >>>
         normalize(chosen)
+        val params = buildParams(chosen)
+        lastPicked = params
+        prune()
         save()
-        return buildParams(chosen)
+        return params
     }
 
     @Synchronized
     fun report(win: Boolean, mistakes: Int) {
         ensureLoaded()
-        val rewardRaw = if (win) 1.0 else 0.0
-        val reward = rewardRaw - mistakes * MISTAKE_PENALTY
+        val rewardBase = if (win) 1.0 else 0.0
+        val reward = (rewardBase - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
         for ((_, ps) in state.params) {
             val entryKey = keyOf(ps.lastValue)
@@ -276,11 +346,15 @@ object ClassicV2Tuner {
             ps.totalPlays += 1
             changed = true
         }
-        if (changed) save()
+        if (changed) {
+            prune()
+            save()
+        }
     }
 
     fun defaults(): ClassicParams = buildParams(specs.associate { it.key to it.def })
 
+    // ------------------------ BUILDERS ------------------------
     private fun buildParams(map: Map<String, Double>): ClassicParams = ClassicParams(
         fullDrawMsMin = map.int("fullDrawMsMin"),
         fullDrawMsMax = map.int("fullDrawMsMax"),
@@ -355,9 +429,14 @@ object ClassicV2Tuner {
         forwardStickMinMs = map.int("forwardStickMinMs"),
         forwardStickMaxMs = map.int("forwardStickMaxMs"),
         meleeFocusMinMs = map.int("meleeFocusMinMs"),
-        meleeFocusMaxMs = map.int("meleeFocusMaxMs")
+        meleeFocusMaxMs = map.int("meleeFocusMaxMs"),
+
+        antiJumpZoneDist = map.float("antiJumpZoneDist"),
+        startupJumpDelayMs = map.int("startupJumpDelayMs"),
+        continuousJumpMinIntervalMs = map.int("continuousJumpMinIntervalMs")
     )
 
+    // ------------------------ HELPERS ------------------------
     private fun Map<String, Double>.float(key: String): Float = clampNum(this[key], key).toFloat()
     private fun Map<String, Double>.int(key: String): Int = clampNum(this[key], key).toInt()
     private fun Map<String, Double>.long(key: String): Long = clampNum(this[key], key).toLong()
@@ -368,15 +447,6 @@ object ClassicV2Tuner {
         val raw = v ?: spec?.def ?: 0.0
         return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
-
-    private fun epsilon(totalPlays: Int): Double {
-        val base = 0.35
-        val decay = totalPlays / 25.0
-        return max(0.05, base / (1.0 + decay))
-    }
-
-    private fun exploreNow(epsilon: Double): Boolean =
-        RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
 
     private fun bestValue(ps: ParamState, spec: ParamSpec): Double =
         clamp(ps.values.values.maxByOrNull { it.avg() }?.value ?: spec.def, spec)
