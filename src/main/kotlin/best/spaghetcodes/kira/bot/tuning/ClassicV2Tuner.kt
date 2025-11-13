@@ -14,7 +14,6 @@ import kotlin.math.round
 
 object ClassicV2Tuner {
 
-    // ==================== PARAMS ====================
     data class ClassicParams(
         val fullDrawMsMin: Int,
         val fullDrawMsMax: Int,
@@ -101,7 +100,6 @@ object ClassicV2Tuner {
     private const val CURRENT_VERSION = 1
     private const val MISTAKE_PENALTY = 0.1
 
-    // ============ Specs (bornes + défauts) ============
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
     private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)
     private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.LONG)
@@ -186,7 +184,6 @@ object ClassicV2Tuner {
 
     private val specByKey = specs.associateBy { it.key }
 
-    // ==================== STATE / IO ====================
     private var loaded = false
     private var state = StoredState()
 
@@ -204,6 +201,44 @@ object ClassicV2Tuner {
 
     private fun file(): File = File(configDir(), "classicv2_tuner.json")
 
+    // ----------- Normalisation anti-crash des paires -----------
+    private fun MutableMap<String, Double>.order(a: String, b: String) {
+        val av = this[a] ?: return
+        val bv = this[b] ?: return
+        if (av > bv) { this[a] = bv; this[b] = av }
+    }
+    private fun normalize(chosen: MutableMap<String, Double>) {
+        // temps / fenêtres
+        chosen.order("fullDrawMsMin", "fullDrawMsMax")
+        chosen.order("openSpacingMin", "openSpacingMax")
+        chosen.order("parryHoldMinMs", "parryHoldMaxMs")
+        chosen.order("parryStickMinMs", "parryStickMaxMs")
+        chosen.order("closeBurstWindowMinMs", "closeBurstWindowMaxMs")
+        chosen.order("closeBurstFlipMinMs", "closeBurstFlipMaxMs")
+        chosen.order("closeHoldWindowMinMs", "closeHoldWindowMaxMs")
+        chosen.order("forwardStickMinMs", "forwardStickMaxMs")
+        chosen.order("meleeFocusMinMs", "meleeFocusMaxMs")
+
+        // ranges distances
+        chosen.order("rodCloseMin", "rodCloseMax")
+        chosen.order("rodMainMin", "rodMainMax")
+        chosen.order("rodInterceptMin", "rodInterceptMax")
+        chosen.order("rodMidInstantMin", "rodMidInstantMax")
+
+        // holds
+        chosen.order("rodHoldCloseMinMs", "rodHoldCloseMaxMs")
+        chosen.order("rodHoldMidMinMs", "rodHoldMidMaxMs")
+
+        // anti-spam (passif)
+        chosen.order("rodAntiSpamClosePassiveMin", "rodAntiSpamClosePassiveMax")
+        chosen.order("rodAntiSpamMidPassiveMin", "rodAntiSpamMidPassiveMax")
+        chosen.order("rodAntiSpamFarPassiveMin", "rodAntiSpamFarPassiveMax")
+        // anti-spam (actif)
+        chosen.order("rodAntiSpamCloseActiveMin", "rodAntiSpamCloseActiveMax")
+        chosen.order("rodAntiSpamMidActiveMin", "rodAntiSpamMidActiveMax")
+        chosen.order("rodAntiSpamFarActiveMin", "rodAntiSpamFarActiveMax")
+    }
+
     @Synchronized
     fun pickParams(): ClassicParams {
         ensureLoaded()
@@ -212,7 +247,6 @@ object ClassicV2Tuner {
             val p = state.params.getOrPut(spec.key) { ParamState() }
             val eps = epsilon(p.totalPlays)
             val value = when {
-                // Cold-start: première valeur = défauts sûrs
                 p.values.isEmpty() -> spec.def
                 exploreNow(eps) -> sample(spec)
                 else -> bestValue(p, spec)
@@ -222,6 +256,8 @@ object ClassicV2Tuner {
             p.lastValue = value
             chosen[spec.key] = value
         }
+        // <<< Normalisation cruciale (anti IllegalArgument) >>>
+        normalize(chosen)
         save()
         return buildParams(chosen)
     }
@@ -243,10 +279,8 @@ object ClassicV2Tuner {
         if (changed) save()
     }
 
-    // Optionnel : pour fallback côté bot si tu veux éviter NO MATTER WHAT un crash
     fun defaults(): ClassicParams = buildParams(specs.associate { it.key to it.def })
 
-    // ================== CORE / HELPERS ==================
     private fun buildParams(map: Map<String, Double>): ClassicParams = ClassicParams(
         fullDrawMsMin = map.int("fullDrawMsMin"),
         fullDrawMsMax = map.int("fullDrawMsMax"),
@@ -368,7 +402,6 @@ object ClassicV2Tuner {
 
     private fun keyOf(v: Double): String = "%.4f".format(v)
 
-    // ==================== PERSISTENCE ====================
     @Synchronized
     private fun ensureLoaded() {
         if (!loaded) {
@@ -387,7 +420,6 @@ object ClassicV2Tuner {
                 gson.fromJson<StoredState>(r, type) ?: StoredState()
             }
         } catch (ex: Exception) {
-            // Sauvegarde un backup et repart propre
             tryBackupCorrupt(f, ex)
             StoredState()
         }
@@ -398,16 +430,13 @@ object ClassicV2Tuner {
         val f = file()
         try {
             f.parentFile?.mkdirs()
-            // écriture atomique : tmp -> rename
             val tmp = File(f.parentFile, f.name + ".tmp")
             tmp.writer().use { w -> gson.toJson(state, w) }
             if (!tmp.renameTo(f)) {
-                // fallback écriture directe si rename échoue (Windows parfois)
                 tmp.copyTo(f, overwrite = true)
                 tmp.delete()
             }
         } catch (_: Exception) {
-            // ignore : on ne crash jamais à cause du tuner
         }
     }
 
@@ -416,10 +445,8 @@ object ClassicV2Tuner {
             val sdf = SimpleDateFormat("yyyyMMdd_HHmmss")
             val bak = File(f.parentFile, f.nameWithoutExtension + "_corrupt_" + sdf.format(Date()) + ".bak.json")
             f.copyTo(bak, overwrite = true)
-            // on efface l’original corrompu pour repartir propre
             f.delete()
         } catch (_: IOException) {
-            // rien
         }
         ex.printStackTrace()
     }
