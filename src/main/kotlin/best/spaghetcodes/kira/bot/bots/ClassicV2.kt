@@ -798,14 +798,15 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         if (!Mouse.rClickDown && !projectileActive && (now - lastGotHitAt) > 260 && !continuousJumping) {
             val facingAway = EntityUtils.entityFacingAway(p, opp)
             val oppVeryStill = (stillFrames >= 6)
-            if (distance > 8.0f) {
+            val farJumpThreshold = antiJumpZoneDist + 2.0f
+            if (distance >= farJumpThreshold) {
                 if (p.onGround && now - lastTacticalJumpAt >= 520 && now - lastJumpAt >= continuousJumpMinIntervalMs) {
                     ClassicV2Tuner.noteCloseJump(distance, aiming)
                     Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
                     lastJumpAt = now
                     lastTacticalJumpAt = now
                 }
-            } else if (distance in 4.5f..8.0f && (facingAway || oppVeryStill)) {
+            } else if (distance > antiJumpZoneDist && distance < farJumpThreshold && (facingAway || oppVeryStill)) {
                 if (p.onGround && now - lastTacticalJumpAt >= 720 && now - lastJumpAt >= continuousJumpMinIntervalMs) {
                     ClassicV2Tuner.noteCloseJump(distance, aiming)
                     Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
