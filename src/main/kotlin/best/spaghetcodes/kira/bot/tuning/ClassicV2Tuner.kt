@@ -207,12 +207,12 @@ object ClassicV2Tuner {
 
         // POST-HIT - Plages larges, defaults ajustés
         specI("forwardStickMinMs", 160.0, 300.0, 10.0, 170.0),           // default 220→170 (données)
-        specI("forwardStickMaxMs", 220.0, 360.0, 10.0, 330.0),           // default 280→330 (données)
+        specI("forwardStickMaxMs", 250.0, 310.0, 10.0, 270.0),           // default 280→330→270 (découverte 95.6% WR!)
         specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 370.0),             // default 300→370 (données)
         specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),             // default 340→390 (données)
 
-        // JUMP - CORRECTION CRITIQUE + plages larges
-        specF("antiJumpZoneDist", 7.0, 9.0, 0.1, 8.0),                   // default 7.8→8.0, plage élargie 6.8-8.6→7.0-9.0
+        // JUMP - Zone anti-jump optimale à 8.2 (100% WR sur 308 parties)
+        specF("antiJumpZoneDist", 7.8, 8.5, 0.1, 8.0),                   // default 7.8→8.0, plage resserrée 7.0-9.0→7.8-8.5
         specI("startupJumpDelayMs", 260.0, 340.0, 5.0, 270.0),           // default 300→270 (données)
         specI("continuousJumpMinIntervalMs", 180.0, 260.0, 5.0, 215.0)   // default 220→215 (données)
     )
