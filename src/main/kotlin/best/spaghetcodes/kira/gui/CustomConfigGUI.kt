@@ -328,6 +328,7 @@ class CustomConfigGUI : GuiScreen() {
 
         y = drawSectionHeader("Bot Behavior", x, y, width); y += SECTION_SPACING
         val botNames = listOf("Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz")
+        val rotationBotNames = botNames + "None"
         selector(
             "Current Bot",
             x,
@@ -393,7 +394,7 @@ class CustomConfigGUI : GuiScreen() {
             width,
             { cfg.rotationMode3 },
             { cfg.rotationMode3 = it },
-            botNames
+            rotationBotNames
         ); y += ROW_HEIGHT + SECTION_SPACING
 
         y = drawSectionHeader("Auto Disconnect", x, y, width); y += SECTION_SPACING
