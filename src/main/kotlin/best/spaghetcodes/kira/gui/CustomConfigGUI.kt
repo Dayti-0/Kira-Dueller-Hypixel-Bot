@@ -158,13 +158,15 @@ class CustomConfigGUI : GuiScreen() {
         width: Int,
         get: () -> Int,
         set: (Int) -> Unit,
-        options: List<String>
+        options: List<String>,
+        enabled: Boolean = true
     ) {
         val yPos = y - scroll
         val controlEdgeX = x + width
         val cur = min(max(0, get()), options.lastIndex)
         val value = options.getOrElse(cur) { "N/A" }
-        drawString(fontRendererObj, label, x, yPos, highlightColor)
+        val labelColor = if (enabled) highlightColor else grayColor
+        drawString(fontRendererObj, label, x, yPos, labelColor)
 
         val valueW = fontRendererObj.getStringWidth(value)
         val arrowChar = ">"
@@ -174,8 +176,8 @@ class CustomConfigGUI : GuiScreen() {
         val rightArrowX = controlEdgeX - arrowW
         val leftArrowX = controlEdgeX - interactiveWidth
 
-        val leftHover = isHovered(leftArrowX, yPos - 1, arrowW + 10, 10)
-        val rightHover = isHovered(rightArrowX - 10, yPos - 1, arrowW + 10, 10)
+        val leftHover = enabled && isHovered(leftArrowX, yPos - 1, arrowW + 10, 10)
+        val rightHover = enabled && isHovered(rightArrowX - 10, yPos - 1, arrowW + 10, 10)
 
         // Center the text between the fixed arrows
         val textContainerStart = leftArrowX + arrowW + 10
@@ -185,18 +187,36 @@ class CustomConfigGUI : GuiScreen() {
         // Draw shadows/outlines
         drawString(fontRendererObj, "<", leftArrowX + 1, yPos + 1, Color.BLACK.rgb)
         drawString(fontRendererObj, arrowChar, rightArrowX + 1, yPos + 1, Color.BLACK.rgb)
-        drawString(fontRendererObj, value, textX + 1, yPos + 1, Color(primaryColor).darker().darker().rgb)
+        val valueShadowColor = if (enabled) Color(primaryColor).darker().darker().rgb else darkGrayColor
+        drawString(fontRendererObj, value, textX + 1, yPos + 1, valueShadowColor)
 
         // Draw main text and arrows
-        drawString(fontRendererObj, "<", leftArrowX, yPos, if (leftHover) highlightColor else grayColor)
-        drawString(fontRendererObj, value, textX, yPos, primaryColor)
-        drawString(fontRendererObj, arrowChar, rightArrowX, yPos, if (rightHover) highlightColor else grayColor)
-
-        addHotspot(leftArrowX, yPos - 1, arrowW + 10, 10) {
-            mutateConfig { set(if (cur <= 0) options.lastIndex else cur - 1) }
+        val arrowColor = when {
+            !enabled -> darkGrayColor
+            else -> grayColor
         }
-        addHotspot(rightArrowX - 10, yPos - 1, arrowW + 10, 10) {
-            mutateConfig { set(if (cur >= options.lastIndex) 0 else cur + 1) }
+        val leftColor = when {
+            !enabled -> arrowColor
+            leftHover -> highlightColor
+            else -> grayColor
+        }
+        val rightColor = when {
+            !enabled -> arrowColor
+            rightHover -> highlightColor
+            else -> grayColor
+        }
+        val valueColor = if (enabled) primaryColor else darkGrayColor
+        drawString(fontRendererObj, "<", leftArrowX, yPos, leftColor)
+        drawString(fontRendererObj, value, textX, yPos, valueColor)
+        drawString(fontRendererObj, arrowChar, rightArrowX, yPos, rightColor)
+
+        if (enabled) {
+            addHotspot(leftArrowX, yPos - 1, arrowW + 10, 10) {
+                mutateConfig { set(if (cur <= 0) options.lastIndex else cur - 1) }
+            }
+            addHotspot(rightArrowX - 10, yPos - 1, arrowW + 10, 10) {
+                mutateConfig { set(if (cur >= options.lastIndex) 0 else cur + 1) }
+            }
         }
     }
 
@@ -329,14 +349,20 @@ class CustomConfigGUI : GuiScreen() {
         y = drawSectionHeader("Bot Behavior", x, y, width); y += SECTION_SPACING
         val botNames = listOf("Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz")
         val rotationBotNames = botNames + "None"
+        val currentBotLabel = if (cfg.enableModeRotation) {
+            "Current Bot (disabled in rotation mode)"
+        } else {
+            "Current Bot"
+        }
         selector(
-            "Current Bot",
+            currentBotLabel,
             x,
             y,
             width,
             { cfg.currentBot },
             { v -> cfg.currentBot = v; kira.config?.getBot(v)?.let { kira.swapBot(it) } },
-            botNames
+            botNames,
+            enabled = !cfg.enableModeRotation
         ); y += ROW_HEIGHT
         toggle("Lobby Movement", x, y, width, { cfg.lobbyMovement }, { cfg.lobbyMovement = it }); y += ROW_HEIGHT
         toggle("Fast Requeue", x, y, width, { cfg.fastRequeue }, { cfg.fastRequeue = it }); y += ROW_HEIGHT
