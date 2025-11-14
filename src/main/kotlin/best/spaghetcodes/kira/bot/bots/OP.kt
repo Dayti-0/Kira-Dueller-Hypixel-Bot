@@ -464,6 +464,12 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         takingPotion = true
         Mouse.stopTracking()
         Movement.stopJumping()
+        Movement.stopForward()
+        Movement.stopBackward()
+        Movement.clearLeftRight()
+        Movement.stopSprinting()
+        Mouse.setRunningAway(false)
+        Mouse.setUsingProjectile(false)
         val effectKey = when (damage) {
             speedDamage -> "speed"
             regenDamage -> "regeneration"
@@ -483,7 +489,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                 if (Mouse.rClickDown) Mouse.rClickUp()
                 Mouse.rClick(60)
                 TimeUtils.setTimeout({
-                    useSplashPotion(damage, false, false)
+                    useSplashPotion(damage, false, false, releaseDelayRange = 160..240)
                     lastPotion = System.currentTimeMillis()
                     setPitchLock(down, lockMs = RandomUtils.randomIntInRange(130, 170))
                     val verifyDelay = RandomUtils.randomIntInRange(230, 260)
