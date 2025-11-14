@@ -146,6 +146,11 @@ class CustomConfigGUI : GuiScreen() {
         return y + ROW_HEIGHT + 4
     }
 
+    private inline fun mutateConfig(action: () -> Unit) {
+        action()
+        kira.config?.markDirty()
+    }
+
     private fun selector(
         label: String,
         x: Int,
@@ -187,8 +192,12 @@ class CustomConfigGUI : GuiScreen() {
         drawString(fontRendererObj, value, textX, yPos, primaryColor)
         drawString(fontRendererObj, arrowChar, rightArrowX, yPos, if (rightHover) highlightColor else grayColor)
 
-        addHotspot(leftArrowX, yPos - 1, arrowW + 10, 10) { set(if (cur <= 0) options.lastIndex else cur - 1) }
-        addHotspot(rightArrowX - 10, yPos - 1, arrowW + 10, 10) { set(if (cur >= options.lastIndex) 0 else cur + 1) }
+        addHotspot(leftArrowX, yPos - 1, arrowW + 10, 10) {
+            mutateConfig { set(if (cur <= 0) options.lastIndex else cur - 1) }
+        }
+        addHotspot(rightArrowX - 10, yPos - 1, arrowW + 10, 10) {
+            mutateConfig { set(if (cur >= options.lastIndex) 0 else cur + 1) }
+        }
     }
 
     private fun toggle(label: String, x: Int, y: Int, width: Int, get: () -> Boolean, set: (Boolean) -> Unit) {
@@ -211,7 +220,9 @@ class CustomConfigGUI : GuiScreen() {
             drawCircle(circleX, circleY, radius, if (v) primaryColor else accentColor)
         }
 
-        addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) { set(!v) }
+        addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) {
+            mutateConfig { set(!v) }
+        }
     }
 
     private fun drawToggleSection(
@@ -264,8 +275,8 @@ class CustomConfigGUI : GuiScreen() {
         drawString(fontRendererObj, valueStr, valueX, yPos, highlightColor)
         drawString(fontRendererObj, "+", plusX, yPos, if (plusHover) highlightColor else grayColor)
 
-        addHotspot(minusX, yPos - 1, symbolW, 10, onDecrement)
-        addHotspot(plusX, yPos - 1, symbolW, 10, onIncrement)
+        addHotspot(minusX, yPos - 1, symbolW, 10) { mutateConfig(onDecrement) }
+        addHotspot(plusX, yPos - 1, symbolW, 10) { mutateConfig(onIncrement) }
     }
 
     private fun number(
@@ -601,6 +612,7 @@ class CustomConfigGUI : GuiScreen() {
     }
 
     private fun saveConfig() {
+        kira.config?.markDirty()
         kira.config?.writeData()
         ChatUtils.info("Configuration saved!")
     }
