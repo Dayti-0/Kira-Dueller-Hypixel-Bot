@@ -190,6 +190,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var continuousJumpMinIntervalMs = 220
     private var continuousJumping = false
     private var lastJumpAt = 0L
+    
+    // Logique anti-jump intelligente
+    private var hasReachedCombatZone = false           // Flag : on a atteint la zone de combat
+    private var lastTimeLeftCombatZone = 0L            // Timestamp quand on sort de la zone
+    private val combatZoneExitDelayMs = 3000L          // Délai de 3 secondes avant de pouvoir sauter
 
     // ========= SAFE START GATE (anti-crash ouverture) =========
     private var startGateActive = false
@@ -248,6 +253,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
         startupJumping = true
         continuousJumping = false
+        hasReachedCombatZone = false
+        lastTimeLeftCombatZone = 0L
+        lastJumpAt = 0L
         gameStartAt = now
 
         val delay = startupJumpDelayMs
@@ -347,6 +355,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }, RandomUtils.randomIntInRange(200, 400))
         startupJumping = false
         continuousJumping = false
+        hasReachedCombatZone = false
+        lastTimeLeftCombatZone = 0L
+        lastJumpAt = 0L
         startGateActive = false
         startGateReady = false
     }
@@ -583,7 +594,31 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Movement.stopJumping()
             return
         }
-        val shouldJump = distanceToOpp > antiJumpZoneDist
+        
+        // Tracker si on a atteint la zone de combat (≤8 blocks)
+        if (distanceToOpp <= antiJumpZoneDist) {
+            hasReachedCombatZone = true
+            lastTimeLeftCombatZone = 0L  // Reset le timer
+        }
+        
+        // Si on est hors zone ET qu'on a déjà été en combat
+        if (hasReachedCombatZone && distanceToOpp > antiJumpZoneDist) {
+            if (lastTimeLeftCombatZone == 0L) {
+                lastTimeLeftCombatZone = now  // Démarrer le timer
+            }
+        }
+        
+        // Logique de saut intelligente
+        val shouldJump: Boolean = if (!hasReachedCombatZone) {
+            // DÉBUT DE PARTIE : Sauter continuellement si > antiJumpZoneDist
+            distanceToOpp > antiJumpZoneDist
+        } else {
+            // MILIEU DE PARTIE : Seulement si > antiJumpZoneDist depuis 3+ secondes
+            distanceToOpp > antiJumpZoneDist && 
+            lastTimeLeftCombatZone != 0L && 
+            (now - lastTimeLeftCombatZone) >= combatZoneExitDelayMs
+        }
+        
         continuousJumping = shouldJump
         if (shouldJump) {
             Movement.startForward()
