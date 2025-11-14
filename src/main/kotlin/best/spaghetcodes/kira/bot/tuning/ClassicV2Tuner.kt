@@ -9,8 +9,10 @@ import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.round
+import kotlin.math.sqrt
 
 object ClassicV2Tuner {
 
@@ -107,105 +109,137 @@ object ClassicV2Tuner {
 
     // -------------------------- STORAGE --------------------------
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
-    private data class ParamSpec(val key: String, val min: Double, val max: Double, val step: Double, val def: Double, val type: ParamType)
+    
+    // Catégorie de convergence par paramètre
+    private enum class ConvergenceLevel { LOCKED, CONVERGED, MODERATE, EXPLORE }
+    
+    private data class ParamSpec(
+        val key: String, 
+        val min: Double, 
+        val max: Double, 
+        val step: Double, 
+        val def: Double, 
+        val type: ParamType,
+        val convergence: ConvergenceLevel = ConvergenceLevel.MODERATE
+    )
+    
     private data class ValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0) {
         fun avg() = if (plays > 0) totalReward / plays else Double.NEGATIVE_INFINITY
     }
+    
     private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
     private const val CURRENT_VERSION = 2
     private const val MISTAKE_PENALTY = 0.25    // pénalité par "mauvais" saut (proche ou pendant arc)
     private const val TOP_N_KEEP = 16          // pruning par param pour éviter un JSON obèse
+    private const val UCB_EXPLORATION_FACTOR = 0.5  // Facteur pour le bonus UCB
 
     // -------------------------- SPECS --------------------------
-    private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
-    private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)
-    private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.LONG)
-    private fun specD(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.DOUBLE)
+    private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double, conv: ConvergenceLevel = ConvergenceLevel.MODERATE) = 
+        ParamSpec(k, mi, ma, st, de, ParamType.FLOAT, conv)
+    private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double, conv: ConvergenceLevel = ConvergenceLevel.MODERATE) = 
+        ParamSpec(k, mi, ma, st, de, ParamType.INT, conv)
+    private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double, conv: ConvergenceLevel = ConvergenceLevel.MODERATE) = 
+        ParamSpec(k, mi, ma, st, de, ParamType.LONG, conv)
+    private fun specD(k: String, mi: Double, ma: Double, st: Double, de: Double, conv: ConvergenceLevel = ConvergenceLevel.MODERATE) = 
+        ParamSpec(k, mi, ma, st, de, ParamType.DOUBLE, conv)
 
-    // NB: on garde des bornes "réalistes" (±20-30%) et on verrouille openVolleyMax=1 (prouvé meilleur).
+    // SPECS OPTIMISÉES basées sur les 999 parties
     private val specs = listOf(
-        specI("fullDrawMsMin", 700.0, 1000.0, 10.0, 820.0),
-        specI("fullDrawMsMax", 900.0, 1100.0, 10.0, 980.0),
-        specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),
-        specF("bowMinUseDist", 7.0, 11.0, 0.1, 9.0),
-        // verrouillage sur 1
-        specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),
-        specL("openSpacingMin", 450.0, 850.0, 10.0, 650.0),
-        specL("openSpacingMax", 700.0, 1150.0, 10.0, 900.0),
-        specF("openShotMinDist", 7.0, 12.0, 0.1, 9.0),
-        specL("reactiveCdMs", 450.0, 900.0, 10.0, 650.0),
+        // BOW - ULTRA CONVERGED (plages très serrées autour des valeurs optimales)
+        specI("fullDrawMsMin", 820.0, 860.0, 5.0, 840.0, ConvergenceLevel.LOCKED),           // 840 dominant (676 parties)
+        specI("fullDrawMsMax", 1000.0, 1040.0, 5.0, 1020.0, ConvergenceLevel.LOCKED),        // 1020 dominant (552 parties)
+        specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 6.3, ConvergenceLevel.MODERATE),         // Variance acceptable
+        specF("bowMinUseDist", 10.4, 11.0, 0.1, 10.7, ConvergenceLevel.CONVERGED),           // 10.7 optimal (402 parties)
+        
+        // openVolleyMax verrouillé à 1 (prouvé optimal)
+        specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0, ConvergenceLevel.LOCKED),
+        
+        specL("openSpacingMin", 420.0, 480.0, 10.0, 450.0, ConvergenceLevel.CONVERGED),      // 450 optimal (451 parties)
+        specL("openSpacingMax", 840.0, 900.0, 10.0, 870.0, ConvergenceLevel.CONVERGED),      // 870 optimal (460 parties)
+        specF("openShotMinDist", 11.5, 12.1, 0.1, 11.8, ConvergenceLevel.CONVERGED),         // 11.8 optimal (308 parties)
+        specL("reactiveCdMs", 640.0, 700.0, 10.0, 670.0, ConvergenceLevel.CONVERGED),        // 670 optimal (493 parties)
 
-        specD("stillFrameThreshold", 0.008, 0.02, 0.0005, 0.0125),
-        specI("stillFramesNeeded", 6.0, 16.0, 1.0, 10.0),
-        specD("bowSlowThreshold", 0.04, 0.09, 0.002, 0.06),
-        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),
+        // Détection mouvement - plages moyennes (moins critique)
+        specD("stillFrameThreshold", 0.008, 0.02, 0.0005, 0.0125, ConvergenceLevel.MODERATE),
+        specI("stillFramesNeeded", 6.0, 16.0, 1.0, 10.0, ConvergenceLevel.MODERATE),
+        specD("bowSlowThreshold", 0.04, 0.09, 0.002, 0.06, ConvergenceLevel.MODERATE),
+        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0, ConvergenceLevel.MODERATE),
 
-        specL("reserveTightMs", 7000.0, 13000.0, 100.0, 10000.0),
-        specI("earlyReserve", 2.0, 5.0, 1.0, 3.0),
-        specI("midReserve", 1.0, 4.0, 1.0, 2.0),
+        // Réserves - plages moyennes
+        specL("reserveTightMs", 7000.0, 13000.0, 100.0, 10000.0, ConvergenceLevel.MODERATE),
+        specI("earlyReserve", 2.0, 5.0, 1.0, 3.0, ConvergenceLevel.MODERATE),
+        specI("midReserve", 1.0, 4.0, 1.0, 2.0, ConvergenceLevel.MODERATE),
 
-        specL("rodCdCloseMsBase", 280.0, 420.0, 10.0, 340.0),
-        specL("rodCdFarMsBase", 360.0, 620.0, 10.0, 480.0),
-        specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),
-        specF("rodBanMeleeDist", 3.0, 5.0, 0.05, 4.0),
-        specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),
-        specF("rodCloseMax", 2.6, 4.0, 0.05, 3.4),
-        specF("rodMainMin", 2.4, 3.6, 0.05, 3.0),
-        specF("rodMainMax", 5.5, 8.2, 0.05, 6.8),
-        specF("rodInterceptMin", 4.8, 6.4, 0.05, 5.8),
-        specF("rodInterceptMax", 6.2, 8.2, 0.05, 7.2),
-        specF("rodMaxRangeHard", 6.5, 8.0, 0.05, 7.2),
-        specF("rodMidInstantMin", 4.8, 6.2, 0.05, 5.5),
-        specF("rodMidInstantMax", 6.2, 7.6, 0.05, 7.0),
-        specF("farThreshold", 9.0, 14.0, 0.1, 11.0),
-        specL("reentryRodGraceMs", 200.0, 500.0, 10.0, 300.0),
+        // ROD - EXPLORATION MODÉRÉE (encore de la variance dans les données)
+        specL("rodCdCloseMsBase", 290.0, 330.0, 10.0, 310.0, ConvergenceLevel.MODERATE),     // 310 bon (207 parties)
+        specL("rodCdFarMsBase", 460.0, 500.0, 10.0, 480.0, ConvergenceLevel.MODERATE),       // 480 bon (388 parties)
+        specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25, ConvergenceLevel.MODERATE),
+        specF("rodBanMeleeDist", 3.0, 5.0, 0.05, 4.0, ConvergenceLevel.MODERATE),
+        
+        // Rod distances - plages réduites mais explorables
+        specF("rodCloseMin", 1.8, 2.4, 0.05, 2.0, ConvergenceLevel.EXPLORE),
+        specF("rodCloseMax", 2.8, 3.6, 0.05, 3.2, ConvergenceLevel.EXPLORE),
+        specF("rodMainMin", 2.6, 3.2, 0.05, 2.8, ConvergenceLevel.EXPLORE),                  // 2.8 bon (154 parties)
+        specF("rodMainMax", 6.5, 7.5, 0.05, 7.0, ConvergenceLevel.EXPLORE),                  // 7.0 bon (236 parties)
+        specF("rodInterceptMin", 4.8, 6.4, 0.05, 5.8, ConvergenceLevel.EXPLORE),
+        specF("rodInterceptMax", 6.2, 8.2, 0.05, 7.2, ConvergenceLevel.EXPLORE),
+        specF("rodMaxRangeHard", 6.5, 8.0, 0.05, 7.2, ConvergenceLevel.EXPLORE),
+        specF("rodMidInstantMin", 4.8, 6.2, 0.05, 5.5, ConvergenceLevel.EXPLORE),
+        specF("rodMidInstantMax", 6.2, 7.6, 0.05, 7.0, ConvergenceLevel.EXPLORE),
+        specF("farThreshold", 9.0, 14.0, 0.1, 11.0, ConvergenceLevel.MODERATE),
+        specL("reentryRodGraceMs", 200.0, 500.0, 10.0, 300.0, ConvergenceLevel.MODERATE),
 
-        specI("rodHoldCloseMinMs", 90.0, 160.0, 5.0, 118.0),
-        specI("rodHoldCloseMaxMs", 110.0, 190.0, 5.0, 142.0),
-        specI("rodHoldMidMinMs", 160.0, 260.0, 5.0, 208.0),
-        specI("rodHoldMidMaxMs", 180.0, 300.0, 5.0, 232.0),
+        // Rod hold - plages moyennes
+        specI("rodHoldCloseMinMs", 90.0, 160.0, 5.0, 118.0, ConvergenceLevel.MODERATE),
+        specI("rodHoldCloseMaxMs", 110.0, 190.0, 5.0, 142.0, ConvergenceLevel.MODERATE),
+        specI("rodHoldMidMinMs", 160.0, 260.0, 5.0, 208.0, ConvergenceLevel.MODERATE),
+        specI("rodHoldMidMaxMs", 180.0, 300.0, 5.0, 232.0, ConvergenceLevel.MODERATE),
 
-        specI("rodAntiSpamClosePassiveMin", 260.0, 420.0, 10.0, 340.0),
-        specI("rodAntiSpamClosePassiveMax", 340.0, 520.0, 10.0, 420.0),
-        specI("rodAntiSpamMidPassiveMin", 400.0, 640.0, 10.0, 520.0),
-        specI("rodAntiSpamMidPassiveMax", 520.0, 820.0, 10.0, 680.0),
-        specI("rodAntiSpamFarPassiveMin", 400.0, 640.0, 10.0, 520.0),
-        specI("rodAntiSpamFarPassiveMax", 540.0, 860.0, 10.0, 700.0),
+        // Rod anti-spam - EXPLORATION (encore variance significative)
+        specI("rodAntiSpamClosePassiveMin", 260.0, 420.0, 10.0, 340.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamClosePassiveMax", 340.0, 520.0, 10.0, 420.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamMidPassiveMin", 400.0, 460.0, 10.0, 420.0, ConvergenceLevel.MODERATE),  // 420 bon (461 parties)
+        specI("rodAntiSpamMidPassiveMax", 520.0, 820.0, 10.0, 680.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamFarPassiveMin", 400.0, 640.0, 10.0, 520.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamFarPassiveMax", 540.0, 860.0, 10.0, 700.0, ConvergenceLevel.EXPLORE),
 
-        specI("rodAntiSpamCloseActiveMin", 200.0, 360.0, 10.0, 260.0),
-        specI("rodAntiSpamCloseActiveMax", 260.0, 420.0, 10.0, 320.0),
-        specI("rodAntiSpamMidActiveMin", 280.0, 480.0, 10.0, 380.0),
-        specI("rodAntiSpamMidActiveMax", 400.0, 640.0, 10.0, 520.0),
-        specI("rodAntiSpamFarActiveMin", 320.0, 520.0, 10.0, 400.0),
-        specI("rodAntiSpamFarActiveMax", 420.0, 700.0, 10.0, 560.0),
+        specI("rodAntiSpamCloseActiveMin", 180.0, 220.0, 10.0, 200.0, ConvergenceLevel.MODERATE),  // 200 optimal (490 parties)
+        specI("rodAntiSpamCloseActiveMax", 260.0, 420.0, 10.0, 320.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamMidActiveMin", 280.0, 480.0, 10.0, 380.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamMidActiveMax", 400.0, 640.0, 10.0, 520.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamFarActiveMin", 320.0, 520.0, 10.0, 400.0, ConvergenceLevel.EXPLORE),
+        specI("rodAntiSpamFarActiveMax", 420.0, 700.0, 10.0, 560.0, ConvergenceLevel.EXPLORE),
 
-        specF("parryCloseCancelDist", 11.0, 19.0, 0.2, 15.0),
-        specL("parryCooldownMs", 600.0, 1200.0, 10.0, 900.0),
-        specI("parryHoldMinMs", 520.0, 820.0, 10.0, 650.0),
-        specI("parryHoldMaxMs", 820.0, 1200.0, 10.0, 980.0),
-        specI("parryStickMinMs", 720.0, 1100.0, 10.0, 900.0),
-        specI("parryStickMaxMs", 1200.0, 1800.0, 10.0, 1500.0),
-        specL("parryJumpCd", 400.0, 800.0, 10.0, 580.0),
-        specL("allowParryDelayMs", 2000.0, 3600.0, 50.0, 2800.0),
+        // PARRY - EXPLORATION (peu de données, besoin d'explorer)
+        specF("parryCloseCancelDist", 11.0, 19.0, 0.2, 15.0, ConvergenceLevel.EXPLORE),
+        specL("parryCooldownMs", 600.0, 1200.0, 10.0, 900.0, ConvergenceLevel.EXPLORE),
+        specI("parryHoldMinMs", 520.0, 820.0, 10.0, 650.0, ConvergenceLevel.EXPLORE),
+        specI("parryHoldMaxMs", 820.0, 1200.0, 10.0, 980.0, ConvergenceLevel.EXPLORE),
+        specI("parryStickMinMs", 720.0, 1100.0, 10.0, 900.0, ConvergenceLevel.EXPLORE),
+        specI("parryStickMaxMs", 1200.0, 1800.0, 10.0, 1500.0, ConvergenceLevel.EXPLORE),
+        specL("parryJumpCd", 400.0, 800.0, 10.0, 580.0, ConvergenceLevel.EXPLORE),
+        specL("allowParryDelayMs", 2000.0, 3600.0, 50.0, 2800.0, ConvergenceLevel.EXPLORE),
 
-        specI("closeBurstWindowMinMs", 200.0, 360.0, 10.0, 280.0),
-        specI("closeBurstWindowMaxMs", 320.0, 520.0, 10.0, 420.0),
-        specI("closeBurstFlipMinMs", 40.0, 100.0, 5.0, 60.0),
-        specI("closeBurstFlipMaxMs", 80.0, 160.0, 5.0, 110.0),
-        specI("closeHoldWindowMinMs", 160.0, 300.0, 10.0, 220.0),
-        specI("closeHoldWindowMaxMs", 260.0, 420.0, 10.0, 340.0),
+        // STRAFE PROCHE - CONVERGED (200-300ms domine totalement)
+        specI("closeBurstWindowMinMs", 185.0, 215.0, 10.0, 200.0, ConvergenceLevel.CONVERGED),  // 200 optimal (490 parties)
+        specI("closeBurstWindowMaxMs", 280.0, 320.0, 10.0, 300.0, ConvergenceLevel.CONVERGED),  // 300 optimal (610 parties)
+        specI("closeBurstFlipMinMs", 40.0, 100.0, 5.0, 60.0, ConvergenceLevel.MODERATE),
+        specI("closeBurstFlipMaxMs", 80.0, 160.0, 5.0, 110.0, ConvergenceLevel.MODERATE),
+        specI("closeHoldWindowMinMs", 185.0, 215.0, 10.0, 200.0, ConvergenceLevel.CONVERGED),  // 200 optimal (490 parties)
+        specI("closeHoldWindowMaxMs", 280.0, 320.0, 10.0, 300.0, ConvergenceLevel.CONVERGED),  // 300 optimal (610 parties)
 
-        specI("forwardStickMinMs", 160.0, 300.0, 10.0, 220.0),
-        specI("forwardStickMaxMs", 220.0, 360.0, 10.0, 280.0),
-        specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 300.0),
-        specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 340.0),
+        // POST-HIT - ULTRA CONVERGED
+        specI("forwardStickMinMs", 160.0, 180.0, 5.0, 170.0, ConvergenceLevel.LOCKED),         // 170 ULTRA dominant (821 parties)
+        specI("forwardStickMaxMs", 315.0, 345.0, 5.0, 330.0, ConvergenceLevel.LOCKED),         // 330 ULTRA dominant (636 parties)
+        specI("meleeFocusMinMs", 360.0, 380.0, 10.0, 370.0, ConvergenceLevel.CONVERGED),       // 370 optimal (524 parties)
+        specI("meleeFocusMaxMs", 380.0, 400.0, 5.0, 390.0, ConvergenceLevel.LOCKED),           // 390 ULTRA dominant (902 parties)
 
-        // >>> NOUVEAUX PARAMS de saut
-        specF("antiJumpZoneDist", 6.8, 8.6, 0.05, 7.8),
-        specI("startupJumpDelayMs", 260.0, 340.0, 5.0, 300.0),
-        specI("continuousJumpMinIntervalMs", 180.0, 260.0, 5.0, 220.0)
+        // JUMP - ULTRA CONVERGED (valeurs sacrées !)
+        specF("antiJumpZoneDist", 6.80, 7.00, 0.05, 6.9, ConvergenceLevel.LOCKED),             // 6.9 ULTRA dominant (697 parties)
+        specI("startupJumpDelayMs", 260.0, 280.0, 5.0, 270.0, ConvergenceLevel.LOCKED),        // 270 ULTRA dominant (928 parties)
+        specI("continuousJumpMinIntervalMs", 205.0, 225.0, 5.0, 215.0, ConvergenceLevel.LOCKED) // 215 ULTRA dominant (647 parties)
     )
 
     private val specByKey = specs.associateBy { it.key }
@@ -233,6 +267,7 @@ object ClassicV2Tuner {
         val bv = this[b] ?: return
         if (av > bv) { this[a] = bv; this[b] = av }
     }
+    
     private fun normalize(chosen: MutableMap<String, Double>) {
         // temps / fenêtres
         chosen.order("fullDrawMsMin", "fullDrawMsMax")
@@ -265,15 +300,37 @@ object ClassicV2Tuner {
         chosen.order("rodAntiSpamFarActiveMin", "rodAntiSpamFarActiveMax")
     }
 
-    // ----------- Exploration (epsilon décroissant) -----------
-    private fun epsilon(totalPlays: Int): Double {
-        val base = 0.25
-        val minE = 0.02
-        val decay = totalPlays / 40.0
-        return max(minE, base / (1.0 + decay))
+    // ----------- Epsilon par niveau de convergence -----------
+    private fun epsilonForSpec(spec: ParamSpec, totalPlays: Int): Double {
+        val baseEpsilon = when (spec.convergence) {
+            ConvergenceLevel.LOCKED -> 0.01      // Quasi-exploitation pure
+            ConvergenceLevel.CONVERGED -> 0.03   // Très faible exploration
+            ConvergenceLevel.MODERATE -> 0.08    // Exploration modérée
+            ConvergenceLevel.EXPLORE -> 0.15     // Exploration active
+        }
+        
+        // Decay progressif mais limité par la catégorie
+        val minEpsilon = when (spec.convergence) {
+            ConvergenceLevel.LOCKED -> 0.005
+            ConvergenceLevel.CONVERGED -> 0.01
+            ConvergenceLevel.MODERATE -> 0.03
+            ConvergenceLevel.EXPLORE -> 0.08
+        }
+        
+        val decay = totalPlays / 60.0
+        return max(minEpsilon, baseEpsilon / (1.0 + decay))
     }
+    
     private fun exploreNow(epsilon: Double): Boolean =
         RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
+
+    // ----------- UCB-like selection (bonus d'exploration) -----------
+    private fun ucbScore(vs: ValueState, totalPlays: Int): Double {
+        if (vs.plays == 0) return Double.POSITIVE_INFINITY
+        val exploitation = vs.avg()
+        val exploration = UCB_EXPLORATION_FACTOR * sqrt(ln(totalPlays.toDouble()) / vs.plays)
+        return exploitation + exploration
+    }
 
     // ----------- Pruning des valeurs (top-N) -----------
     private fun prune() {
@@ -295,11 +352,12 @@ object ClassicV2Tuner {
     private var lastPicked: ClassicParams? = null
 
     fun noteCloseJump(distance: Float, holdingBow: Boolean) {
-        val zone = lastPicked?.antiJumpZoneDist ?: 7.8f
+        val zone = lastPicked?.antiJumpZoneDist ?: 6.9f
         if (holdingBow || distance <= zone) {
             currentMistakes += 1
         }
     }
+    
     fun takeAndResetMistakes(): Int {
         val m = currentMistakes
         currentMistakes = 0
@@ -311,19 +369,29 @@ object ClassicV2Tuner {
     fun pickParams(): ClassicParams {
         ensureLoaded()
         val chosen = mutableMapOf<String, Double>()
+        
         for (spec in specs) {
             val p = state.params.getOrPut(spec.key) { ParamState() }
-            val eps = epsilon(p.totalPlays)
+            val eps = epsilonForSpec(spec, p.totalPlays)
+            
             val value = when {
                 p.values.isEmpty() -> spec.def
-                exploreNow(eps)    -> sample(spec)
-                else               -> bestValue(p, spec)
+                exploreNow(eps) -> sample(spec)
+                else -> {
+                    // Utilisation de UCB pour la sélection
+                    val bestEntry = p.values.entries.maxByOrNull { 
+                        ucbScore(it.value, p.totalPlays) 
+                    }
+                    bestEntry?.value?.value ?: spec.def
+                }
             }
+            
             val key = keyOf(value)
             if (!p.values.containsKey(key)) p.values[key] = ValueState(value = value)
             p.lastValue = value
             chosen[spec.key] = value
         }
+        
         normalize(chosen)
         val params = buildParams(chosen)
         lastPicked = params
@@ -338,6 +406,7 @@ object ClassicV2Tuner {
         val rewardBase = if (win) 1.0 else 0.0
         val reward = (rewardBase - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
+        
         for ((_, ps) in state.params) {
             val entryKey = keyOf(ps.lastValue)
             val vs = ps.values.getOrPut(entryKey) { ValueState(value = ps.lastValue) }
@@ -346,6 +415,7 @@ object ClassicV2Tuner {
             ps.totalPlays += 1
             changed = true
         }
+        
         if (changed) {
             prune()
             save()
@@ -447,9 +517,6 @@ object ClassicV2Tuner {
         val raw = v ?: spec?.def ?: 0.0
         return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
-
-    private fun bestValue(ps: ParamState, spec: ParamSpec): Double =
-        clamp(ps.values.values.maxByOrNull { it.avg() }?.value ?: spec.def, spec)
 
     private fun sample(spec: ParamSpec): Double =
         clamp(quantize(RandomUtils.randomDoubleInRange(spec.min, spec.max), if (spec.step <= 0.0) 1.0 else spec.step), spec)
