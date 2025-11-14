@@ -65,6 +65,47 @@ object ModeRotationManager {
     fun onBotToggle(enabled: Boolean) {
         if (!enabled) {
             reset()
+            return
+        }
+
+        val cfg = kira.config ?: return
+        if (!isRotationActive(cfg)) {
+            syncState(cfg)
+            return
+        }
+
+        if (lastKnownBotIndex != -1) {
+            syncState(cfg)
+            return
+        }
+
+        val sequence = getRotationSequence(cfg)
+        if (sequence.isEmpty()) {
+            reset()
+            lastKnownBotIndex = cfg.currentBot
+            return
+        }
+
+        val firstIdx = sequence.first()
+        val wasToggled = kira.bot?.toggled() == true
+
+        if (cfg.currentBot != firstIdx) {
+            cfg.currentBot = firstIdx
+            cfg.markDirty()
+        }
+
+        val previousBot = kira.bot
+        val newBot = cfg.getBot(firstIdx) ?: previousBot
+        if (newBot != null && newBot !== previousBot) {
+            kira.swapBot(newBot)
+        }
+
+        gamesInCurrentMode = 0
+        queueWaitTicks = 0
+        lastKnownBotIndex = firstIdx
+
+        if (newBot != null && newBot.toggled() != wasToggled) {
+            newBot.toggle()
         }
     }
 
