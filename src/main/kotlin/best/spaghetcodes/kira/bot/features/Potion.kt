@@ -12,7 +12,12 @@ interface Potion {
 
     var lastPotion: Long
 
-    fun useSplashPotion(damage: Int, run: Boolean, facingAway: Boolean) {
+    fun useSplashPotion(
+        damage: Int,
+        run: Boolean,
+        facingAway: Boolean,
+        releaseDelayRange: IntRange = 500..700
+    ) {
         lastPotion = System.currentTimeMillis()
         fun pot(dmg: Int) {
             Mouse.stopLeftAC()
@@ -35,9 +40,17 @@ interface Potion {
                             TimeUtils.setTimeout(fun() {
                                 Inventory.setInvItem("sword")
 
+                                val releaseMin = releaseDelayRange.first
+                                val releaseMax = releaseDelayRange.last
+                                val releaseDelay = if (releaseMin <= releaseMax) {
+                                    RandomUtils.randomIntInRange(releaseMin, releaseMax)
+                                } else {
+                                    releaseMin
+                                }
+
                                 TimeUtils.setTimeout(fun() {
                                     Mouse.setRunningAway(false)
-                                }, RandomUtils.randomIntInRange(500, 700))
+                                }, releaseDelay)
                             }, RandomUtils.randomIntInRange(80, 120))
                         }, r + RandomUtils.randomIntInRange(80, 120))
                     }, RandomUtils.randomIntInRange(100, 200))
