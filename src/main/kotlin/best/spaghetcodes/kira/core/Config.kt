@@ -1,8 +1,9 @@
 package best.spaghetcodes.kira.core
 
-import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.bots.*
+import best.spaghetcodes.kira.bot.ModeRotationManager
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.gui.CustomConfigGUI
 import gg.essential.vigilance.Vigilant
 import gg.essential.vigilance.data.Property
@@ -38,6 +39,52 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(type = PropertyType.SWITCH, name = "Show Stats Overlay", description = "Display session stats on screen.", category = "General")
     var showStatsOverlay = true
+
+    @Property(
+        type = PropertyType.SWITCH,
+        name = "Enable Mode Rotation",
+        description = "Automatically cycle between multiple duel modes.",
+        category = "General"
+    )
+    var enableModeRotation = false
+
+    @Property(
+        type = PropertyType.NUMBER,
+        name = "Games Per Mode",
+        description = "How many games to play before switching to the next mode.",
+        category = "General",
+        min = 1,
+        max = 1000,
+        increment = 1
+    )
+    var modeRotationGames = 5
+
+    @Property(
+        type = PropertyType.SELECTOR,
+        name = "Rotation Mode 1",
+        description = "First mode used in the automatic rotation.",
+        category = "General",
+        options = ["Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz"]
+    )
+    var rotationMode1 = 0
+
+    @Property(
+        type = PropertyType.SELECTOR,
+        name = "Rotation Mode 2",
+        description = "Second mode used in the automatic rotation.",
+        category = "General",
+        options = ["Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz"]
+    )
+    var rotationMode2 = 1
+
+    @Property(
+        type = PropertyType.SELECTOR,
+        name = "Rotation Mode 3",
+        description = "Third mode used in the automatic rotation.",
+        category = "General",
+        options = ["Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz"]
+    )
+    var rotationMode3 = 2
 
     @Property(type = PropertyType.NUMBER, name = "Throw After X Games", description = "After X games the bot will underperform and throw the game. 0 = disabled.", category = "General", min = 0, max = 1000, increment = 10)
     var throwAfterGames = 0
@@ -191,13 +238,24 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
         addDependency("dodgeWLR", "enableDodging")
         addDependency("dodgeLostTo", "enableDodging")
         addDependency("dodgeNoStats", "enableDodging")
+        addDependency("modeRotationGames", "enableModeRotation")
+        addDependency("rotationMode1", "enableModeRotation")
+        addDependency("rotationMode2", "enableModeRotation")
+        addDependency("rotationMode3", "enableModeRotation")
 
         // Toujours utiliser getBot ici -> pas d'Any
         registerListener("currentBot") { idx: Int ->
             getBot(idx)?.let { kira.swapBot(it) }
         }
 
+        registerListener("enableModeRotation") { _: Boolean -> ModeRotationManager.onConfigUpdated() }
+        registerListener("modeRotationGames") { _: Int -> ModeRotationManager.onConfigUpdated() }
+        registerListener("rotationMode1") { _: Int -> ModeRotationManager.onConfigUpdated() }
+        registerListener("rotationMode2") { _: Int -> ModeRotationManager.onConfigUpdated() }
+        registerListener("rotationMode3") { _: Int -> ModeRotationManager.onConfigUpdated() }
+
         initialize()
+        ModeRotationManager.onConfigUpdated()
     }
 
     fun getCustomGui(): GuiScreen = CustomConfigGUI()

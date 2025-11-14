@@ -37,6 +37,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun toggle() {
         toggled = !toggled
         Session.updateBotEnabled(toggled)
+        ModeRotationManager.onBotToggle(toggled)
         if (!toggled) {
             resetAntiDetection()
         }
@@ -323,12 +324,17 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
             if (StateManager.state != StateManager.States.PLAYING) {
                 ticksSinceGameStart++
-                if (ticksSinceGameStart / 20 > (kira.config?.rqNoGame ?: 30)) {
+                val rotationDecision = ModeRotationManager.onQueueWaitingTick(this)
+                if (rotationDecision != null) {
+                    ticksSinceGameStart = 0
+                    TimeUtils.setTimeout({ rotationDecision.botToQueue.queueNextGame() }, RandomUtils.randomIntInRange(300, 500))
+                } else if (ticksSinceGameStart / 20 > (kira.config?.rqNoGame ?: 30)) {
                     ticksSinceGameStart = 0
                     joinGame()
                 }
             } else {
                 ticksSinceGameStart = 0
+                ModeRotationManager.onOpponentFound()
             }
 
             if (mc.thePlayer != null && opponent != null) {
@@ -490,6 +496,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 opponentTimer = TimeUtils.setInterval(this::bakery, 0, 500)
             }, quickRefresh)
             resultCounted = false
+            ModeRotationManager.onOpponentFound()
             onGameStart()
         }
     }
@@ -505,11 +512,13 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }, kira.config?.ggDelay ?: 100)
             }
 
+            val rotationDecision = ModeRotationManager.onGameCompleted(this)
+            val targetBot = rotationDecision?.botToQueue ?: this
             val delay = kira.config?.autoRqDelay ?: 2000
             if (kira.config?.fastRequeue == true) {
-                TimeUtils.setTimeout(this::joinGame, RandomUtils.randomIntInRange(300, 500))
+                TimeUtils.setTimeout({ targetBot.queueNextGame() }, RandomUtils.randomIntInRange(300, 500))
             } else {
-                TimeUtils.setTimeout(this::joinGame, delay)
+                TimeUtils.setTimeout({ targetBot.queueNextGame() }, delay)
             }
         }
     }
@@ -555,6 +564,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 TimeUtils.setTimeout({ ChatUtils.sendAsPlayer(queueCommand) }, RandomUtils.randomIntInRange(100, 300))
             }
         }
+    }
+
+    fun queueNextGame() {
+        joinGame()
     }
 
     private fun disconnect() {

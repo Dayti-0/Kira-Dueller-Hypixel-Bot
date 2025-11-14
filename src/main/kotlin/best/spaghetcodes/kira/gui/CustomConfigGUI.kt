@@ -348,6 +348,54 @@ class CustomConfigGUI : GuiScreen() {
             { cfg.disableChatMessages },
             { cfg.disableChatMessages = it }); y += ROW_HEIGHT + SECTION_SPACING
 
+        y = drawSectionHeader("Mode Rotation", x, y, width); y += SECTION_SPACING
+        toggle(
+            "Enable Mode Rotation",
+            x,
+            y,
+            width,
+            { cfg.enableModeRotation },
+            { cfg.enableModeRotation = it }
+        ); y += ROW_HEIGHT
+        number(
+            "Games Per Mode",
+            x,
+            y,
+            width,
+            { cfg.modeRotationGames },
+            { cfg.modeRotationGames = it },
+            1,
+            1000,
+            1
+        ); y += ROW_HEIGHT
+        selector(
+            "Rotation Mode 1",
+            x,
+            y,
+            width,
+            { cfg.rotationMode1 },
+            { cfg.rotationMode1 = it },
+            botNames
+        ); y += ROW_HEIGHT
+        selector(
+            "Rotation Mode 2",
+            x,
+            y,
+            width,
+            { cfg.rotationMode2 },
+            { cfg.rotationMode2 = it },
+            botNames
+        ); y += ROW_HEIGHT
+        selector(
+            "Rotation Mode 3",
+            x,
+            y,
+            width,
+            { cfg.rotationMode3 },
+            { cfg.rotationMode3 = it },
+            botNames
+        ); y += ROW_HEIGHT + SECTION_SPACING
+
         y = drawSectionHeader("Auto Disconnect", x, y, width); y += SECTION_SPACING
         number(
             "After X Games",
