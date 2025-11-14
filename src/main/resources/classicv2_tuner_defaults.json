@@ -1,0 +1,753 @@
+{
+  "version": 2,
+  "params": {
+    "fullDrawMsMin": {
+      "values": {
+        "780.0000": {
+          "value": 780.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 780.0,
+      "totalPlays": 1481
+    },
+    "fullDrawMsMax": {
+      "values": {
+        "1020.0000": {
+          "value": 1020.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 1020.0,
+      "totalPlays": 1481
+    },
+    "bowCancelCloseDist": {
+      "values": {
+        "6.3000": {
+          "value": 6.3,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 6.3,
+      "totalPlays": 1481
+    },
+    "bowMinUseDist": {
+      "values": {
+        "7.2000": {
+          "value": 7.2,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 7.2,
+      "totalPlays": 1481
+    },
+    "openVolleyMax": {
+      "values": {
+        "1.0000": {
+          "value": 1.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 1.0,
+      "totalPlays": 1481
+    },
+    "openSpacingMin": {
+      "values": {
+        "450.0000": {
+          "value": 450.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 450.0,
+      "totalPlays": 1481
+    },
+    "openSpacingMax": {
+      "values": {
+        "870.0000": {
+          "value": 870.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 870.0,
+      "totalPlays": 1481
+    },
+    "openShotMinDist": {
+      "values": {
+        "11.8000": {
+          "value": 11.8,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 11.8,
+      "totalPlays": 1481
+    },
+    "reactiveCdMs": {
+      "values": {
+        "670.0000": {
+          "value": 670.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 670.0,
+      "totalPlays": 1481
+    },
+    "stillFrameThreshold": {
+      "values": {
+        "0.0175": {
+          "value": 0.0175,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 0.0175,
+      "totalPlays": 1481
+    },
+    "stillFramesNeeded": {
+      "values": {
+        "10.0000": {
+          "value": 10.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 10.0,
+      "totalPlays": 1481
+    },
+    "bowSlowThreshold": {
+      "values": {
+        "0.0440": {
+          "value": 0.044,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 0.044,
+      "totalPlays": 1481
+    },
+    "bowSlowFramesNeeded": {
+      "values": {
+        "4.0000": {
+          "value": 4.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 4.0,
+      "totalPlays": 1481
+    },
+    "reserveTightMs": {
+      "values": {
+        "9400.0000": {
+          "value": 9400.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 9400.0,
+      "totalPlays": 1481
+    },
+    "earlyReserve": {
+      "values": {
+        "2.0000": {
+          "value": 2.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 2.0,
+      "totalPlays": 1481
+    },
+    "midReserve": {
+      "values": {
+        "1.0000": {
+          "value": 1.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 1.0,
+      "totalPlays": 1481
+    },
+    "rodCdCloseMsBase": {
+      "values": {
+        "400.0000": {
+          "value": 400.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 400.0,
+      "totalPlays": 1481
+    },
+    "rodCdFarMsBase": {
+      "values": {
+        "410.0000": {
+          "value": 410.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 410.0,
+      "totalPlays": 1481
+    },
+    "rodCdBiasMax": {
+      "values": {
+        "1.3400": {
+          "value": 1.34,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 1.34,
+      "totalPlays": 1481
+    },
+    "rodBanMeleeDist": {
+      "values": {
+        "4.1000": {
+          "value": 4.1,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 4.1,
+      "totalPlays": 1481
+    },
+    "rodCloseMin": {
+      "values": {
+        "1.9000": {
+          "value": 1.9,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 1.9,
+      "totalPlays": 1481
+    },
+    "rodCloseMax": {
+      "values": {
+        "2.6000": {
+          "value": 2.6,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 2.6,
+      "totalPlays": 1481
+    },
+    "rodMainMin": {
+      "values": {
+        "2.9500": {
+          "value": 2.95,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 2.95,
+      "totalPlays": 1481
+    },
+    "rodMainMax": {
+      "values": {
+        "5.6500": {
+          "value": 5.65,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 5.65,
+      "totalPlays": 1481
+    },
+    "rodInterceptMin": {
+      "values": {
+        "5.9000": {
+          "value": 5.9,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 5.9,
+      "totalPlays": 1481
+    },
+    "rodInterceptMax": {
+      "values": {
+        "7.7000": {
+          "value": 7.7,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 7.7,
+      "totalPlays": 1481
+    },
+    "rodMaxRangeHard": {
+      "values": {
+        "7.3000": {
+          "value": 7.3,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 7.3,
+      "totalPlays": 1481
+    },
+    "rodMidInstantMin": {
+      "values": {
+        "5.6500": {
+          "value": 5.65,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 5.65,
+      "totalPlays": 1481
+    },
+    "rodMidInstantMax": {
+      "values": {
+        "6.6000": {
+          "value": 6.6,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 6.6,
+      "totalPlays": 1481
+    },
+    "farThreshold": {
+      "values": {
+        "12.7000": {
+          "value": 12.7,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 12.7,
+      "totalPlays": 1481
+    },
+    "reentryRodGraceMs": {
+      "values": {
+        "280.0000": {
+          "value": 280.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 280.0,
+      "totalPlays": 1481
+    },
+    "rodHoldCloseMinMs": {
+      "values": {
+        "125.0000": {
+          "value": 125.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 125.0,
+      "totalPlays": 1481
+    },
+    "rodHoldCloseMaxMs": {
+      "values": {
+        "190.0000": {
+          "value": 190.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 190.0,
+      "totalPlays": 1481
+    },
+    "rodHoldMidMinMs": {
+      "values": {
+        "165.0000": {
+          "value": 165.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 165.0,
+      "totalPlays": 1481
+    },
+    "rodHoldMidMaxMs": {
+      "values": {
+        "240.0000": {
+          "value": 240.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 240.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamClosePassiveMin": {
+      "values": {
+        "410.0000": {
+          "value": 410.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 410.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamClosePassiveMax": {
+      "values": {
+        "510.0000": {
+          "value": 510.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 510.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamMidPassiveMin": {
+      "values": {
+        "420.0000": {
+          "value": 420.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 420.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamMidPassiveMax": {
+      "values": {
+        "530.0000": {
+          "value": 530.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 530.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamFarPassiveMin": {
+      "values": {
+        "410.0000": {
+          "value": 410.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 410.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamFarPassiveMax": {
+      "values": {
+        "570.0000": {
+          "value": 570.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 570.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamCloseActiveMin": {
+      "values": {
+        "240.0000": {
+          "value": 240.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 240.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamCloseActiveMax": {
+      "values": {
+        "400.0000": {
+          "value": 400.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 400.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamMidActiveMin": {
+      "values": {
+        "330.0000": {
+          "value": 330.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 330.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamMidActiveMax": {
+      "values": {
+        "580.0000": {
+          "value": 580.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 580.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamFarActiveMin": {
+      "values": {
+        "380.0000": {
+          "value": 380.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 380.0,
+      "totalPlays": 1481
+    },
+    "rodAntiSpamFarActiveMax": {
+      "values": {
+        "670.0000": {
+          "value": 670.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 670.0,
+      "totalPlays": 1481
+    },
+    "parryCloseCancelDist": {
+      "values": {
+        "12.0000": {
+          "value": 12.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 12.0,
+      "totalPlays": 1481
+    },
+    "parryCooldownMs": {
+      "values": {
+        "850.0000": {
+          "value": 850.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 850.0,
+      "totalPlays": 1481
+    },
+    "parryHoldMinMs": {
+      "values": {
+        "710.0000": {
+          "value": 710.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 710.0,
+      "totalPlays": 1481
+    },
+    "parryHoldMaxMs": {
+      "values": {
+        "940.0000": {
+          "value": 940.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 940.0,
+      "totalPlays": 1481
+    },
+    "parryStickMinMs": {
+      "values": {
+        "760.0000": {
+          "value": 760.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 760.0,
+      "totalPlays": 1481
+    },
+    "parryStickMaxMs": {
+      "values": {
+        "1330.0000": {
+          "value": 1330.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 1330.0,
+      "totalPlays": 1481
+    },
+    "parryJumpCd": {
+      "values": {
+        "460.0000": {
+          "value": 460.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 460.0,
+      "totalPlays": 1481
+    },
+    "allowParryDelayMs": {
+      "values": {
+        "2600.0000": {
+          "value": 2600.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 2600.0,
+      "totalPlays": 1481
+    },
+    "closeBurstWindowMinMs": {
+      "values": {
+        "200.0000": {
+          "value": 200.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 200.0,
+      "totalPlays": 1481
+    },
+    "closeBurstWindowMaxMs": {
+      "values": {
+        "430.0000": {
+          "value": 430.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 430.0,
+      "totalPlays": 1481
+    },
+    "closeBurstFlipMinMs": {
+      "values": {
+        "100.0000": {
+          "value": 100.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 100.0,
+      "totalPlays": 1481
+    },
+    "closeBurstFlipMaxMs": {
+      "values": {
+        "135.0000": {
+          "value": 135.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 135.0,
+      "totalPlays": 1481
+    },
+    "closeHoldWindowMinMs": {
+      "values": {
+        "200.0000": {
+          "value": 200.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 200.0,
+      "totalPlays": 1481
+    },
+    "closeHoldWindowMaxMs": {
+      "values": {
+        "300.0000": {
+          "value": 300.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 300.0,
+      "totalPlays": 1481
+    },
+    "forwardStickMinMs": {
+      "values": {
+        "170.0000": {
+          "value": 170.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 170.0,
+      "totalPlays": 1481
+    },
+    "forwardStickMaxMs": {
+      "values": {
+        "270.0000": {
+          "value": 270.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 270.0,
+      "totalPlays": 1481
+    },
+    "meleeFocusMinMs": {
+      "values": {
+        "370.0000": {
+          "value": 370.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 370.0,
+      "totalPlays": 1481
+    },
+    "meleeFocusMaxMs": {
+      "values": {
+        "390.0000": {
+          "value": 390.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 390.0,
+      "totalPlays": 1481
+    },
+    "antiJumpZoneDist": {
+      "values": {
+        "7.0000": {
+          "value": 7.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 7.0,
+      "totalPlays": 1481
+    },
+    "startupJumpDelayMs": {
+      "values": {
+        "270.0000": {
+          "value": 270.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 270.0,
+      "totalPlays": 1481
+    },
+    "continuousJumpMinIntervalMs": {
+      "values": {
+        "215.0000": {
+          "value": 215.0,
+          "plays": 1481,
+          "totalReward": 1481.0
+        }
+      },
+      "lastValue": 215.0,
+      "totalPlays": 1481
+    }
+  }
+}

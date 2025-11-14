@@ -114,7 +114,10 @@ object ClassicV2Tuner {
     private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
+    private data class BundledDefault(val json: String, val state: StoredState)
+
     private const val CURRENT_VERSION = 2
+    private const val DEFAULT_RESOURCE_PATH = "/classicv2_tuner_defaults.json"
     private const val MISTAKE_PENALTY = 0.25
     private const val TOP_N_KEEP = 16
 
@@ -222,6 +225,8 @@ object ClassicV2Tuner {
     // -------------------------- STATE --------------------------
     private var loaded = false
     private var state = StoredState()
+
+    private val storedStateType = object : TypeToken<StoredState>() {}.type
 
     private val localGson: Gson by lazy { GsonBuilder().setPrettyPrinting().create() }
     private val gson: Gson get() = try { kira.gson ?: localGson } catch (_: Throwable) { localGson }
@@ -488,15 +493,14 @@ object ClassicV2Tuner {
     @Synchronized
     private fun load(): StoredState {
         val f = file()
-        if (!f.exists()) return StoredState()
+        if (!f.exists()) return loadBundledStateOrDefault(f)
         return try {
             f.reader().use { r ->
-                val type = object : TypeToken<StoredState>() {}.type
-                gson.fromJson<StoredState>(r, type) ?: StoredState()
+                gson.fromJson<StoredState>(r, storedStateType) ?: loadBundledStateOrDefault(f)
             }
         } catch (ex: Exception) {
             tryBackupCorrupt(f, ex)
-            StoredState()
+            loadBundledStateOrDefault(f)
         }
     }
 
@@ -511,6 +515,38 @@ object ClassicV2Tuner {
                 tmp.copyTo(f, overwrite = true)
                 tmp.delete()
             }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun loadBundledStateOrDefault(target: File): StoredState {
+        val bundled = loadBundledState() ?: return StoredState()
+        writeBundledState(target, bundled.json)
+        return bundled.state
+    }
+
+    private fun loadBundledState(): BundledDefault? {
+        val json = readBundledStateJson() ?: return null
+        return try {
+            val parsed = localGson.fromJson<StoredState>(json, storedStateType)
+            if (parsed != null) BundledDefault(json, parsed) else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun readBundledStateJson(): String? {
+        return try {
+            ClassicV2Tuner::class.java.getResourceAsStream(DEFAULT_RESOURCE_PATH)?.bufferedReader()?.use { it.readText() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun writeBundledState(target: File, json: String) {
+        try {
+            target.parentFile?.mkdirs()
+            target.writer().use { it.write(json) }
         } catch (_: Exception) {
         }
     }
