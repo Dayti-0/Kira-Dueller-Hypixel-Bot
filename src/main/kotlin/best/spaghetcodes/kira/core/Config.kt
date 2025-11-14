@@ -82,7 +82,7 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
         name = "Rotation Mode 3",
         description = "Third mode used in the automatic rotation.",
         category = "General",
-        options = ["Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz"]
+        options = ["Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz", "None"]
     )
     var rotationMode3 = 2
 

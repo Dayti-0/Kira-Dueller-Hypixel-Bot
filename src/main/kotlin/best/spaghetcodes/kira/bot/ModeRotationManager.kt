@@ -95,7 +95,11 @@ object ModeRotationManager {
                 cfg.currentBot = nextIdx
                 cfg.markDirty()
             }
-            val newBot = kira.bot ?: cfg.getBot(nextIdx)
+            val previousBot = kira.bot
+            val newBot = cfg.getBot(nextIdx) ?: previousBot
+            if (newBot != null && newBot !== previousBot) {
+                kira.swapBot(newBot)
+            }
             if (newBot != null && newBot.toggled() != wasToggled) {
                 newBot.toggle()
             }
@@ -123,7 +127,11 @@ object ModeRotationManager {
             cfg.markDirty()
         }
 
-        val newBot = kira.bot ?: cfg.getBot(nextBotIndex) ?: fallbackBot
+        val previousBot = kira.bot
+        val newBot = cfg.getBot(nextBotIndex) ?: previousBot ?: fallbackBot
+        if (newBot !== previousBot) {
+            kira.swapBot(newBot)
+        }
         if (newBot.toggled() != wasToggled) {
             newBot.toggle()
         }
