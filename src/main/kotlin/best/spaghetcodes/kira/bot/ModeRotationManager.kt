@@ -18,7 +18,7 @@ object ModeRotationManager {
         QUEUE_TIMEOUT
     }
 
-    data class RotationDecision(val botToQueue: BotBase, val trigger: Trigger)
+    data class RotationDecision(val botToQueue: BotBase, val trigger: Trigger, val forceQueueCommand: Boolean)
 
     fun onGameCompleted(currentBot: BotBase): RotationDecision? {
         val cfg = kira.config ?: return null
@@ -146,7 +146,7 @@ object ModeRotationManager {
         }
         ChatUtils.info(message)
 
-        return RotationDecision(newBot, trigger)
+        return RotationDecision(newBot, trigger, true)
     }
 
     private fun syncState(cfg: Config) {
