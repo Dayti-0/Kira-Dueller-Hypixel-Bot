@@ -7,14 +7,14 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(EntityRenderer.class)
 public interface EntityRendererAccessor {
     @Accessor("thirdPersonDistance")
-    float getThirdPersonDistance();
+    double getThirdPersonDistance();
 
     @Accessor("thirdPersonDistance")
-    void setThirdPersonDistance(float distance);
+    void setThirdPersonDistance(double distance);
 
     @Accessor("thirdPersonDistanceTemp")
-    float getThirdPersonDistanceTemp();
+    double getThirdPersonDistanceTemp();
 
     @Accessor("thirdPersonDistanceTemp")
-    void setThirdPersonDistanceTemp(float distance);
+    void setThirdPersonDistanceTemp(double distance);
 }
