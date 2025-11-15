@@ -127,8 +127,8 @@ object ClassicV2Tuner {
     // VERSION HYBRID : Plages larges de l'ancien + defaults ajustés d'après les données
     private val specs = listOf(
         // BOW - Plages larges conservées, defaults légèrement ajustés
-        specI("fullDrawMsMin", 700.0, 1000.0, 10.0, 840.0),        // default 820→840 (données)
-        specI("fullDrawMsMax", 900.0, 1100.0, 10.0, 1020.0),       // default 980→1020 (données)
+        specI("fullDrawMsMin", 700.0, 800.0, 10.0, 750.0),        // V3: default 840→750, 710-770 ont 96-98% WR
+        specI("fullDrawMsMax", 1020.0, 1100.0, 10.0, 1060.0),       // V3: default 1020→1060 (97.6% WR!)
         specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),          // inchangé
         specF("bowMinUseDist", 7.0, 11.0, 0.1, 10.5),              // default 9→10.5 (proche de 10.7 optimal)
         
@@ -211,9 +211,9 @@ object ClassicV2Tuner {
         specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 370.0),             // default 300→370 (données)
         specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),             // default 340→390 (données)
 
-        // JUMP - Zone anti-jump optimale à 8.2 (100% WR sur 308 parties)
-        specF("antiJumpZoneDist", 7.8, 8.5, 0.1, 8.0),                   // default 7.8→8.0, plage resserrée 7.0-9.0→7.8-8.5
-        specI("startupJumpDelayMs", 260.0, 340.0, 5.0, 270.0),           // default 300→270 (données)
+        // JUMP - Zone anti-jump optimale à 8.20 (99.7% WR sur 309 parties!)
+        specF("antiJumpZoneDist", 8.0, 8.4, 0.05, 8.20),                 // V3: default 8.0→8.20, plage resserrée autour optimal
+        specI("startupJumpDelayMs", 260.0, 275.0, 5.0, 265.0),           // V3: default 300→270→265 (97.2% WR!), plage resserrée
         specI("continuousJumpMinIntervalMs", 180.0, 260.0, 5.0, 215.0)   // default 220→215 (données)
     )
 
@@ -271,9 +271,9 @@ object ClassicV2Tuner {
 
     // ----------- Epsilon simple comme l'ancien -----------
     private fun epsilon(totalPlays: Int): Double {
-        val base = 0.25
+        val base = 0.15  // V3: Réduit de 0.25 à 0.15 pour plus d'exploitation
         val minE = 0.02
-        val decay = totalPlays / 40.0
+        val decay = totalPlays / 30.0  // V3: Decay plus rapide (40 → 30)
         return max(minE, base / (1.0 + decay))
     }
     
