@@ -6,6 +6,7 @@ import best.spaghetcodes.kira.bot.bots.Sumo
 import best.spaghetcodes.kira.bot.player.LobbyMovement
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.commands.ConfigCommand
+import best.spaghetcodes.kira.core.CameraController
 import best.spaghetcodes.kira.core.Config
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.gui.StatsOverlay
@@ -58,6 +59,7 @@ class kira {
         MinecraftForge.EVENT_BUS.register(Mouse)
         MinecraftForge.EVENT_BUS.register(LobbyMovement)
         MinecraftForge.EVENT_BUS.register(KeyBindings)
+        MinecraftForge.EVENT_BUS.register(CameraController)
         MinecraftForge.EVENT_BUS.register(StatsOverlay())
 
         // Utilise l’accès typé -> aucun Any ici.
