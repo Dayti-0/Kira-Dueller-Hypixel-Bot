@@ -6,8 +6,7 @@
     "MixinModList",
     "MixinEffectRenderer",
     "MixinLayerCape",
-    "MixinEntityRenderer",
-    "EntityRendererAccessor"
+    "MixinEntityRenderer"
   ],
   "injectors": {
     "defaultRequire": 1
