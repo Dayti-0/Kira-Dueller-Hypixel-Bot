@@ -42,6 +42,14 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(
         type = PropertyType.SWITCH,
+        name = "Cinematic Camera",
+        description = "Automatically switch to a wide third-person camera with a cinematic angle.",
+        category = "General"
+    )
+    var cinematicCamera = false
+
+    @Property(
+        type = PropertyType.SWITCH,
         name = "Enable Mode Rotation",
         description = "Automatically cycle between multiple duel modes.",
         category = "General"

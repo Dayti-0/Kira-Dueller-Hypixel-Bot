@@ -373,7 +373,14 @@ class CustomConfigGUI : GuiScreen() {
             y,
             width,
             { cfg.disableChatMessages },
-            { cfg.disableChatMessages = it }); y += ROW_HEIGHT + SECTION_SPACING
+            { cfg.disableChatMessages = it }); y += ROW_HEIGHT
+        toggle(
+            "Cinematic Camera",
+            x,
+            y,
+            width,
+            { cfg.cinematicCamera },
+            { cfg.cinematicCamera = it }); y += ROW_HEIGHT + SECTION_SPACING
 
         y = drawSectionHeader("Mode Rotation", x, y, width); y += SECTION_SPACING
         toggle(
