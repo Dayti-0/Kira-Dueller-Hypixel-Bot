@@ -13,13 +13,13 @@ object CameraController {
     private var storedSmoothCamera: Boolean? = null
     private var storedDistances: DistanceSnapshot? = null
 
-    private const val CINEMATIC_DISTANCE = 12.0
+    private const val CINEMATIC_DISTANCE = 12f
     private const val PITCH_OFFSET = 12f
     private const val VERTICAL_OFFSET = 0.6f
 
     private data class DistanceSnapshot(
-        val distance: Double,
-        val temp: Double
+        val distance: Float,
+        val temp: Float
     )
 
     private fun accessor(): EntityRendererAccessor? = mc.entityRenderer as? EntityRendererAccessor
