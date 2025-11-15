@@ -1,13 +1,18 @@
 package best.spaghetcodes.kira.core
 
 import best.spaghetcodes.kira.kira
-import best.spaghetcodes.kira.mixins.EntityRendererAccessor
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.EntityRenderer
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
+import net.minecraftforge.fml.relauncher.ReflectionHelper
+import org.apache.logging.log4j.LogManager
+import java.lang.reflect.Field
 
 object CameraController {
     private val mc: Minecraft = Minecraft.getMinecraft()
+
+    private val logger = LogManager.getLogger("Kira")
 
     private var storedThirdPersonView: Int? = null
     private var storedSmoothCamera: Boolean? = null
@@ -22,13 +27,11 @@ object CameraController {
         val temp: Float
     )
 
-    private fun accessor(): EntityRendererAccessor? = mc.entityRenderer as? EntityRendererAccessor
-
     @SubscribeEvent
     fun onClientTick(event: TickEvent.ClientTickEvent) {
         if (event.phase != TickEvent.Phase.END) return
         val config = kira.config ?: return
-        val renderer = accessor() ?: return
+        val renderer = mc.entityRenderer ?: return
 
         if (config.cinematicCamera) {
             applyCinematicSettings(renderer)
@@ -37,29 +40,24 @@ object CameraController {
         }
     }
 
-    private fun applyCinematicSettings(renderer: EntityRendererAccessor) {
+    private fun applyCinematicSettings(renderer: EntityRenderer) {
         if (storedThirdPersonView == null) {
             storedThirdPersonView = mc.gameSettings.thirdPersonView
             storedSmoothCamera = mc.gameSettings.smoothCamera
-            storedDistances = DistanceSnapshot(
-                renderer.getThirdPersonDistance(),
-                renderer.getThirdPersonDistanceTemp()
-            )
+            storedDistances = DistanceAccess.snapshot(renderer)
         }
 
         mc.gameSettings.thirdPersonView = 1
         mc.gameSettings.smoothCamera = true
 
-        renderer.setThirdPersonDistance(CINEMATIC_DISTANCE)
-        renderer.setThirdPersonDistanceTemp(CINEMATIC_DISTANCE)
+        DistanceAccess.apply(renderer, CINEMATIC_DISTANCE, CINEMATIC_DISTANCE)
     }
 
-    private fun restore(renderer: EntityRendererAccessor) {
+    private fun restore(renderer: EntityRenderer) {
         storedThirdPersonView?.let { mc.gameSettings.thirdPersonView = it }
         storedSmoothCamera?.let { mc.gameSettings.smoothCamera = it }
         storedDistances?.let {
-            renderer.setThirdPersonDistance(it.distance)
-            renderer.setThirdPersonDistanceTemp(it.temp)
+            DistanceAccess.apply(renderer, it.distance, it.temp)
         }
 
         storedThirdPersonView = null
@@ -75,4 +73,41 @@ object CameraController {
     fun verticalOffset(): Float = if (isActive()) VERTICAL_OFFSET else 0f
 
     fun isActive(): Boolean = kira.config?.cinematicCamera == true
+
+    private object DistanceAccess {
+        private val distanceField = resolve("thirdPersonDistance", "field_78490_B", "q")
+        private val tempField = resolve("thirdPersonDistanceTemp", "field_78491_C", "r")
+
+        fun snapshot(renderer: EntityRenderer): DistanceSnapshot? {
+            val distance = read(distanceField, renderer)
+            val temp = read(tempField, renderer)
+            return if (distance != null && temp != null) DistanceSnapshot(distance, temp) else null
+        }
+
+        fun apply(renderer: EntityRenderer, distance: Float, temp: Float) {
+            write(distanceField, renderer, distance)
+            write(tempField, renderer, temp)
+        }
+
+        private fun resolve(vararg names: String): Field? = try {
+            ReflectionHelper.findField(EntityRenderer::class.java, *names).apply { isAccessible = true }
+        } catch (throwable: ReflectionHelper.UnableToFindFieldException) {
+            logger.error("Failed to resolve cinematic camera field {}", names.joinToString(", "), throwable)
+            null
+        }
+
+        private fun read(field: Field?, renderer: EntityRenderer): Float? = field?.let {
+            runCatching { it.getFloat(renderer) }.getOrElse { error ->
+                logger.error("Failed to read cinematic camera distance from {}", it.name, error)
+                null
+            }
+        }
+
+        private fun write(field: Field?, renderer: EntityRenderer, value: Float) {
+            field ?: return
+            runCatching { field.setFloat(renderer, value) }.onFailure { error ->
+                logger.error("Failed to update cinematic camera distance for {}", field.name, error)
+            }
+        }
+    }
 }
