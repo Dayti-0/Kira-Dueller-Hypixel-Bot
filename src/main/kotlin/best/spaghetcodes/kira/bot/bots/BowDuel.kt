@@ -1,11 +1,13 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.Bow
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.BowDuelTuner
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
@@ -28,7 +30,7 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
     // ---------- Tir / cadence ----------
     private var shotsFired = 0
     private var lastShot = 0L
-    private val shotCooldown = 800L
+    private var shotCooldownMs = 800L
 
     // Rafale -> phase d’esquive
     private var burstCount = 0
@@ -44,11 +46,27 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
     // ---------- Pearl (1 usage, défensif) ----------
     private var pearls = 1
     private var lastPearl = 0L
-    private val pearlCooldown = 6000L
-    private val pearlEscapeDist = 20f
+    private var pearlCooldown = 6000L
+    private var pearlEscapeDist = 20f
+    private var burstMinShots = 3
+    private var burstMaxShots = 4
+
+    private fun applyParams(params: BowDuelTuner.BowParams) {
+        shotCooldownMs = params.shotCooldownMs
+        pearlCooldown = params.pearlCooldownMs
+        pearlEscapeDist = params.pearlEscapeDist
+        burstMinShots = params.burstMin
+        burstMaxShots = params.burstMax
+    }
     // ------------------------------------------------
 
     override fun onGameStart() {
+        val params = try {
+            BowDuelTuner.pickParams()
+        } catch (_: Throwable) {
+            BowDuelTuner.defaults()
+        }
+        applyParams(params)
         Mouse.startTracking()
         Movement.startSprinting()
         // IMPORTANT : ne pas avancer vers l’adversaire en bow duel
@@ -74,6 +92,12 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
     }
 
     override fun onGameEnd() {
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        BowDuelTuner.report(win, 0)
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({
@@ -169,7 +193,7 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
                 burstCount++
 
                 // Après 3–4 flèches consécutives -> courte phase d'évasion latérale
-                if (burstCount >= RandomUtils.randomIntInRange(3, 4)) {
+                if (burstCount >= RandomUtils.randomIntInRange(burstMinShots, burstMaxShots)) {
                     evasionUntil = lastShot + RandomUtils.randomIntInRange(900, 1200)
                     strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
                     strafeFlipAt = lastShot + RandomUtils.randomIntInRange(220, 360)
@@ -180,7 +204,7 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
         }
 
         // 2) Sinon, décider de lancer un hop-shot (alternance gauche/droite), puis shooter
-        if (!Mouse.isUsingProjectile() && (now - lastShot) > shotCooldown && shotPlannedUntil == 0L) {
+        if (!Mouse.isUsingProjectile() && (now - lastShot) > shotCooldownMs && shotPlannedUntil == 0L) {
             val shootProb = when {
                 distance > 28f -> 100
                 distance > 20f -> 90
@@ -202,7 +226,7 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
                 lastShot = shotPlannedUntil
                 return
             }
-        } else if ((now - lastShot) > (shotCooldown + 700)) {
+        } else if ((now - lastShot) > (shotCooldownMs + 700)) {
             // Si on ne tire pas depuis un moment, on casse la rafale
             burstCount = 0
         }

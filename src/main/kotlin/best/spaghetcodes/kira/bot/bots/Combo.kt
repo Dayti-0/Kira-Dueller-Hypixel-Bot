@@ -1,6 +1,7 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.Gap
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Potion
@@ -8,6 +9,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.ComboTuner
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.EntityUtils
 import best.spaghetcodes.kira.utils.RandomUtils
@@ -44,15 +46,33 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private var retreating = false
     private var leftACActive = false
     private var lastOpponentDistance = 0f
-    private val strengthPeriodMs = 294_000L
-    private val gapPeriodMs = 26_000L
+    private var strengthPeriodMs = 294_000L
+    private var gapPeriodMs = 26_000L
+    private var maxPearlsConfigured = 5
     private fun isConsuming(): Boolean = System.currentTimeMillis() < consumingUntil
+
+    private var closeInnerThreshold = 1.4f
+    private var closeMidThreshold = 2.0f
+    private var closeInnerDelayMs = 340L
+    private var closeMidDelayMs = 260L
+    private var closeFarDelayMs = 200L
+
+    private fun applyParams(params: ComboTuner.ComboParams) {
+        strengthPeriodMs = params.strengthPeriodMs
+        gapPeriodMs = params.gapPeriodMs
+        maxPearlsConfigured = params.maxPearls
+        closeInnerThreshold = params.closeInnerThreshold
+        closeMidThreshold = params.closeMidThreshold
+        closeInnerDelayMs = params.closeInnerDelayMs
+        closeMidDelayMs = params.closeMidDelayMs
+        closeFarDelayMs = params.closeFarDelayMs
+    }
 
     private fun computeCloseStrafeDelay(distance: Float): Long {
         return when {
-            distance < 1.4f -> 340L
-            distance < 2.0f -> 260L
-            else -> 200L
+            distance < closeInnerThreshold -> closeInnerDelayMs
+            distance < closeMidThreshold -> closeMidDelayMs
+            else -> closeFarDelayMs
         }
     }
 
@@ -270,6 +290,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
     // ------------------- Lifecycle -------------------
     override fun onGameStart() {
+        val params = try {
+            ComboTuner.pickParams()
+        } catch (_: Throwable) {
+            ComboTuner.defaults()
+        }
+        applyParams(params)
         Mouse.rClickUp()
         Movement.startSprinting()
         Movement.startForward()
@@ -302,7 +328,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         gapCycleStarted = false
         nextGapAt = 0L
 
-        pearls = 5
+        pearls = maxPearlsConfigured
         lastPearl = 0L
 
         consumingUntil = 0L
@@ -318,6 +344,12 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     }
 
     override fun onGameEnd() {
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        ComboTuner.report(win, 0)
         TimeUtils.setTimeout({
             Movement.clearAll()
             Mouse.stopLeftAC()
@@ -338,7 +370,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             gapCycleStarted = false
             nextGapAt = 0L
 
-            pearls = 5
+            pearls = maxPearlsConfigured
             lastPearl = 0L
 
             armor = hashMapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1)

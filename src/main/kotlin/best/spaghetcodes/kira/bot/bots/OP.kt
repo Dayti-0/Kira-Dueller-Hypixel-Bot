@@ -1,11 +1,13 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.*
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.OPTuner
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.entity.EntityLivingBase
@@ -33,6 +35,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     // =====================  CONFIG GÉNÉRALE  =====================
     var shotsFired = 0
     var maxArrows = 20
+    private var configuredMaxArrows = 20
 
     var speedDamage = 16386
     var regenDamage = 16385
@@ -40,6 +43,9 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     var speedPotsLeft = 2
     var regenPotsLeft = 2
     var gapsLeft = 6
+    private var baseSpeedPots = 2
+    private var baseRegenPots = 2
+    private var baseGapCount = 6
 
     override var flintUses = 5
 
@@ -74,7 +80,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     var tapping = false
 
     // Anti double-gap strict
-    private val MIN_GAP_INTERVAL_MS = 4500L
+    private var minGapIntervalMs = 4500L
     private var gapLockUntil = 0L
 
     // =====================  STRAFE  =====================
@@ -151,6 +157,17 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             else -> longStrafeChance
         }
         return RandomUtils.randomIntInRange(1, 100) <= chance
+    }
+
+    private fun applyParams(params: OPTuner.OPParams) {
+        configuredMaxArrows = params.maxArrows
+        baseSpeedPots = params.speedPots
+        baseRegenPots = params.regenPots
+        baseGapCount = params.gaps
+        minGapIntervalMs = params.minGapIntervalMs
+        longStrafeChance = params.longStrafeChance
+        rodCdCloseMsBase = params.rodCdCloseMsBase
+        rodCdFarMsBase = params.rodCdFarMsBase
     }
 
     // =====================  LOGIQUE ROD (import ClassicV2 améliorée)  =====================
@@ -584,7 +601,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         if (eatingGap) return
         if (takingPotion || retreating) return
         if (Mouse.isUsingPotion() || Mouse.isUsingProjectile()) return
-        if (now < lastGap + MIN_GAP_INTERVAL_MS) return
+        if (now < lastGap + minGapIntervalMs) return
 
         val recentRegen = now - lastRegenUse < 30_000L
         val gapThreshold = if (recentRegen) 8f else 10f
@@ -666,7 +683,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                     if (!decremented) {
                         gapsLeft = max(0, gapsLeft - 1)
                         lastGap = System.currentTimeMillis()
-                        gapLockUntil = lastGap + MIN_GAP_INTERVAL_MS
+                        gapLockUntil = lastGap + minGapIntervalMs
                         decremented = true
                     }
 
@@ -768,6 +785,12 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     // =====================  LIFECYCLE  =====================
     override fun onGameStart() {
+        val params = try {
+            OPTuner.pickParams()
+        } catch (_: Throwable) {
+            OPTuner.defaults()
+        }
+        applyParams(params)
         stopPreGapBackwardLock()
         gameStartAt = System.currentTimeMillis()
         openingPhaseUntil = gameStartAt + 5500L
@@ -775,6 +798,10 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         openingRegenPending = false
 
         flintUses = 5
+        maxArrows = configuredMaxArrows
+        speedPotsLeft = baseSpeedPots
+        regenPotsLeft = baseRegenPots
+        gapsLeft = baseGapCount
 
         preGapLock = false
         preGapStartedAt = 0L
@@ -836,11 +863,18 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     }
 
     override fun onGameEnd() {
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        OPTuner.report(win, 0)
         stopPreGapBackwardLock()
         shotsFired = 0
-        speedPotsLeft = 2
-        regenPotsLeft = 2
-        gapsLeft = 6
+        maxArrows = configuredMaxArrows
+        speedPotsLeft = baseSpeedPots
+        regenPotsLeft = baseRegenPots
+        gapsLeft = baseGapCount
         flintUses = 5
 
         lastSpeedUse = 0L

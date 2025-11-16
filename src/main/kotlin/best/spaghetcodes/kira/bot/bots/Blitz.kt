@@ -1,11 +1,13 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.BlitzTuner
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
@@ -27,9 +29,29 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
 
     private var tapping = false
     private var lastKitSwitch = 0L
-    private val kitSwitchCooldown = 3000L
+    private var kitSwitchCooldown = 3000L
+    private var jumpAggroDist = 3.0f
+    private var stopForwardDist = 1.2f
+    private var stopForwardComboDist = 2.5f
+    private var potionHpThreshold = 15f
+    private var potionUseChance = 30
+
+    private fun applyParams(params: BlitzTuner.BlitzParams) {
+        jumpAggroDist = params.jumpAggroDist
+        stopForwardDist = params.stopForwardDist
+        stopForwardComboDist = params.stopForwardComboDist
+        kitSwitchCooldown = params.kitSwitchCooldownMs
+        potionHpThreshold = params.potionHpThreshold
+        potionUseChance = params.potionUseChance
+    }
 
     override fun onGameStart() {
+        val params = try {
+            BlitzTuner.pickParams()
+        } catch (_: Throwable) {
+            BlitzTuner.defaults()
+        }
+        applyParams(params)
         Mouse.startTracking()
         Movement.startSprinting()
         Movement.startForward()
@@ -47,6 +69,12 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
     }
 
     override fun onGameEnd() {
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        BlitzTuner.report(win, 0)
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({
@@ -82,7 +110,7 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
         val now = System.currentTimeMillis()
 
         // Sauts (Blitz un peu plus agressif)
-        if (distance > 3f) {
+        if (distance > jumpAggroDist) {
             Movement.startJumping()
         } else {
             Movement.stopJumping()
@@ -94,7 +122,7 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
         }
 
         // Avancer / reculer
-        if (distance < 1.2f || (distance < 2.5f && combo >= 1)) {
+        if (distance < stopForwardDist || (distance < stopForwardComboDist && combo >= 1)) {
             Movement.stopForward()
         } else if (!tapping) {
             Movement.startForward()
@@ -119,7 +147,7 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
                 else -> {
                     // Distance moyenne : objets spéciaux/potions si présents
                     if (Inventory.hasItem("potion")) {
-                        if (p.health < 15f && RandomUtils.randomIntInRange(0, 100) < 30) {
+                        if (p.health < potionHpThreshold && RandomUtils.randomIntInRange(0, 100) < potionUseChance) {
                             Inventory.setInvItem("potion")
                             TimeUtils.setTimeout({
                                 Mouse.rClick(RandomUtils.randomIntInRange(80, 120))
