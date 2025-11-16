@@ -33,6 +33,13 @@ public abstract class MixinLayerCape {
     @Unique
     private static final Set<UUID> KIRA$FAILED_CAPES = new HashSet<>();
 
+    /**
+     * Overwrites {@link LayerCape#doRenderLayer} so we can render Hypixel capes with
+     * additional null-guards while keeping vanilla behaviour intact.
+     *
+     * @author Kira Bot Team
+     * @reason Avoid crashes when custom cape data is missing while still drawing vanilla capes.
+     */
     @Overwrite
     public void doRenderLayer(AbstractClientPlayer player, float limbSwing, float limbSwingAmount, float partialTicks,
                               float ageInTicks, float netHeadYaw, float headPitch, float scale) {

@@ -204,7 +204,7 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
     }
 
     private fun updateCenterOnce() {
-        val p = mc.thePlayer ?: return
+        if (mc.thePlayer == null) return
         val o = opponent() ?: return
         if (oppSpawnX == null) {
             oppSpawnX = o.posX

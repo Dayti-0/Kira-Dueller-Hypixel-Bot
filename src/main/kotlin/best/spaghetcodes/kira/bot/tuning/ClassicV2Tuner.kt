@@ -224,11 +224,16 @@ object ClassicV2Tuner {
     private var state = StoredState()
 
     private val localGson: Gson by lazy { GsonBuilder().setPrettyPrinting().create() }
-    private val gson: Gson get() = try { kira.gson ?: localGson } catch (_: Throwable) { localGson }
+    private val gson: Gson
+        get() = try {
+            kira.gson
+        } catch (_: Throwable) {
+            localGson
+        }
 
     private fun configDir(): File {
         return try {
-            val mcDir = kira.mc?.mcDataDir
+            val mcDir = kira.mc.mcDataDir
             if (mcDir != null) File(mcDir, "config") else File(File(System.getProperty("user.home"), ".kira"), "config")
         } catch (_: Throwable) {
             File("config")
