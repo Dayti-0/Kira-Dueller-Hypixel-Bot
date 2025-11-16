@@ -126,9 +126,9 @@ object ClassicV2Tuner {
 
     // VERSION HYBRID : Plages larges de l'ancien + defaults ajustés d'après les données
     private val specs = listOf(
-        // BOW - Plages larges conservées, defaults légèrement ajustés
-        specI("fullDrawMsMin", 700.0, 800.0, 10.0, 750.0),        // V3: default 840→750, 710-770 ont 96-98% WR
-        specI("fullDrawMsMax", 1020.0, 1100.0, 10.0, 1060.0),       // V3: default 1020→1060 (97.6% WR!)
+        // BOW - Defaults V4 basés sur découvertes session (867 et 779 parties)
+        specI("fullDrawMsMin", 780.0, 820.0, 10.0, 800.0),        // V4: 750→800 (99.4% WR), plage resserrée 700-800→780-820
+        specI("fullDrawMsMax", 1080.0, 1120.0, 10.0, 1100.0),       // V4: 1060→1100 (100% WR!), plage resserrée 1020-1100→1080-1120
         specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),          // inchangé
         specF("bowMinUseDist", 7.0, 11.0, 0.1, 10.5),              // default 9→10.5 (proche de 10.7 optimal)
         
@@ -271,9 +271,9 @@ object ClassicV2Tuner {
 
     // ----------- Epsilon simple comme l'ancien -----------
     private fun epsilon(totalPlays: Int): Double {
-        val base = 0.15  // V3: Réduit de 0.25 à 0.15 pour plus d'exploitation
+        val base = 0.12  // V4: Réduit de 0.15 à 0.12 pour plus d'exploitation des optimums
         val minE = 0.02
-        val decay = totalPlays / 30.0  // V3: Decay plus rapide (40 → 30)
+        val decay = totalPlays / 25.0  // V4: Decay plus rapide (30 → 25)
         return max(minE, base / (1.0 + decay))
     }
     
