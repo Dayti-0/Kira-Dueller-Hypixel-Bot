@@ -1,6 +1,7 @@
 package best.spaghetcodes.kira.bot.bots
 
 import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.Bow
 import best.spaghetcodes.kira.bot.features.MovePriority
 import best.spaghetcodes.kira.bot.features.Rod
@@ -8,6 +9,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.ClassicTuner
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
@@ -31,8 +33,8 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     }
 
     // =====================  ARC  =====================
-    private val fullDrawMsMin = 820
-    private val fullDrawMsMax = 980
+    private var fullDrawMsMin = 820
+    private var fullDrawMsMax = 980
     private val bowCancelCloseDist = 8.0f
     private val bowMinUseDist = 9.0f
 
@@ -42,9 +44,9 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var openWindowUntil = 0L
     private var openStartDelayUntil = 0L
     private var lastShotAt = 0L
-    private val openSpacingMin = 650L
-    private val openSpacingMax = 900L
-    private val openShotMinDist = 9.0f
+    private var openSpacingMin = 650L
+    private var openSpacingMax = 900L
+    private var openShotMinDist = 9.0f
 
     // Détection immobile / slow-bow
     private val stillFrameThreshold = 0.0125
@@ -67,11 +69,11 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private val KIND_BOW = 2
 
     private var lastReactiveShotAt = 0L
-    private val reactiveCdMs = 650L
+    private var reactiveCdMs = 650L
 
     // Réserve d'arrows
     private var gameStartAt = 0L
-    private val reserveTightMs = 10_000L
+    private var reserveTightMs = 10_000L
     private val earlyReserve = 3
     private val midReserve = 2
 
@@ -82,7 +84,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodCdBias = 1.0f
     private val rodCdBiasMax = 1.25f
 
-    private val rodBanMeleeDist = 3.5f  // Réduit (était 4.0f)
+    private var rodBanMeleeDist = 3.5f  // Réduit (était 4.0f)
 
     private val rodCloseMin = 2.0f
     private val rodCloseMax = 3.4f
@@ -123,10 +125,10 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     // ==================  PARADE ÉPÉE  =================
     private val parryMinDist = 12.0f  // Réduit (était 15.0f)
-    private val parryCloseCancelDist = 12.0f
-    private val parryCooldownMs = 900L
-    private val parryHoldMinMs = 650
-    private val parryHoldMaxMs = 980
+    private var parryCloseCancelDist = 12.0f
+    private var parryCooldownMs = 900L
+    private var parryHoldMinMs = 650
+    private var parryHoldMaxMs = 980
     private val parryStickMinMs = 900
     private val parryStickMaxMs = 1500
 
@@ -166,6 +168,12 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
+        val params = try {
+            ClassicTuner.pickParams()
+        } catch (_: Throwable) {
+            ClassicTuner.defaults()
+        }
+        applyParams(params)
         Mouse.startTracking()
         Movement.startSprinting()
         Movement.startForward()
@@ -238,6 +246,12 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     }
 
     override fun onGameEnd() {
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        ClassicTuner.report(win, 0)
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({
@@ -247,6 +261,23 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Combat.stopRandomStrafe()
         }, RandomUtils.randomIntInRange(200, 400))
         startupJumping = false
+    }
+
+    private fun applyParams(p: ClassicTuner.ClassicParams) {
+        fullDrawMsMin = p.fullDrawMsMin
+        fullDrawMsMax = p.fullDrawMsMax
+        openSpacingMin = p.openSpacingMin
+        openSpacingMax = p.openSpacingMax
+        openShotMinDist = p.openShotMinDist
+        reactiveCdMs = p.reactiveCdMs
+        reserveTightMs = p.reserveTightMs
+        rodCdCloseMsBase = p.rodCdCloseMsBase
+        rodCdFarMsBase = p.rodCdFarMsBase
+        rodBanMeleeDist = p.rodBanMeleeDist
+        parryCloseCancelDist = p.parryCloseCancelDist
+        parryCooldownMs = p.parryCooldownMs
+        parryHoldMinMs = p.parryHoldMinMs
+        parryHoldMaxMs = p.parryHoldMaxMs
     }
 
     override fun onAttack() {
