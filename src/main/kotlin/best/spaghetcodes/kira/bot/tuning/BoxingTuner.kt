@@ -306,8 +306,5 @@ object BoxingTuner {
         }
     }
 
-    private fun file(): File {
-        val base = File(kira.mc.mcDataDir, "config")
-        return File(base, "boxing_tuner.json")
-    }
+    private fun file(): File = File(kira.tunerDir, "boxing_tuner.json")
 }

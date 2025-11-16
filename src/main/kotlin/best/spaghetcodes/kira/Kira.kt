@@ -32,7 +32,9 @@ class kira {
 
         val mc: Minecraft = Minecraft.getMinecraft()
         private val configDir = File(mc.mcDataDir, "config")
-        val configLocation: String = File(configDir, "kira.toml").absolutePath
+        val kiraConfigDir: File = File(configDir, "Kira")
+        val tunerDir: File = File(kiraConfigDir, "Tuner")
+        val configLocation: String = File(kiraConfigDir, "kira.toml").absolutePath
         val gson = Gson()
         var config: Config? = null
         var bot: BotBase? = null
@@ -48,6 +50,8 @@ class kira {
     @Suppress("UNUSED_PARAMETER")
     fun init(event: FMLInitializationEvent) {
         configDir.mkdirs()
+        kiraConfigDir.mkdirs()
+        tunerDir.mkdirs()
         config = Config()
         config?.preload()
 
