@@ -17,7 +17,19 @@ object ComboTuner {
         val closeMidThreshold: Float,
         val closeInnerDelayMs: Long,
         val closeMidDelayMs: Long,
-        val closeFarDelayMs: Long
+        val closeFarDelayMs: Long,
+        val openingStrengthHoldMs: Int,
+        val openingGapHoldMs: Int,
+        val recurringGapHoldMs: Int,
+        val gapPreMinMs: Int,
+        val gapPreMaxMs: Int,
+        val strengthRecastPreMinMs: Int,
+        val strengthRecastPreMaxMs: Int,
+        val strengthRecastHoldMs: Int,
+        val farJumpCooldownMs: Long,
+        val pearlCooldownMs: Long,
+        val quickPearlDistanceMin: Float,
+        val defensivePearlMinMotionY: Float
     )
 
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
@@ -66,7 +78,19 @@ object ComboTuner {
         specF("closeMidThreshold", 1.6, 2.4, 0.05, 2.0),
         specL("closeInnerDelayMs", 260.0, 420.0, 10.0, 340.0),
         specL("closeMidDelayMs", 200.0, 320.0, 10.0, 260.0),
-        specL("closeFarDelayMs", 160.0, 280.0, 10.0, 200.0)
+        specL("closeFarDelayMs", 160.0, 280.0, 10.0, 200.0),
+        specL("openingStrengthHoldMs", 1900.0, 2400.0, 50.0, 2100.0),
+        specL("openingGapHoldMs", 2200.0, 2800.0, 50.0, 2400.0),
+        specL("recurringGapHoldMs", 2200.0, 2600.0, 25.0, 2400.0),
+        specI("gapPreMinMs", 60.0, 150.0, 5.0, 110.0),
+        specI("gapPreMaxMs", 120.0, 240.0, 5.0, 160.0),
+        specI("strengthRecastPreMinMs", 60.0, 200.0, 5.0, 110.0),
+        specI("strengthRecastPreMaxMs", 120.0, 300.0, 5.0, 160.0),
+        specL("strengthRecastHoldMs", 2000.0, 2800.0, 50.0, 2400.0),
+        specL("farJumpCooldownMs", 420.0, 720.0, 20.0, 540.0),
+        specL("pearlCooldownMs", 9000.0, 13000.0, 250.0, 11000.0),
+        specF("quickPearlDistanceMin", 20.0, 28.0, 0.5, 24.0),
+        specF("defensivePearlMinMotionY", 0.12, 0.2, 0.01, 0.15)
     )
 
     private val specByKey = specs.associateBy { it.key }
@@ -95,6 +119,10 @@ object ComboTuner {
     private fun build(values: Map<String, Double>): ComboParams {
         val inner = values.float("closeInnerThreshold")
         val mid = values.float("closeMidThreshold").coerceAtLeast(inner + 0.1f)
+        val gapPreMin = values.int("gapPreMinMs")
+        val gapPreMax = max(gapPreMin + 5, values.int("gapPreMaxMs"))
+        val strengthPreMin = values.int("strengthRecastPreMinMs")
+        val strengthPreMax = max(strengthPreMin + 5, values.int("strengthRecastPreMaxMs"))
         return ComboParams(
             strengthPeriodMs = values.long("strengthPeriodMs"),
             gapPeriodMs = values.long("gapPeriodMs"),
@@ -103,7 +131,19 @@ object ComboTuner {
             closeMidThreshold = mid,
             closeInnerDelayMs = values.long("closeInnerDelayMs"),
             closeMidDelayMs = values.long("closeMidDelayMs"),
-            closeFarDelayMs = values.long("closeFarDelayMs")
+            closeFarDelayMs = values.long("closeFarDelayMs"),
+            openingStrengthHoldMs = values.long("openingStrengthHoldMs").toInt(),
+            openingGapHoldMs = values.long("openingGapHoldMs").toInt(),
+            recurringGapHoldMs = values.long("recurringGapHoldMs").toInt(),
+            gapPreMinMs = gapPreMin,
+            gapPreMaxMs = gapPreMax,
+            strengthRecastPreMinMs = strengthPreMin,
+            strengthRecastPreMaxMs = strengthPreMax,
+            strengthRecastHoldMs = values.long("strengthRecastHoldMs").toInt(),
+            farJumpCooldownMs = values.long("farJumpCooldownMs"),
+            pearlCooldownMs = values.long("pearlCooldownMs"),
+            quickPearlDistanceMin = values.float("quickPearlDistanceMin"),
+            defensivePearlMinMotionY = values.float("defensivePearlMinMotionY")
         )
     }
 
@@ -136,9 +176,9 @@ object ComboTuner {
     }
 
     private fun epsilon(totalPlays: Int): Double {
-        val base = 0.35
-        val decay = totalPlays / 25.0
-        return max(0.05, base / (1.0 + decay))
+        val base = 0.55
+        val decay = totalPlays / 35.0
+        return max(0.1, base / (1.0 + decay))
     }
 
     private fun exploreNow(epsilon: Double): Boolean =

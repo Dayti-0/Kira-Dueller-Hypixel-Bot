@@ -56,6 +56,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private var closeInnerDelayMs = 340L
     private var closeMidDelayMs = 260L
     private var closeFarDelayMs = 200L
+    private var openingStrengthHoldMs = 2100
+    private var openingGapHoldMs = 2400
+    private var recurringGapHoldMs = 2400
+    private var gapPreMinMs = 110
+    private var gapPreMaxMs = 160
+    private var strengthRecastPreMinMs = 110
+    private var strengthRecastPreMaxMs = 160
+    private var strengthRecastHoldMs = 2400
+    private var farJumpCooldownMs = 540L
+    private var pearlCooldownMs = 11_000L
+    private var quickPearlDistanceMin = 24f
+    private var defensivePearlMinMotionY = 0.15f
 
     private fun applyParams(params: ComboTuner.ComboParams) {
         strengthPeriodMs = params.strengthPeriodMs
@@ -66,6 +78,18 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         closeInnerDelayMs = params.closeInnerDelayMs
         closeMidDelayMs = params.closeMidDelayMs
         closeFarDelayMs = params.closeFarDelayMs
+        openingStrengthHoldMs = params.openingStrengthHoldMs
+        openingGapHoldMs = params.openingGapHoldMs
+        recurringGapHoldMs = params.recurringGapHoldMs
+        gapPreMinMs = params.gapPreMinMs
+        gapPreMaxMs = params.gapPreMaxMs
+        strengthRecastPreMinMs = params.strengthRecastPreMinMs
+        strengthRecastPreMaxMs = params.strengthRecastPreMaxMs
+        strengthRecastHoldMs = params.strengthRecastHoldMs
+        farJumpCooldownMs = params.farJumpCooldownMs
+        pearlCooldownMs = params.pearlCooldownMs
+        quickPearlDistanceMin = params.quickPearlDistanceMin
+        defensivePearlMinMotionY = params.defensivePearlMinMotionY
     }
 
     private fun computeCloseStrafeDelay(distance: Float): Long {
@@ -256,7 +280,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
     private fun startOpening(player: net.minecraft.entity.player.EntityPlayer, target: net.minecraft.entity.Entity) {
         val prePot = RandomUtils.randomIntInRange(0, 10)
-        val holdPot = 2100
+        val holdPot = openingStrengthHoldMs
 
         // 1) Potion d’ouverture
         drinkStrength(prePot, holdPot, /*returnSword=*/false)
@@ -268,7 +292,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
                 TimeUtils.setTimeout({ chainGap() }, 40)
             } else {
                 val preGap = RandomUtils.randomIntInRange(0, 10)
-                val holdGap = 2400
+                val holdGap = openingGapHoldMs
                 eatGap(preGap, holdGap, EntityUtils.getDistanceNoY(player, target), player, target)
 
                 // 3) Fin de l’ouverture lorsque la gap est consommée
@@ -423,7 +447,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         lastOpponentDistance = distance
 
         // Sauts > 8 blocs
-        if (distance > 8f && player.onGround && now - lastFarJumpAt >= 540L) {
+        if (distance > 8f && player.onGround && now - lastFarJumpAt >= farJumpCooldownMs) {
             Movement.singleJump(RandomUtils.randomIntInRange(130, 180))
             lastFarJumpAt = now
         }
@@ -453,8 +477,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         // Potion #2 à +296s (aucun check d'effet)
         if (!openingPhase && strengthCycleStarted && strengthDosesUsed == 1 && !isConsuming()) {
             if (now >= nextStrengthAt) {
-                val pre = RandomUtils.randomIntInRange(110, 160)
-                val hold = 2400
+                val pre = RandomUtils.randomIntInRange(strengthRecastPreMinMs, strengthRecastPreMaxMs)
+                val hold = strengthRecastHoldMs
                 drinkStrength(pre, hold, /*returnSword=*/true)
             }
         }
@@ -502,19 +526,19 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
         // Gap toutes les 26s (infini) + watchdog anti-stall
         if (!openingPhase && gapCycleStarted && !isConsuming()) {
             if (now >= nextGapAt || now - lastGap > gapPeriodMs + 2000) {
-                val pre = RandomUtils.randomIntInRange(110, 160)
-                val hold = 2400
+                val pre = RandomUtils.randomIntInRange(gapPreMinMs, gapPreMaxMs)
+                val hold = recurringGapHoldMs
                 eatGap(pre, hold, distance, player, target)
             }
         }
 
-        // Defensive pearl: break juggle when launched upward (11s cooldown)
+        // Defensive pearl: break juggle when launched upward (configurable cooldown)
         if (!isConsuming() &&
-            player.motionY > 0.15 &&
+            player.motionY > defensivePearlMinMotionY &&
             !player.onGround &&
             now - gameStartAt > 45_000L &&
             pearls > 0 &&
-            now - lastPearl > 11000 // 11s cooldown
+            now - lastPearl > pearlCooldownMs
         ) {
             lastPearl = now
             Mouse.stopLeftAC()
@@ -548,14 +572,14 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             }, RandomUtils.randomIntInRange(50, 100))
         }
 
-        // Quick pearl (safe hors conso, 11s cooldown)
+        // Quick pearl (safe hors conso, configurable cooldown)
         if (!isConsuming() &&
             !openingPhase &&
-            distance > 24f &&
+            distance > quickPearlDistanceMin &&
             now - gameStartAt > 45_000L &&
             EntityUtils.entityFacingAway(target, player) &&
             !Mouse.isRunningAway() &&
-            now - lastPearl > 11000 && // 11s cooldown
+            now - lastPearl > pearlCooldownMs &&
             pearls > 0
         ) {
             fun pearlRoutine() {
@@ -583,8 +607,8 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             }
             val timeUntilGap = nextGapAt - now
             if (gapCycleStarted && timeUntilGap <= 12_000L) {
-                val pre = RandomUtils.randomIntInRange(110, 160)
-                val hold = 2400
+                val pre = RandomUtils.randomIntInRange(gapPreMinMs, gapPreMaxMs)
+                val hold = recurringGapHoldMs
                 eatGap(pre, hold, distance, player, target)
                 val delay = pre + hold + RandomUtils.randomIntInRange(40, 80)
                 TimeUtils.setTimeout({ pearlRoutine() }, delay)
