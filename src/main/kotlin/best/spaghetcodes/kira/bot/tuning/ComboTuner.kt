@@ -70,9 +70,12 @@ object ComboTuner {
     private fun specL(key: String, min: Double, max: Double, step: Double, def: Double) =
         ParamSpec(key, min, max, step, def, ParamType.LONG)
 
+    private const val LOCKED_GAP_PERIOD_MS = 26_000.0
+    private const val LOCKED_PEARL_COOLDOWN_MS = 10_000.0
+
     private val specs = listOf(
         specL("strengthPeriodMs", 240000.0, 320000.0, 2000.0, 294000.0),
-        specL("gapPeriodMs", 22000.0, 34000.0, 500.0, 26000.0),
+        specL("gapPeriodMs", LOCKED_GAP_PERIOD_MS, LOCKED_GAP_PERIOD_MS, 1.0, LOCKED_GAP_PERIOD_MS),
         specI("maxPearls", 3.0, 6.0, 1.0, 5.0),
         specF("closeInnerThreshold", 1.1, 1.8, 0.05, 1.4),
         specF("closeMidThreshold", 1.6, 2.4, 0.05, 2.0),
@@ -88,7 +91,7 @@ object ComboTuner {
         specI("strengthRecastPreMaxMs", 120.0, 300.0, 5.0, 160.0),
         specL("strengthRecastHoldMs", 2000.0, 2800.0, 50.0, 2400.0),
         specL("farJumpCooldownMs", 420.0, 720.0, 20.0, 540.0),
-        specL("pearlCooldownMs", 9000.0, 13000.0, 250.0, 11000.0),
+        specL("pearlCooldownMs", LOCKED_PEARL_COOLDOWN_MS, LOCKED_PEARL_COOLDOWN_MS, 1.0, LOCKED_PEARL_COOLDOWN_MS),
         specF("quickPearlDistanceMin", 20.0, 28.0, 0.5, 24.0),
         specF("defensivePearlMinMotionY", 0.12, 0.2, 0.01, 0.15)
     )
