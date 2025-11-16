@@ -37,6 +37,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun toggle() {
         toggled = !toggled
         Session.updateBotEnabled(toggled)
+        ModeRotationManager.onBotToggle(toggled)
         if (!toggled) {
             resetAntiDetection()
         }
@@ -268,7 +269,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                     ChatUtils.info(Session.getSession())
 
                                     if (!iWon) {
-                                        TimeUtils.setTimeout(this::joinGame, RandomUtils.randomIntInRange(1000, 2000))
+                                        TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(1000, 2000))
                                     }
 
                                     if ((kira.config?.disconnectAfterGames ?: 0) > 0) {
@@ -323,12 +324,17 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
             if (StateManager.state != StateManager.States.PLAYING) {
                 ticksSinceGameStart++
-                if (ticksSinceGameStart / 20 > (kira.config?.rqNoGame ?: 30)) {
+                val rotationDecision = ModeRotationManager.onQueueWaitingTick(this)
+                if (rotationDecision != null) {
+                    ticksSinceGameStart = 0
+                    TimeUtils.setTimeout({ rotationDecision.botToQueue.queueNextGame(rotationDecision.forceQueueCommand) }, RandomUtils.randomIntInRange(300, 500))
+                } else if (ticksSinceGameStart / 20 > (kira.config?.rqNoGame ?: 30)) {
                     ticksSinceGameStart = 0
                     joinGame()
                 }
             } else {
                 ticksSinceGameStart = 0
+                ModeRotationManager.onOpponentFound()
             }
 
             if (mc.thePlayer != null && opponent != null) {
@@ -415,11 +421,11 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             }
 
             if (unformatted.lowercase().contains("something went wrong trying") || unformatted.lowercase().contains("please don't spam the command")) {
-                TimeUtils.setTimeout(this::joinGame, RandomUtils.randomIntInRange(6000, 8000))
+                TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
             } else if (unformatted.contains("A disconnect occurred in your connection, so you were put")) {
                 Movement.clearAll()
                 Mouse.stopLeftAC()
-                TimeUtils.setTimeout(this::joinGame, RandomUtils.randomIntInRange(6000, 8000))
+                TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
             }
 
             if (unformatted.contains("Woah there, slow down!") && kira.config?.strictDodging == true) {
@@ -450,7 +456,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         if (toggled()) {
             println("Reconnect successful!")
             reconnectTimer?.cancel()
-            TimeUtils.setTimeout(this::joinGame, RandomUtils.randomIntInRange(6000, 8000))
+            TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
         }
     }
 
@@ -490,6 +496,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 opponentTimer = TimeUtils.setInterval(this::bakery, 0, 500)
             }, quickRefresh)
             resultCounted = false
+            ModeRotationManager.onOpponentFound()
             onGameStart()
         }
     }
@@ -505,11 +512,14 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }, kira.config?.ggDelay ?: 100)
             }
 
+            val rotationDecision = ModeRotationManager.onGameCompleted(this)
+            val targetBot = rotationDecision?.botToQueue ?: this
+            val forceCommand = rotationDecision?.forceQueueCommand ?: false
             val delay = kira.config?.autoRqDelay ?: 2000
             if (kira.config?.fastRequeue == true) {
-                TimeUtils.setTimeout(this::joinGame, RandomUtils.randomIntInRange(300, 500))
+                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, RandomUtils.randomIntInRange(300, 500))
             } else {
-                TimeUtils.setTimeout(this::joinGame, delay)
+                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, delay)
             }
         }
     }
@@ -535,26 +545,30 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
-    private fun joinGame(second: Boolean = false) {
+    private fun joinGame(second: Boolean = false, forceCommand: Boolean = false) {
         if (toggled() && StateManager.state != StateManager.States.PLAYING && !StateManager.gameFull) {
             if (StateManager.state == StateManager.States.GAME) {
-                val paper = kira.config?.paperRequeue == true && Inventory.setInvItem("paper")
+                val paper = !forceCommand && kira.config?.paperRequeue == true && Inventory.setInvItem("paper")
                 if (paper) {
                     TimeUtils.setTimeout({
                         Mouse.rClick(RandomUtils.randomIntInRange(30, 70))
                         TimeUtils.setTimeout({ Mouse.rClick(RandomUtils.randomIntInRange(30, 70)) }, RandomUtils.randomIntInRange(100, 300))
                     }, RandomUtils.randomIntInRange(100, 300))
                 } else {
-                    if (second) {
+                    if (second || forceCommand) {
                         TimeUtils.setTimeout({ ChatUtils.sendAsPlayer(queueCommand) }, RandomUtils.randomIntInRange(100, 300))
                     } else {
-                        TimeUtils.setTimeout({ joinGame(true) }, RandomUtils.randomIntInRange(1000, 1400))
+                        TimeUtils.setTimeout({ joinGame(true, forceCommand) }, RandomUtils.randomIntInRange(1000, 1400))
                     }
                 }
             } else {
                 TimeUtils.setTimeout({ ChatUtils.sendAsPlayer(queueCommand) }, RandomUtils.randomIntInRange(100, 300))
             }
         }
+    }
+
+    fun queueNextGame(forceCommand: Boolean = false) {
+        joinGame(forceCommand = forceCommand)
     }
 
     private fun disconnect() {

@@ -1,14 +1,16 @@
 package best.spaghetcodes.kira.bot.bots
 
-import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.StateManager
+import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.features.MovePriority
+import best.spaghetcodes.kira.bot.tuning.BoxingTuner
 import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.utils.*
+import best.spaghetcodes.kira.kira
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import java.util.*
@@ -84,68 +86,77 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
     // =================== Réglages (profil agressif) ===================
 
     // Jumps
-    private val JUMP_COOLDOWN_MS = 900L
-    private val NO_JUMP_CLOSE_DIST = 3.6f
+    private var jumpCooldownMs = 900L
+    private var noJumpCloseDist = 3.6f
 
     // Warm-up (début seulement, jusqu'à <= 7 blocs)
-    private val WARMUP_DISTANCE_STOP = 7.0f
-    private val WARMUP_JUMP_EVERY_MIN = 240
-    private val WARMUP_JUMP_EVERY_MAX = 380
-    private val WARMUP_PRESS_MIN = 130
-    private val WARMUP_PRESS_MAX = 190
+    private var warmupDistanceStop = 7.0f
+    private var warmupJumpEveryMin = 240
+    private var warmupJumpEveryMax = 380
+    private var warmupPressMin = 130
+    private var warmupPressMax = 190
 
     // Combo-lock agressif
-    private val COMBO_LOCK_MIN = 560L
-    private val COMBO_LOCK_MAX = 760L
-    private val MICRO_JITTER_MIN = 120L
-    private val MICRO_JITTER_MAX = 180L
+    private var comboLockMin = 560
+    private var comboLockMax = 760
+    private var forwardStickMinMs = 260
+    private var forwardStickMaxMs = 340
+    private var meleeFocusMinMs = 420
+    private var meleeFocusMaxMs = 520
+    private var microJitterMin = 120
+    private var microJitterMax = 180
 
     // Avance/stop (hystérésis fallback)
-    private val STOP_FORWARD_CLOSE_DIST_COMBO = 1.00f
-    private val RESUME_FORWARD_DIST_COMBO = 1.45f
-    private val STOP_FORWARD_CLOSE_DIST_DEFAULT = 1.10f
-    private val RESUME_FORWARD_DIST_DEFAULT = 1.60f
+    private var stopForwardCloseDistCombo = 1.00f
+    private var resumeForwardDistCombo = 1.45f
+    private var stopForwardCloseDistDefault = 1.10f
+    private var resumeForwardDistDefault = 1.60f
 
     // KB recovery
-    private val KB_RECOVERY_MIN = 520L
-    private val KB_RECOVERY_MAX = 760L
-    private val HEAVY_KB_DELTA = 0.45f
+    private var kbRecoveryMin = 520
+    private var kbRecoveryMax = 760
+    private var heavyKbRecoveryMin = 650
+    private var heavyKbRecoveryMax = 900
+    private var heavyKbDelta = 0.45f
 
     // Sweet-zones
-    private val TARGET_DIST_COMBO_MIN = 1.08f
-    private val TARGET_DIST_COMBO_MAX = 1.50f
-    private val TARGET_DIST_NEUTRAL_MIN = 1.75f
-    private val TARGET_DIST_NEUTRAL_MAX = 2.35f
+    private var targetDistComboMin = 1.08f
+    private var targetDistComboMax = 1.50f
+    private var targetDistNeutralMin = 1.75f
+    private var targetDistNeutralMax = 2.35f
 
     // Strafe timing (agressif)
-    private val BURST_FLIP_MIN = 55
-    private val BURST_FLIP_MAX = 95
-    private val BURST_WINDOW_MIN = 240L
-    private val BURST_WINDOW_MAX = 380L
-    private val HOLD_WINDOW_MIN = 220L
-    private val HOLD_WINDOW_MAX = 340L
-    private val LONG_STRAFE_MIN = 900L
-    private val LONG_STRAFE_MAX = 1600L
-    private val LONG_STRAFE_DISTANCE_CAP = 3.4f
-    private val LONG_STRAFE_BASE_CHANCE = 30 // %
-    private val ANTI_STALL_EPS = 0.015f
-    private val ANTI_STALL_DELAY = 260L
+    private var burstFlipMin = 55
+    private var burstFlipMax = 95
+    private var burstWindowMin = 240
+    private var burstWindowMax = 380
+    private var holdWindowMin = 220
+    private var holdWindowMax = 340
+    private var longStrafeMin = 900
+    private var longStrafeMax = 1600
+    private var longStrafeDistanceCap = 3.4f
+    private var longStrafeBaseChance = 30 // %
+    private var antiStallEps = 0.015f
+    private var antiStallDelay = 260
 
     // Aim-spike
-    private val AIM_SPIKE_DEG = 14f
-    private val AIM_SPIKE_COOLDOWN = 180L
+    private var aimSpikeDeg = 14f
+    private var aimSpikeCooldown = 180L
 
     // Mur/centre d'arène
-    private val WALL_NEAR_MARGIN = 0.9f
-    private val WALL_ESCAPE_TIME_MS_MIN = 600L
-    private val WALL_ESCAPE_TIME_MS_MAX = 900L
+    private var wallNearMargin = 0.9f
+    private var wallEscapeTimeMsMin = 600
+    private var wallEscapeTimeMsMax = 900
 
     // Anti-trade (soft) — moins fort en agressif
-    private val ENEMY_IFRAME_SOFT = 3
+    private var enemyIframeSoft = 3
 
     // =================== Lifecycle ===================
 
     override fun onGameStart() {
+        val params = try { BoxingTuner.pickParams() } catch (_: Throwable) { BoxingTuner.defaults() }
+        applyParams(params)
+
         Movement.startSprinting()
         Movement.startForward()
         if (kira.config?.boxingFish == true) {
@@ -209,6 +220,12 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
     }
 
     override fun onGameEnd() {
+        val win = when {
+            Session.wins > Session.losses -> true
+            Session.losses > Session.wins -> false
+            else -> false
+        }
+        BoxingTuner.report(win, 0)
         TimeUtils.setTimeout({
             Movement.clearAll()
             Mouse.stopLeftAC()
@@ -225,9 +242,12 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         TimeUtils.setTimeout({ tapping = false }, 100)
 
         val now = System.currentTimeMillis()
-        forwardStickUntil = now + latAdj(RandomUtils.randomIntInRange(260, 340))
-        meleeFocusUntil = now + latAdj(RandomUtils.randomIntInRange(420, 520))
-        comboLockUntil = max(comboLockUntil, now + latAdj(RandomUtils.randomIntInRange(COMBO_LOCK_MIN.toInt(), COMBO_LOCK_MAX.toInt())))
+        val forwardStick = RandomUtils.randomIntInRange(forwardStickMinMs, forwardStickMaxMs)
+        val meleeFocus = RandomUtils.randomIntInRange(meleeFocusMinMs, meleeFocusMaxMs)
+        val comboLock = RandomUtils.randomIntInRange(comboLockMin, comboLockMax)
+        forwardStickUntil = now + latAdj(forwardStick)
+        meleeFocusUntil = now + latAdj(meleeFocus)
+        comboLockUntil = max(comboLockUntil, now + latAdj(comboLock))
         if (combo >= 2) Movement.clearLeftRight() // “colle” l’ennemi
         // Fin du warm-up dès le premier hit (même si distance > 7)
         warmupActive = false
@@ -242,14 +262,15 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
 
         // KB reçu -> récupération
         if (p.hurtTime > 0 && now - lastHurtStamp > 120) {
-            kbRecoveryUntil = now + latAdj(RandomUtils.randomIntInRange(KB_RECOVERY_MIN.toInt(), KB_RECOVERY_MAX.toInt()))
+            kbRecoveryUntil = now + latAdj(RandomUtils.randomIntInRange(kbRecoveryMin, kbRecoveryMax))
             lastHurtStamp = now
         }
 
         val distance = EntityUtils.getDistanceNoY(p, opp)
         val deltaDist = if (prevDistance > 0f) distance - prevDistance else 0f
-        if (deltaDist > HEAVY_KB_DELTA) {
-            kbRecoveryUntil = max(kbRecoveryUntil, now + latAdj(RandomUtils.randomIntInRange(650, 900)))
+        if (deltaDist > heavyKbDelta) {
+            val heavyRecovery = RandomUtils.randomIntInRange(heavyKbRecoveryMin, heavyKbRecoveryMax)
+            kbRecoveryUntil = max(kbRecoveryUntil, now + latAdj(heavyRecovery))
         }
         val kbRecovering = now < kbRecoveryUntil
 
@@ -263,10 +284,10 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
 
         // Warm-up sauts continus (début seulement) jusqu’à <= 7 blocs
         if (warmupActive && !kbRecovering && p.onGround) {
-            if (distance > WARMUP_DISTANCE_STOP) {
-                val cadence = latAdj(RandomUtils.randomIntInRange(WARMUP_JUMP_EVERY_MIN, WARMUP_JUMP_EVERY_MAX))
+            if (distance > warmupDistanceStop) {
+                val cadence = latAdj(RandomUtils.randomIntInRange(warmupJumpEveryMin, warmupJumpEveryMax))
                 if (now - lastWarmupJumpAt >= cadence) {
-                    Movement.singleJump(RandomUtils.randomIntInRange(WARMUP_PRESS_MIN, WARMUP_PRESS_MAX))
+                    Movement.singleJump(RandomUtils.randomIntInRange(warmupPressMin, warmupPressMax))
                     lastWarmupJumpAt = now
                     lastJumpAt = now
                 }
@@ -283,7 +304,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         // Aim delta & spike
         val aimDelta = abs(opp.rotationYaw - oppPrevYaw)
         aimDeltaEma = 0.15f * aimDelta + 0.85f * aimDeltaEma
-        val aimSpike = aimDelta >= AIM_SPIKE_DEG && (now - lastAimSpikeAt) > AIM_SPIKE_COOLDOWN
+        val aimSpike = aimDelta >= aimSpikeDeg && (now - lastAimSpikeAt) > aimSpikeCooldown
         if (aimSpike) {
             strafeDir = -strafeDir
             lastAimSpikeAt = now
@@ -312,7 +333,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
             val target = 1.28f
             val thrust = distPid.step(target, distance)
             // seuils anti-pompage + filet à courte distance
-            if (distance <= STOP_FORWARD_CLOSE_DIST_COMBO) {
+            if (distance <= stopForwardCloseDistCombo) {
                 Movement.stopForward()
             } else if (thrust > 0.10f && !tapping) {
                 Movement.startForward()
@@ -320,7 +341,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
                 Movement.stopForward()
             }
         } else {
-            val (stopDist, resumeDist) = STOP_FORWARD_CLOSE_DIST_DEFAULT to RESUME_FORWARD_DIST_DEFAULT
+            val (stopDist, resumeDist) = stopForwardCloseDistDefault to resumeForwardDistDefault
             if (distance <= stopDist) {
                 Movement.stopForward()
             } else if (distance >= resumeDist && !tapping) {
@@ -336,10 +357,10 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
             val dx = p.posX - it.xCoord
             val dz = p.posZ - it.zCoord
             val r = sqrt(dx*dx + dz*dz).toFloat()
-            r > (arenaRadiusEst - WALL_NEAR_MARGIN)
+            r > (arenaRadiusEst - wallNearMargin)
         } ?: false
         if (nearWall && wallEscapeUntil < now) {
-            wallEscapeUntil = now + RandomUtils.randomIntInRange(WALL_ESCAPE_TIME_MS_MIN.toInt(), WALL_ESCAPE_TIME_MS_MAX.toInt())
+            wallEscapeUntil = now + RandomUtils.randomIntInRange(wallEscapeTimeMsMin, wallEscapeTimeMsMax)
         }
         val escapingWall = now < wallEscapeUntil
 
@@ -350,10 +371,10 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
 
         // Long strafe opportuniste (neutre, très courte distance)
         val oppFlipFast = oppFlipIntervalEma < 260f // flips rapides -> on préfère BURST vs long
-        if (!inCombo && !kbRecovering && distance <= LONG_STRAFE_DISTANCE_CAP && longStrafeUntil < now && !oppFlipFast) {
+        if (!inCombo && !kbRecovering && distance <= longStrafeDistanceCap && longStrafeUntil < now && !oppFlipFast) {
             val extra = if (aimDeltaEma < 8f) 8 else 0 // s'ils visent "smooth", on tente plus souvent
-            if (RandomUtils.randomIntInRange(1, 100) <= (LONG_STRAFE_BASE_CHANCE + extra)) {
-                longStrafeUntil = now + latAdj(RandomUtils.randomIntInRange(LONG_STRAFE_MIN.toInt(), LONG_STRAFE_MAX.toInt()))
+            if (RandomUtils.randomIntInRange(1, 100) <= (longStrafeBaseChance + extra)) {
+                longStrafeUntil = now + latAdj(RandomUtils.randomIntInRange(longStrafeMin, longStrafeMax))
                 strafeDir = if (RandomUtils.randomIntInRange(0, 1) == 1) 1 else -1
                 lastStrafeFlip = now
             }
@@ -367,17 +388,17 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
                 val burstBias = if (oppFlipFast) 68 else 55
                 neutralMode = if (RandomUtils.randomIntInRange(0, 99) < burstBias) Mode.BURST else Mode.HOLD
                 modeUntil = now + (if (neutralMode == Mode.HOLD)
-                    latAdj(RandomUtils.randomIntInRange(HOLD_WINDOW_MIN.toInt(), HOLD_WINDOW_MAX.toInt()))
+                    latAdj(RandomUtils.randomIntInRange(holdWindowMin, holdWindowMax))
                 else
-                    latAdj(RandomUtils.randomIntInRange(BURST_WINDOW_MIN.toInt(), BURST_WINDOW_MAX.toInt()))
+                    latAdj(RandomUtils.randomIntInRange(burstWindowMin, burstWindowMax))
                 )
                 if (neutralMode == Mode.BURST) {
-                    burstToggleAt = now + latAdj(RandomUtils.randomIntInRange(BURST_FLIP_MIN, BURST_FLIP_MAX))
+                    burstToggleAt = now + latAdj(RandomUtils.randomIntInRange(burstFlipMin, burstFlipMax))
                 }
             } else if (neutralMode == Mode.BURST && now >= burstToggleAt) {
                 strafeDir = -strafeDir
                 lastStrafeFlip = now
-                burstToggleAt = now + latAdj(RandomUtils.randomIntInRange(BURST_FLIP_MIN, BURST_FLIP_MAX))
+                burstToggleAt = now + latAdj(RandomUtils.randomIntInRange(burstFlipMin, burstFlipMax))
             }
         }
 
@@ -387,8 +408,8 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
                 antiStallDistRef = distance; antiStallStamp = now
             } else {
                 val d = abs(distance - antiStallDistRef)
-                if (d < ANTI_STALL_EPS) {
-                    if (now - antiStallStamp >= latAdj(ANTI_STALL_DELAY.toInt())) {
+                if (d < antiStallEps) {
+                    if (now - antiStallStamp >= latAdj(antiStallDelay)) {
                         strafeDir = -strafeDir
                         lastStrafeFlip = now
                         antiStallStamp = now
@@ -414,7 +435,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
                 }
                 inCombo -> {
                     // Micro-jitter minimal (agressif = très collé)
-                    if (now - lastStrafeFlip >= latAdj(RandomUtils.randomIntInRange(MICRO_JITTER_MIN.toInt(), MICRO_JITTER_MAX.toInt()))) {
+                    if (now - lastStrafeFlip >= latAdj(RandomUtils.randomIntInRange(microJitterMin, microJitterMax))) {
                         strafeDir = -strafeDir
                         lastStrafeFlip = now
                     }
@@ -451,7 +472,7 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         }
 
         // Anti-trade doux hors combo (agressif = peu d’atténuation)
-        if (opp.hurtTime > ENEMY_IFRAME_SOFT && !inCombo) {
+        if (opp.hurtTime > enemyIframeSoft && !inCombo) {
             if (movePriority[0] > 1) movePriority[0] -= 1
             if (movePriority[1] > 1) movePriority[1] -= 1
             // on pourrait couper randomStrafe, mais en agressif on le garde souvent
@@ -479,11 +500,11 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
 
         // Sweet-zones (douce incitation, en plus du PID/hystérésis)
         if (inCombo) {
-            if (distance < TARGET_DIST_COMBO_MIN) Movement.stopForward()
-            else if (distance > TARGET_DIST_COMBO_MAX && !tapping) Movement.startForward()
+            if (distance < targetDistComboMin) Movement.stopForward()
+            else if (distance > targetDistComboMax && !tapping) Movement.startForward()
         } else if (!kbRecovering) {
-            if (distance < TARGET_DIST_NEUTRAL_MIN) Movement.stopForward()
-            else if (distance > TARGET_DIST_NEUTRAL_MAX && !tapping) Movement.startForward()
+            if (distance < targetDistNeutralMin) Movement.stopForward()
+            else if (distance > targetDistNeutralMax && !tapping) Movement.startForward()
         }
 
         prevDistance = distance
@@ -496,6 +517,65 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         return (combo >= 2) || (now < comboLockUntil) || (now < meleeFocusUntil)
     }
 
+    private fun applyParams(p: BoxingTuner.Params) {
+        jumpCooldownMs = p.jumpCooldownMs
+        noJumpCloseDist = p.noJumpCloseDist
+
+        warmupDistanceStop = p.warmupDistanceStop
+        warmupJumpEveryMin = min(p.warmupJumpEveryMin, p.warmupJumpEveryMax)
+        warmupJumpEveryMax = max(p.warmupJumpEveryMin, p.warmupJumpEveryMax)
+        warmupPressMin = min(p.warmupPressMin, p.warmupPressMax)
+        warmupPressMax = max(p.warmupPressMin, p.warmupPressMax)
+
+        comboLockMin = min(p.comboLockMin, p.comboLockMax)
+        comboLockMax = max(p.comboLockMin, p.comboLockMax)
+        forwardStickMinMs = min(p.forwardStickMinMs, p.forwardStickMaxMs)
+        forwardStickMaxMs = max(p.forwardStickMinMs, p.forwardStickMaxMs)
+        meleeFocusMinMs = min(p.meleeFocusMinMs, p.meleeFocusMaxMs)
+        meleeFocusMaxMs = max(p.meleeFocusMinMs, p.meleeFocusMaxMs)
+        microJitterMin = min(p.microJitterMin, p.microJitterMax)
+        microJitterMax = max(p.microJitterMin, p.microJitterMax)
+
+        stopForwardCloseDistCombo = p.stopForwardCloseDistCombo
+        resumeForwardDistCombo = p.resumeForwardDistCombo
+        stopForwardCloseDistDefault = p.stopForwardCloseDistDefault
+        resumeForwardDistDefault = p.resumeForwardDistDefault
+
+        kbRecoveryMin = min(p.kbRecoveryMin, p.kbRecoveryMax)
+        kbRecoveryMax = max(p.kbRecoveryMin, p.kbRecoveryMax)
+        heavyKbRecoveryMin = min(p.heavyKbRecoveryMin, p.heavyKbRecoveryMax)
+        heavyKbRecoveryMax = max(p.heavyKbRecoveryMin, p.heavyKbRecoveryMax)
+        heavyKbDelta = p.heavyKbDelta
+
+        targetDistComboMin = min(p.targetDistComboMin, p.targetDistComboMax)
+        targetDistComboMax = max(p.targetDistComboMin, p.targetDistComboMax)
+        targetDistNeutralMin = min(p.targetDistNeutralMin, p.targetDistNeutralMax)
+        targetDistNeutralMax = max(p.targetDistNeutralMin, p.targetDistNeutralMax)
+
+        burstFlipMin = min(p.burstFlipMin, p.burstFlipMax)
+        burstFlipMax = max(p.burstFlipMin, p.burstFlipMax)
+        burstWindowMin = min(p.burstWindowMin, p.burstWindowMax)
+        burstWindowMax = max(p.burstWindowMin, p.burstWindowMax)
+        holdWindowMin = min(p.holdWindowMin, p.holdWindowMax)
+        holdWindowMax = max(p.holdWindowMin, p.holdWindowMax)
+        longStrafeMin = min(p.longStrafeMin, p.longStrafeMax)
+        longStrafeMax = max(p.longStrafeMin, p.longStrafeMax)
+        longStrafeDistanceCap = p.longStrafeDistanceCap
+        longStrafeBaseChance = p.longStrafeBaseChance
+
+        antiStallEps = p.antiStallEps
+        antiStallDelay = p.antiStallDelay
+
+        aimSpikeDeg = p.aimSpikeDeg
+        aimSpikeCooldown = p.aimSpikeCooldown
+
+        wallNearMargin = p.wallNearMargin
+        wallEscapeTimeMsMin = min(p.wallEscapeTimeMsMin, p.wallEscapeTimeMsMax)
+        wallEscapeTimeMsMax = max(p.wallEscapeTimeMsMin, p.wallEscapeTimeMsMax)
+
+        enemyIframeSoft = p.enemyIframeSoft
+    }
+
     private fun canJump(
         now: Long,
         distance: Float,
@@ -504,10 +584,10 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         onGround: Boolean
     ): Boolean {
         if (!onGround) return false
-        if (now - lastJumpAt < JUMP_COOLDOWN_MS) return false
+        if (now - lastJumpAt < jumpCooldownMs) return false
         if (comboLockActive) return false
         if (kbRecovering) return false
-        if (distance <= NO_JUMP_CLOSE_DIST) return false
+        if (distance <= noJumpCloseDist) return false
         return true
     }
 

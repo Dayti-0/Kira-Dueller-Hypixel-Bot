@@ -459,11 +459,71 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     }
 
     // ---- 2e Speed / 2e Regen : cast aux PIEDS (sans retrait, sans saut) ----
-    private fun feetSplash(damage: Int, onComplete: (() -> Unit)? = null) {
+    private val feetSplashSafeDistance = 5.6f
+    private val feetSplashRetreatMaxMs = 700
+
+    private fun ensureFeetSplashSpacing(damage: Int, onComplete: (() -> Unit)?): Boolean {
+        val player = mc.thePlayer ?: return false
+        val opp = opponent() ?: return true
+        val distance = EntityUtils.getDistanceNoY(player, opp)
+        if (distance >= feetSplashSafeDistance) return true
+
+        if (takingPotion) return false
+
+        takingPotion = true
+        retreating = true
+        Mouse.stopLeftAC()
+        Mouse.setUsingProjectile(false)
+
+        val pitch = pickForwardOrSlightUpPitch()
+        smoothFaceAway(totalMsMin = 130, totalMsMax = 200, pitch = pitch)
+        Mouse.stopTracking()
+
+        startOppositeRun()
+        Movement.stopJumping()
+
+        fun cleanup() {
+            stopOppositeRun()
+            Movement.stopJumping()
+            Movement.clearLeftRight()
+        }
+
+        fun resumeCasting() {
+            cleanup()
+            retreating = false
+            takingPotion = false
+            feetSplash(damage, ensureSpacing = false, onComplete = onComplete)
+        }
+
+        fun waitForSpace(elapsed: Int) {
+            val pNow = mc.thePlayer ?: return resumeCasting()
+            val oppNow = opponent()
+            val distNow = if (oppNow != null) EntityUtils.getDistanceNoY(pNow, oppNow) else feetSplashSafeDistance
+            if (distNow >= feetSplashSafeDistance || elapsed >= feetSplashRetreatMaxMs) {
+                resumeCasting()
+            } else {
+                TimeUtils.setTimeout({ waitForSpace(elapsed + 40) }, 40)
+            }
+        }
+
+        waitForSpace(0)
+        return false
+    }
+
+    private fun feetSplash(damage: Int, ensureSpacing: Boolean = true, onComplete: (() -> Unit)? = null) {
         if (takingPotion) return
+
+        if (ensureSpacing && !ensureFeetSplashSpacing(damage, onComplete)) return
+
         takingPotion = true
         Mouse.stopTracking()
         Movement.stopJumping()
+        Movement.stopForward()
+        Movement.stopBackward()
+        Movement.clearLeftRight()
+        Movement.stopSprinting()
+        Mouse.setRunningAway(false)
+        Mouse.setUsingProjectile(false)
         val effectKey = when (damage) {
             speedDamage -> "speed"
             regenDamage -> "regeneration"
@@ -483,7 +543,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                 if (Mouse.rClickDown) Mouse.rClickUp()
                 Mouse.rClick(60)
                 TimeUtils.setTimeout({
-                    useSplashPotion(damage, false, false)
+                    useSplashPotion(damage, false, false, releaseDelayRange = 160..240)
                     lastPotion = System.currentTimeMillis()
                     setPitchLock(down, lockMs = RandomUtils.randomIntInRange(130, 170))
                     val verifyDelay = RandomUtils.randomIntInRange(230, 260)

@@ -146,6 +146,11 @@ class CustomConfigGUI : GuiScreen() {
         return y + ROW_HEIGHT + 4
     }
 
+    private inline fun mutateConfig(action: () -> Unit) {
+        action()
+        kira.config?.markDirty()
+    }
+
     private fun selector(
         label: String,
         x: Int,
@@ -153,13 +158,15 @@ class CustomConfigGUI : GuiScreen() {
         width: Int,
         get: () -> Int,
         set: (Int) -> Unit,
-        options: List<String>
+        options: List<String>,
+        enabled: Boolean = true
     ) {
         val yPos = y - scroll
         val controlEdgeX = x + width
         val cur = min(max(0, get()), options.lastIndex)
         val value = options.getOrElse(cur) { "N/A" }
-        drawString(fontRendererObj, label, x, yPos, highlightColor)
+        val labelColor = if (enabled) highlightColor else grayColor
+        drawString(fontRendererObj, label, x, yPos, labelColor)
 
         val valueW = fontRendererObj.getStringWidth(value)
         val arrowChar = ">"
@@ -169,8 +176,8 @@ class CustomConfigGUI : GuiScreen() {
         val rightArrowX = controlEdgeX - arrowW
         val leftArrowX = controlEdgeX - interactiveWidth
 
-        val leftHover = isHovered(leftArrowX, yPos - 1, arrowW + 10, 10)
-        val rightHover = isHovered(rightArrowX - 10, yPos - 1, arrowW + 10, 10)
+        val leftHover = enabled && isHovered(leftArrowX, yPos - 1, arrowW + 10, 10)
+        val rightHover = enabled && isHovered(rightArrowX - 10, yPos - 1, arrowW + 10, 10)
 
         // Center the text between the fixed arrows
         val textContainerStart = leftArrowX + arrowW + 10
@@ -180,15 +187,37 @@ class CustomConfigGUI : GuiScreen() {
         // Draw shadows/outlines
         drawString(fontRendererObj, "<", leftArrowX + 1, yPos + 1, Color.BLACK.rgb)
         drawString(fontRendererObj, arrowChar, rightArrowX + 1, yPos + 1, Color.BLACK.rgb)
-        drawString(fontRendererObj, value, textX + 1, yPos + 1, Color(primaryColor).darker().darker().rgb)
+        val valueShadowColor = if (enabled) Color(primaryColor).darker().darker().rgb else darkGrayColor
+        drawString(fontRendererObj, value, textX + 1, yPos + 1, valueShadowColor)
 
         // Draw main text and arrows
-        drawString(fontRendererObj, "<", leftArrowX, yPos, if (leftHover) highlightColor else grayColor)
-        drawString(fontRendererObj, value, textX, yPos, primaryColor)
-        drawString(fontRendererObj, arrowChar, rightArrowX, yPos, if (rightHover) highlightColor else grayColor)
+        val arrowColor = when {
+            !enabled -> darkGrayColor
+            else -> grayColor
+        }
+        val leftColor = when {
+            !enabled -> arrowColor
+            leftHover -> highlightColor
+            else -> grayColor
+        }
+        val rightColor = when {
+            !enabled -> arrowColor
+            rightHover -> highlightColor
+            else -> grayColor
+        }
+        val valueColor = if (enabled) primaryColor else darkGrayColor
+        drawString(fontRendererObj, "<", leftArrowX, yPos, leftColor)
+        drawString(fontRendererObj, value, textX, yPos, valueColor)
+        drawString(fontRendererObj, arrowChar, rightArrowX, yPos, rightColor)
 
-        addHotspot(leftArrowX, yPos - 1, arrowW + 10, 10) { set(if (cur <= 0) options.lastIndex else cur - 1) }
-        addHotspot(rightArrowX - 10, yPos - 1, arrowW + 10, 10) { set(if (cur >= options.lastIndex) 0 else cur + 1) }
+        if (enabled) {
+            addHotspot(leftArrowX, yPos - 1, arrowW + 10, 10) {
+                mutateConfig { set(if (cur <= 0) options.lastIndex else cur - 1) }
+            }
+            addHotspot(rightArrowX - 10, yPos - 1, arrowW + 10, 10) {
+                mutateConfig { set(if (cur >= options.lastIndex) 0 else cur + 1) }
+            }
+        }
     }
 
     private fun toggle(label: String, x: Int, y: Int, width: Int, get: () -> Boolean, set: (Boolean) -> Unit) {
@@ -211,7 +240,9 @@ class CustomConfigGUI : GuiScreen() {
             drawCircle(circleX, circleY, radius, if (v) primaryColor else accentColor)
         }
 
-        addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) { set(!v) }
+        addHotspot(controlEdgeX - 6, yPos - 2, 12, 12) {
+            mutateConfig { set(!v) }
+        }
     }
 
     private fun drawToggleSection(
@@ -264,8 +295,8 @@ class CustomConfigGUI : GuiScreen() {
         drawString(fontRendererObj, valueStr, valueX, yPos, highlightColor)
         drawString(fontRendererObj, "+", plusX, yPos, if (plusHover) highlightColor else grayColor)
 
-        addHotspot(minusX, yPos - 1, symbolW, 10, onDecrement)
-        addHotspot(plusX, yPos - 1, symbolW, 10, onIncrement)
+        addHotspot(minusX, yPos - 1, symbolW, 10) { mutateConfig(onDecrement) }
+        addHotspot(plusX, yPos - 1, symbolW, 10) { mutateConfig(onIncrement) }
     }
 
     private fun number(
@@ -317,14 +348,21 @@ class CustomConfigGUI : GuiScreen() {
 
         y = drawSectionHeader("Bot Behavior", x, y, width); y += SECTION_SPACING
         val botNames = listOf("Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz")
+        val rotationBotNames = botNames + "None"
+        val currentBotLabel = if (cfg.enableModeRotation) {
+            "Current Bot (disabled in rotation mode)"
+        } else {
+            "Current Bot"
+        }
         selector(
-            "Current Bot",
+            currentBotLabel,
             x,
             y,
             width,
             { cfg.currentBot },
             { v -> cfg.currentBot = v; kira.config?.getBot(v)?.let { kira.swapBot(it) } },
-            botNames
+            botNames,
+            enabled = !cfg.enableModeRotation
         ); y += ROW_HEIGHT
         toggle("Lobby Movement", x, y, width, { cfg.lobbyMovement }, { cfg.lobbyMovement = it }); y += ROW_HEIGHT
         toggle("Fast Requeue", x, y, width, { cfg.fastRequeue }, { cfg.fastRequeue = it }); y += ROW_HEIGHT
@@ -335,7 +373,62 @@ class CustomConfigGUI : GuiScreen() {
             y,
             width,
             { cfg.disableChatMessages },
-            { cfg.disableChatMessages = it }); y += ROW_HEIGHT + SECTION_SPACING
+            { cfg.disableChatMessages = it }); y += ROW_HEIGHT
+        toggle(
+            "Cinematic Camera",
+            x,
+            y,
+            width,
+            { cfg.cinematicCamera },
+            { cfg.cinematicCamera = it }); y += ROW_HEIGHT + SECTION_SPACING
+
+        y = drawSectionHeader("Mode Rotation", x, y, width); y += SECTION_SPACING
+        toggle(
+            "Enable Mode Rotation",
+            x,
+            y,
+            width,
+            { cfg.enableModeRotation },
+            { cfg.enableModeRotation = it }
+        ); y += ROW_HEIGHT
+        number(
+            "Games Per Mode",
+            x,
+            y,
+            width,
+            { cfg.modeRotationGames },
+            { cfg.modeRotationGames = it },
+            1,
+            1000,
+            1
+        ); y += ROW_HEIGHT
+        selector(
+            "Rotation Mode 1",
+            x,
+            y,
+            width,
+            { cfg.rotationMode1 },
+            { cfg.rotationMode1 = it },
+            botNames
+        ); y += ROW_HEIGHT
+        selector(
+            "Rotation Mode 2",
+            x,
+            y,
+            width,
+            { cfg.rotationMode2 },
+            { cfg.rotationMode2 = it },
+            botNames
+        ); y += ROW_HEIGHT
+        selector(
+            "Rotation Mode 3",
+            x,
+            y,
+            width,
+            { cfg.rotationMode3 },
+            { cfg.rotationMode3 = it },
+            rotationBotNames
+        ); y += ROW_HEIGHT + SECTION_SPACING
 
         y = drawSectionHeader("Auto Disconnect", x, y, width); y += SECTION_SPACING
         number(
@@ -601,6 +694,7 @@ class CustomConfigGUI : GuiScreen() {
     }
 
     private fun saveConfig() {
+        kira.config?.markDirty()
         kira.config?.writeData()
         ChatUtils.info("Configuration saved!")
     }
