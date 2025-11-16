@@ -245,8 +245,14 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     private fun performSafeStart(now: Long, soft: Boolean) {
         Mouse.startTracking()
-        Movement.startSprinting()
-        Movement.startForward()
+        if (soft) {
+            // When we time out waiting for the scoreboard we ease into the start instead of hard sprinting.
+            Movement.stopSprinting()
+            Movement.startForward()
+        } else {
+            Movement.startSprinting()
+            Movement.startForward()
+        }
         Mouse.rClickUp()
 
         if (kira.config?.kiraHit == true) Mouse.startLeftAC() else Mouse.stopLeftAC()
