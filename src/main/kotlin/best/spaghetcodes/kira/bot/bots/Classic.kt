@@ -35,8 +35,8 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     // =====================  ARC  =====================
     private var fullDrawMsMin = 820
     private var fullDrawMsMax = 980
-    private val bowCancelCloseDist = 8.0f
-    private val bowMinUseDist = 9.0f
+    private var bowCancelCloseDist = 8.0f
+    private var bowMinUseDist = 9.0f
 
     // Ouverture contrôlée
     private var openVolleyMax = 1
@@ -49,10 +49,10 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var openShotMinDist = 9.0f
 
     // Détection immobile / slow-bow
-    private val stillFrameThreshold = 0.0125
-    private val stillFramesNeeded = 10
-    private val bowSlowThreshold = 0.06
-    private val bowSlowFramesNeeded = 3
+    private var stillFrameThreshold = 0.0125
+    private var stillFramesNeeded = 10
+    private var bowSlowThreshold = 0.06
+    private var bowSlowFramesNeeded = 3
     private var oppLastX = 0.0
     private var oppLastZ = 0.0
     private var stillFrames = 0
@@ -82,28 +82,28 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodCdCloseMsBase = 300L  // Plus agressif (était 340)
     private var rodCdFarMsBase = 420L    // Plus agressif (était 480)
     private var rodCdBias = 1.0f
-    private val rodCdBiasMax = 1.25f
+    private var rodCdBiasMax = 1.25f
 
     private var rodBanMeleeDist = 3.5f  // Réduit (était 4.0f)
 
-    private val rodCloseMin = 2.0f
-    private val rodCloseMax = 3.4f
-    private val rodMainMin = 3.0f
-    private val rodMainMax = 6.8f
-    private val rodInterceptMin = 5.8f
-    private val rodInterceptMax = 7.2f
-    private val rodMaxRangeHard = 7.2f
+    private var rodCloseMin = 2.0f
+    private var rodCloseMax = 3.4f
+    private var rodMainMin = 3.0f
+    private var rodMainMax = 6.8f
+    private var rodInterceptMin = 5.8f
+    private var rodInterceptMax = 7.2f
+    private var rodMaxRangeHard = 7.2f
 
     // Fenêtre mid-range instantanée
-    private val rodMidInstantMin = 5.5f
-    private val rodMidInstantMax = 7.0f
+    private var rodMidInstantMin = 5.5f
+    private var rodMidInstantMax = 7.0f
 
     // Anti-spam rod
     private var rodAntiSpamUntil = 0L
 
     // Détection "éloignement -> retour"
     private var farSince = 0L
-    private val farThreshold = 11.0f
+    private var farThreshold = 11.0f
     private var reentryRodGraceUntil = 0L
 
     // Heuristique hit/miss via hurtTime
@@ -124,13 +124,13 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var rodHoldUntil = 0L
 
     // ==================  PARADE ÉPÉE  =================
-    private val parryMinDist = 12.0f  // Réduit (était 15.0f)
+    private var parryMinDist = 12.0f  // Réduit (était 15.0f)
     private var parryCloseCancelDist = 12.0f
     private var parryCooldownMs = 900L
     private var parryHoldMinMs = 650
     private var parryHoldMaxMs = 980
-    private val parryStickMinMs = 900
-    private val parryStickMaxMs = 1500
+    private var parryStickMinMs = 900
+    private var parryStickMaxMs = 1500
 
     private var lastSwordBlock = 0L
     private var holdBlockUntil = 0L
@@ -142,7 +142,7 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var parryStrafeDir = 1
     private var parryStrafeFlipAt = 0L
     private var lastParryJumpAt = 0L
-    private val parryJumpCd = 580L
+    private var parryJumpCd = 580L
 
     // Anti-parade précoce
     private var allowParryAfter = 0L
@@ -269,15 +269,36 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         openSpacingMin = p.openSpacingMin
         openSpacingMax = p.openSpacingMax
         openShotMinDist = p.openShotMinDist
+        bowCancelCloseDist = p.bowCancelCloseDist
+        bowMinUseDist = p.bowMinUseDist
+        stillFrameThreshold = p.stillFrameThreshold
+        stillFramesNeeded = p.stillFramesNeeded
+        bowSlowThreshold = p.bowSlowThreshold
+        bowSlowFramesNeeded = p.bowSlowFramesNeeded
         reactiveCdMs = p.reactiveCdMs
         reserveTightMs = p.reserveTightMs
         rodCdCloseMsBase = p.rodCdCloseMsBase
         rodCdFarMsBase = p.rodCdFarMsBase
+        rodCdBiasMax = p.rodCdBiasMax
         rodBanMeleeDist = p.rodBanMeleeDist
+        rodCloseMin = p.rodCloseMin
+        rodCloseMax = p.rodCloseMax
+        rodMainMin = p.rodMainMin
+        rodMainMax = p.rodMainMax
+        rodInterceptMin = p.rodInterceptMin
+        rodInterceptMax = p.rodInterceptMax
+        rodMaxRangeHard = p.rodMaxRangeHard
+        rodMidInstantMin = p.rodMidInstantMin
+        rodMidInstantMax = p.rodMidInstantMax
+        farThreshold = p.farThreshold
+        parryMinDist = p.parryMinDist
         parryCloseCancelDist = p.parryCloseCancelDist
         parryCooldownMs = p.parryCooldownMs
         parryHoldMinMs = p.parryHoldMinMs
         parryHoldMaxMs = p.parryHoldMaxMs
+        parryStickMinMs = p.parryStickMinMs
+        parryStickMaxMs = p.parryStickMaxMs
+        parryJumpCd = p.parryJumpCd
     }
 
     override fun onAttack() {
@@ -516,8 +537,10 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         if (holdingSword) {
             if (!Mouse.rClickDown) {
                 val closeRange = distance < parryCloseCancelDist
+                val farEnough = distance >= parryMinDist
 
                 if (!closeRange &&
+                    farEnough &&
                     !startupJumping &&
                     now >= allowParryAfter &&
                     bowLikely &&
