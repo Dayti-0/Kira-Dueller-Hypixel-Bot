@@ -17,7 +17,25 @@ object OPTuner {
         val minGapIntervalMs: Long,
         val longStrafeChance: Int,
         val rodCdCloseMsBase: Long,
-        val rodCdFarMsBase: Long
+        val rodCdFarMsBase: Long,
+        val rodCdBiasMax: Double,
+        val rodBanMeleeDist: Double,
+        val rodCloseMin: Double,
+        val rodCloseMax: Double,
+        val rodMainMin: Double,
+        val rodMainMax: Double,
+        val rodInterceptMin: Double,
+        val rodInterceptMax: Double,
+        val rodMaxRangeHard: Double,
+        val rodMidInstantMin: Double,
+        val rodMidInstantMax: Double,
+        val farThreshold: Double,
+        val stillFrameThreshold: Double,
+        val stillFramesNeeded: Int,
+        val bowSlowThreshold: Double,
+        val bowSlowFramesNeeded: Int,
+        val feetSplashSafeDistance: Double,
+        val feetSplashRetreatMaxMs: Long
     )
 
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
@@ -55,6 +73,9 @@ object OPTuner {
     private fun specL(key: String, min: Double, max: Double, step: Double, def: Double) =
         ParamSpec(key, min, max, step, def, ParamType.LONG)
 
+    private fun specD(key: String, min: Double, max: Double, step: Double, def: Double) =
+        ParamSpec(key, min, max, step, def, ParamType.DOUBLE)
+
     private val specs = listOf(
         specI("maxArrows", 12.0, 28.0, 1.0, 20.0),
         specI("speedPots", 1.0, 3.0, 1.0, 2.0),
@@ -63,7 +84,25 @@ object OPTuner {
         specL("minGapIntervalMs", 3500.0, 5500.0, 100.0, 4500.0),
         specI("longStrafeChance", 10.0, 40.0, 1.0, 25.0),
         specL("rodCdCloseMsBase", 300.0, 420.0, 10.0, 340.0),
-        specL("rodCdFarMsBase", 440.0, 600.0, 10.0, 480.0)
+        specL("rodCdFarMsBase", 440.0, 600.0, 10.0, 480.0),
+        specD("rodCdBiasMax", 1.05, 1.35, 0.01, 1.25),
+        specD("rodBanMeleeDist", 3.5, 4.5, 0.05, 4.0),
+        specD("rodCloseMin", 1.6, 2.6, 0.05, 2.0),
+        specD("rodCloseMax", 2.6, 4.0, 0.05, 3.4),
+        specD("rodMainMin", 2.5, 4.0, 0.05, 3.0),
+        specD("rodMainMax", 5.0, 7.2, 0.05, 6.8),
+        specD("rodInterceptMin", 4.5, 6.5, 0.05, 5.8),
+        specD("rodInterceptMax", 6.0, 7.6, 0.05, 7.2),
+        specD("rodMaxRangeHard", 6.2, 7.8, 0.05, 7.2),
+        specD("rodMidInstantMin", 4.8, 6.4, 0.05, 5.5),
+        specD("rodMidInstantMax", 6.0, 7.6, 0.05, 7.0),
+        specD("farThreshold", 9.0, 13.0, 0.1, 11.0),
+        specD("stillFrameThreshold", 0.008, 0.02, 0.0005, 0.0125),
+        specI("stillFramesNeeded", 6.0, 14.0, 1.0, 10.0),
+        specD("bowSlowThreshold", 0.04, 0.12, 0.0025, 0.06),
+        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),
+        specD("feetSplashSafeDistance", 4.5, 6.5, 0.05, 5.6),
+        specL("feetSplashRetreatMaxMs", 500.0, 1100.0, 20.0, 700.0)
     )
 
     private val specByKey = specs.associateBy { it.key }
@@ -97,7 +136,25 @@ object OPTuner {
         minGapIntervalMs = values.long("minGapIntervalMs"),
         longStrafeChance = values.int("longStrafeChance"),
         rodCdCloseMsBase = values.long("rodCdCloseMsBase"),
-        rodCdFarMsBase = values.long("rodCdFarMsBase")
+        rodCdFarMsBase = values.long("rodCdFarMsBase"),
+        rodCdBiasMax = values.double("rodCdBiasMax"),
+        rodBanMeleeDist = values.double("rodBanMeleeDist"),
+        rodCloseMin = values.double("rodCloseMin"),
+        rodCloseMax = values.double("rodCloseMax"),
+        rodMainMin = values.double("rodMainMin"),
+        rodMainMax = values.double("rodMainMax"),
+        rodInterceptMin = values.double("rodInterceptMin"),
+        rodInterceptMax = values.double("rodInterceptMax"),
+        rodMaxRangeHard = values.double("rodMaxRangeHard"),
+        rodMidInstantMin = values.double("rodMidInstantMin"),
+        rodMidInstantMax = values.double("rodMidInstantMax"),
+        farThreshold = values.double("farThreshold"),
+        stillFrameThreshold = values.double("stillFrameThreshold"),
+        stillFramesNeeded = values.int("stillFramesNeeded"),
+        bowSlowThreshold = values.double("bowSlowThreshold"),
+        bowSlowFramesNeeded = values.int("bowSlowFramesNeeded"),
+        feetSplashSafeDistance = values.double("feetSplashSafeDistance"),
+        feetSplashRetreatMaxMs = values.long("feetSplashRetreatMaxMs")
     )
 
     private fun pickValues(): Map<String, Double> {
@@ -129,9 +186,9 @@ object OPTuner {
     }
 
     private fun epsilon(totalPlays: Int): Double {
-        val base = 0.35
-        val decay = totalPlays / 25.0
-        return max(0.05, base / (1.0 + decay))
+        val base = 0.55
+        val decay = totalPlays / 40.0
+        return max(0.12, base / (1.0 + decay))
     }
 
     private fun exploreNow(epsilon: Double): Boolean =
@@ -167,6 +224,7 @@ object OPTuner {
 
     private fun Map<String, Double>.int(key: String): Int = clampNum(this[key], key).toInt()
     private fun Map<String, Double>.long(key: String): Long = clampNum(this[key], key).toLong()
+    private fun Map<String, Double>.double(key: String): Double = clampNum(this[key], key)
 
     private fun clampNum(value: Double?, key: String): Double {
         val spec = specByKey[key]

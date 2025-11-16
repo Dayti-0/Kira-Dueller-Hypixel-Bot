@@ -168,6 +168,24 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         longStrafeChance = params.longStrafeChance
         rodCdCloseMsBase = params.rodCdCloseMsBase
         rodCdFarMsBase = params.rodCdFarMsBase
+        rodCdBiasMax = params.rodCdBiasMax.toFloat()
+        rodBanMeleeDist = params.rodBanMeleeDist.toFloat()
+        rodCloseMin = params.rodCloseMin.toFloat()
+        rodCloseMax = params.rodCloseMax.toFloat()
+        rodMainMin = params.rodMainMin.toFloat()
+        rodMainMax = params.rodMainMax.toFloat()
+        rodInterceptMin = params.rodInterceptMin.toFloat()
+        rodInterceptMax = params.rodInterceptMax.toFloat()
+        rodMaxRangeHard = params.rodMaxRangeHard.toFloat()
+        rodMidInstantMin = params.rodMidInstantMin.toFloat()
+        rodMidInstantMax = params.rodMidInstantMax.toFloat()
+        farThreshold = params.farThreshold.toFloat()
+        stillFrameThreshold = params.stillFrameThreshold
+        stillFramesNeeded = params.stillFramesNeeded
+        bowSlowThreshold = params.bowSlowThreshold
+        bowSlowFramesNeeded = params.bowSlowFramesNeeded
+        feetSplashSafeDistance = params.feetSplashSafeDistance.toFloat()
+        feetSplashRetreatMaxMs = params.feetSplashRetreatMaxMs
     }
 
     // =====================  LOGIQUE ROD (import ClassicV2 améliorée)  =====================
@@ -175,25 +193,25 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     private var rodCdCloseMsBase = 340L
     private var rodCdFarMsBase = 480L
     private var rodCdBias = 1.0f
-    private val rodCdBiasMax = 1.25f
+    private var rodCdBiasMax = 1.25f
 
-    private val rodBanMeleeDist = 4.0f
+    private var rodBanMeleeDist = 4.0f
 
-    private val rodCloseMin = 2.0f
-    private val rodCloseMax = 3.4f
-    private val rodMainMin = 3.0f
-    private val rodMainMax = 6.8f
-    private val rodInterceptMin = 5.8f
-    private val rodInterceptMax = 7.2f
-    private val rodMaxRangeHard = 7.2f
+    private var rodCloseMin = 2.0f
+    private var rodCloseMax = 3.4f
+    private var rodMainMin = 3.0f
+    private var rodMainMax = 6.8f
+    private var rodInterceptMin = 5.8f
+    private var rodInterceptMax = 7.2f
+    private var rodMaxRangeHard = 7.2f
 
-    private val rodMidInstantMin = 5.5f
-    private val rodMidInstantMax = 7.0f
+    private var rodMidInstantMin = 5.5f
+    private var rodMidInstantMax = 7.0f
 
     private var rodAntiSpamUntil = 0L
 
     private var farSince = 0L
-    private val farThreshold = 11.0f
+    private var farThreshold = 11.0f
     private var reentryRodGraceUntil = 0L
 
     private var lastRodAttemptAt = 0L
@@ -210,10 +228,10 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     private var oppLastX = 0.0
     private var oppLastZ = 0.0
-    private val stillFrameThreshold = 0.0125
-    private val stillFramesNeeded = 10
-    private val bowSlowThreshold = 0.06
-    private val bowSlowFramesNeeded = 3
+    private var stillFrameThreshold = 0.0125
+    private var stillFramesNeeded = 10
+    private var bowSlowThreshold = 0.06
+    private var bowSlowFramesNeeded = 3
     private var stillFrames = 0
     private var bowSlowFrames = 0
 
@@ -476,8 +494,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     }
 
     // ---- 2e Speed / 2e Regen : cast aux PIEDS (sans retrait, sans saut) ----
-    private val feetSplashSafeDistance = 5.6f
-    private val feetSplashRetreatMaxMs = 700
+    private var feetSplashSafeDistance = 5.6f
+    private var feetSplashRetreatMaxMs = 700L
 
     private fun ensureFeetSplashSpacing(damage: Int, onComplete: (() -> Unit)?): Boolean {
         val player = mc.thePlayer ?: return false
