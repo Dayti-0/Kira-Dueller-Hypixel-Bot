@@ -65,7 +65,7 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
     private var strengthRecastPreMaxMs = 160
     private var strengthRecastHoldMs = 2400
     private var farJumpCooldownMs = 540L
-    private var pearlCooldownMs = 11_000L
+    private var pearlCooldownMs = 10_000L
     private var quickPearlDistanceMin = 24f
     private var defensivePearlMinMotionY = 0.15f
 
