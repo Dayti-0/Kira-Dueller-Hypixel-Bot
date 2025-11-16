@@ -19,9 +19,9 @@ public abstract class MixinEntityRenderer {
 
     @Inject(method = "orientCamera", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GlStateManager;translate(FFF)V", ordinal = 0, shift = At.Shift.AFTER))
     private void kira$afterTranslate(float partialTicks, CallbackInfo ci) {
-        float verticalOffset = CameraController.INSTANCE.verticalOffset();
-        if (verticalOffset != 0.0F) {
-            GlStateManager.translate(0.0F, verticalOffset, 0.0F);
+        CameraController.CameraOffset offset = CameraController.INSTANCE.cameraOffset();
+        if (offset != null) {
+            GlStateManager.translate(offset.getX(), offset.getY(), offset.getZ());
         }
     }
 }

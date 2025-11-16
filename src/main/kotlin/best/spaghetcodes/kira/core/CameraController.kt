@@ -21,6 +21,15 @@ object CameraController {
     private const val PITCH_OFFSET = 12f
     private const val YAW_OFFSET = 90f
     private const val VERTICAL_OFFSET = 0.6f
+    private const val SIDE_OFFSET = -3.2f
+
+    data class CameraOffset(
+        val x: Float,
+        val y: Float,
+        val z: Float
+    )
+
+    private val cinematicOffset = CameraOffset(SIDE_OFFSET, VERTICAL_OFFSET, 0f)
 
     private data class DistanceSnapshot(
         val distance: Float,
@@ -74,7 +83,7 @@ object CameraController {
         return angle
     }
 
-    fun verticalOffset(): Float = if (isActive()) VERTICAL_OFFSET else 0f
+    fun cameraOffset(): CameraOffset? = if (isActive()) cinematicOffset else null
 
     fun isActive(): Boolean = kira.config?.cinematicCamera == true
 
