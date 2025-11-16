@@ -314,5 +314,5 @@ object SumoTuner {
         } catch (ex: Exception) { ex.printStackTrace(); StoredState() }
     }
     private fun save() { try { val f = file(); f.parentFile?.mkdirs(); f.writer().use { writer -> kira.gson.toJson(state, writer) } } catch (_: Exception) {} }
-    private fun file(): File { val base = File(kira.mc.mcDataDir, "config"); return File(base, "sumo_tuner.json") }
+    private fun file(): File = File(kira.tunerDir, "sumo_tuner.json")
 }

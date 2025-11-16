@@ -211,10 +211,9 @@ object OPTuner {
 
     private fun configDir(): File {
         return try {
-            val mcDir = kira.mc.mcDataDir
-            if (mcDir != null) File(mcDir, "config") else File(File(System.getProperty("user.home"), ".kira"), "config")
+            kira.tunerDir
         } catch (_: Throwable) {
-            File("config")
+            File(File(File(System.getProperty("user.home"), ".kira"), "config"), "Kira/Tuner")
         }
     }
 }
