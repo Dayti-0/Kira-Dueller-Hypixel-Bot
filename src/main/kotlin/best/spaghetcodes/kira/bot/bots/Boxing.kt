@@ -154,7 +154,15 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
     // =================== Lifecycle ===================
 
     override fun onGameStart() {
-        val params = try { BoxingTuner.pickParams() } catch (_: Throwable) { BoxingTuner.defaults() }
+        val params = if (kira.isTunerEnabled) {
+            try {
+                BoxingTuner.pickParams()
+            } catch (_: Throwable) {
+                BoxingTuner.defaults()
+            }
+        } else {
+            BoxingTuner.defaults()
+        }
         applyParams(params)
 
         Movement.startSprinting()
@@ -225,7 +233,9 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        BoxingTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            BoxingTuner.report(win, 0)
+        }
         TimeUtils.setTimeout({
             Movement.clearAll()
             Mouse.stopLeftAC()

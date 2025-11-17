@@ -271,7 +271,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             val dist = EntityUtils.getDistanceNoY(p, opp)
             val aiming = isBowAiming(System.currentTimeMillis())
             if (!aiming && dist > antiJumpZoneDist && (System.currentTimeMillis() - lastJumpAt >= continuousJumpMinIntervalMs)) {
-                ClassicV2Tuner.noteCloseJump(dist, aiming)
+                recordCloseJump(dist, aiming)
                 Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
                 lastJumpAt = System.currentTimeMillis()
             }
@@ -280,7 +280,15 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
-        val params = try { ClassicV2Tuner.pickParams() } catch (_: Throwable) { ClassicV2Tuner.defaults() }
+        val params = if (kira.isTunerEnabled) {
+            try {
+                ClassicV2Tuner.pickParams()
+            } catch (_: Throwable) {
+                ClassicV2Tuner.defaults()
+            }
+        } else {
+            ClassicV2Tuner.defaults()
+        }
         applyParams(params)
 
         Mouse.stopLeftAC()
@@ -351,8 +359,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        val mistakes = ClassicV2Tuner.takeAndResetMistakes()
-        ClassicV2Tuner.report(win, mistakes)
+        val mistakes = if (kira.isTunerEnabled) ClassicV2Tuner.takeAndResetMistakes() else 0
+        if (kira.isTunerEnabled) {
+            ClassicV2Tuner.report(win, mistakes)
+        }
         TimeUtils.setTimeout({
             i?.cancel()
             Mouse.stopTracking()
@@ -688,7 +698,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             WorldUtils.blockInFront(p, 2f, 0.5f) != Blocks.air &&
             p.onGround &&
             now - lastJumpAt >= continuousJumpMinIntervalMs) {
-            ClassicV2Tuner.noteCloseJump(distance, aiming)
+            recordCloseJump(distance, aiming)
             Movement.singleJump(RandomUtils.randomIntInRange(150, 240))
             lastJumpAt = now
             lastTacticalJumpAt = now
@@ -780,7 +790,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                         parryStrafeDir = -parryStrafeDir
                         parryStrafeFlipAt = now + RandomUtils.randomIntInRange(260, 420)
                     }
-                    ClassicV2Tuner.noteCloseJump(distance, aiming)
+                    recordCloseJump(distance, aiming)
                     Movement.singleJump(RandomUtils.randomIntInRange(140, 210))
                     lastParryJumpAt = now
                     lastJumpAt = now
@@ -807,14 +817,14 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             val farJumpThreshold = antiJumpZoneDist + 2.0f
             if (distance >= farJumpThreshold) {
                 if (p.onGround && now - lastTacticalJumpAt >= 520 && now - lastJumpAt >= continuousJumpMinIntervalMs) {
-                    ClassicV2Tuner.noteCloseJump(distance, aiming)
+                    recordCloseJump(distance, aiming)
                     Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
                     lastJumpAt = now
                     lastTacticalJumpAt = now
                 }
             } else if (distance > antiJumpZoneDist && distance < farJumpThreshold && (facingAway || oppVeryStill)) {
                 if (p.onGround && now - lastTacticalJumpAt >= 720 && now - lastJumpAt >= continuousJumpMinIntervalMs) {
-                    ClassicV2Tuner.noteCloseJump(distance, aiming)
+                    recordCloseJump(distance, aiming)
                     Movement.singleJump(RandomUtils.randomIntInRange(150, 230))
                     lastJumpAt = now
                     lastTacticalJumpAt = now
@@ -1046,5 +1056,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         prevDistance = distance
 
         if (allowParryAfter == 0L) allowParryAfter = gameStartAt + allowParryDelayMs
+    }
+
+    private fun recordCloseJump(distance: Float, aiming: Boolean) {
+        if (kira.isTunerEnabled) {
+            ClassicV2Tuner.noteCloseJump(distance, aiming)
+        }
     }
 }

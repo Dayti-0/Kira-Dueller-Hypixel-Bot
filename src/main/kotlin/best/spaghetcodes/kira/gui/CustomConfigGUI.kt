@@ -368,6 +368,14 @@ class CustomConfigGUI : GuiScreen() {
         toggle("Fast Requeue", x, y, width, { cfg.fastRequeue }, { cfg.fastRequeue = it }); y += ROW_HEIGHT
         toggle("Paper Requeue", x, y, width, { cfg.paperRequeue }, { cfg.paperRequeue = it }); y += ROW_HEIGHT
         toggle(
+            "Enable Tuner",
+            x,
+            y,
+            width,
+            { cfg.enableTuner },
+            { cfg.enableTuner = it }
+        ); y += ROW_HEIGHT
+        toggle(
             "Disable Chat Messages",
             x,
             y,

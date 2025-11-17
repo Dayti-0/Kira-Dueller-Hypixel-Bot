@@ -803,9 +803,13 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     // =====================  LIFECYCLE  =====================
     override fun onGameStart() {
-        val params = try {
-            OPTuner.pickParams()
-        } catch (_: Throwable) {
+        val params = if (kira.isTunerEnabled) {
+            try {
+                OPTuner.pickParams()
+            } catch (_: Throwable) {
+                OPTuner.defaults()
+            }
+        } else {
             OPTuner.defaults()
         }
         applyParams(params)
@@ -886,7 +890,9 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             Session.losses > Session.wins -> false
             else -> false
         }
-        OPTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            OPTuner.report(win, 0)
+        }
         stopPreGapBackwardLock()
         shotsFired = 0
         maxArrows = configuredMaxArrows

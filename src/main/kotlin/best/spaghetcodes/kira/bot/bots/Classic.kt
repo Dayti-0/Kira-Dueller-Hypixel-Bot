@@ -168,9 +168,13 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
     // ====================  LIFECYCLE  ==================
     override fun onGameStart() {
-        val params = try {
-            ClassicTuner.pickParams()
-        } catch (_: Throwable) {
+        val params = if (kira.isTunerEnabled) {
+            try {
+                ClassicTuner.pickParams()
+            } catch (_: Throwable) {
+                ClassicTuner.defaults()
+            }
+        } else {
             ClassicTuner.defaults()
         }
         applyParams(params)
@@ -251,7 +255,9 @@ class Classic : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        ClassicTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            ClassicTuner.report(win, 0)
+        }
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({

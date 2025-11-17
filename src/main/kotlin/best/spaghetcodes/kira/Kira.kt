@@ -39,6 +39,9 @@ class kira {
         var config: Config? = null
         var bot: BotBase? = null
 
+        val isTunerEnabled: Boolean
+            get() = config?.enableTuner != false
+
         fun swapBot(b: BotBase) {
             if (bot != null) MinecraftForge.EVENT_BUS.unregister(bot)
             bot = b
