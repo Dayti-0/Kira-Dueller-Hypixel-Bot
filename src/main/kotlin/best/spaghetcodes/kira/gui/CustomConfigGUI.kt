@@ -507,6 +507,7 @@ class CustomConfigGUI : GuiScreen() {
         ); y += ROW_HEIGHT
         toggle("Enable AutoGG", x, y, width, { cfg.sendAutoGG }, { cfg.sendAutoGG = it }); y += ROW_HEIGHT
         number("AutoGG Delay (ms)", x, y, width, { cfg.ggDelay }, { cfg.ggDelay = it }, 50, 1000, 50); y += ROW_HEIGHT
+        toggle("Win Sneak", x, y, width, { cfg.winSneak }, { cfg.winSneak = it }); y += ROW_HEIGHT
 
         return y
     }
