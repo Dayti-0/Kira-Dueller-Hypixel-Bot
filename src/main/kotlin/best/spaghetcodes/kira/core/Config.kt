@@ -42,7 +42,7 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(
         type = PropertyType.SWITCH,
-        name = "Cinematic Camera",
+        name = "Mode Camera",
         description = "Automatically switch to a wide third-person camera with a cinematic angle.",
         category = "General"
     )
@@ -50,7 +50,7 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(
         type = PropertyType.SWITCH,
-        name = "Enable Mode Rotation",
+        name = "Mode Rotation",
         description = "Automatically cycle between multiple duel modes.",
         category = "General"
     )
@@ -58,7 +58,7 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(
         type = PropertyType.SWITCH,
-        name = "Enable Tuner",
+        name = "Tuner",
         description = "Allow duel bots to auto-tune their behaviour using past games.",
         category = "General"
     )

@@ -368,7 +368,7 @@ class CustomConfigGUI : GuiScreen() {
         toggle("Fast Requeue", x, y, width, { cfg.fastRequeue }, { cfg.fastRequeue = it }); y += ROW_HEIGHT
         toggle("Paper Requeue", x, y, width, { cfg.paperRequeue }, { cfg.paperRequeue = it }); y += ROW_HEIGHT
         toggle(
-            "Enable Tuner",
+            "Tuner",
             x,
             y,
             width,
@@ -383,7 +383,7 @@ class CustomConfigGUI : GuiScreen() {
             { cfg.disableChatMessages },
             { cfg.disableChatMessages = it }); y += ROW_HEIGHT
         toggle(
-            "Cinematic Camera",
+            "Mode Camera",
             x,
             y,
             width,
@@ -392,7 +392,7 @@ class CustomConfigGUI : GuiScreen() {
 
         y = drawSectionHeader("Mode Rotation", x, y, width); y += SECTION_SPACING
         toggle(
-            "Enable Mode Rotation",
+            "Mode Rotation",
             x,
             y,
             width,
