@@ -20,6 +20,11 @@ import kotlin.math.min
 
 class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, Flint {
 
+    companion object {
+        private const val DEFAULT_MAX_ARROWS = 20
+        private const val DEFAULT_GAP_COUNT = 6
+    }
+
     override fun getName(): String = "OP"
 
     init {
@@ -34,18 +39,18 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     // =====================  CONFIG GÉNÉRALE  =====================
     var shotsFired = 0
-    var maxArrows = 20
-    private var configuredMaxArrows = 20
+    var maxArrows = DEFAULT_MAX_ARROWS
+    private var configuredMaxArrows = DEFAULT_MAX_ARROWS
 
     var speedDamage = 16386
     var regenDamage = 16385
 
     var speedPotsLeft = 2
     var regenPotsLeft = 2
-    var gapsLeft = 6
+    var gapsLeft = DEFAULT_GAP_COUNT
     private var baseSpeedPots = 2
     private var baseRegenPots = 2
-    private var baseGapCount = 6
+    private var baseGapCount = DEFAULT_GAP_COUNT
 
     override var flintUses = 5
 
@@ -160,10 +165,10 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     }
 
     private fun applyParams(params: OPTuner.OPParams) {
-        configuredMaxArrows = params.maxArrows
+        configuredMaxArrows = DEFAULT_MAX_ARROWS
         baseSpeedPots = params.speedPots
         baseRegenPots = params.regenPots
-        baseGapCount = params.gaps
+        baseGapCount = DEFAULT_GAP_COUNT
         minGapIntervalMs = params.minGapIntervalMs
         longStrafeChance = params.longStrafeChance
         rodCdCloseMsBase = params.rodCdCloseMsBase
