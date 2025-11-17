@@ -174,6 +174,14 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     @Property(type = PropertyType.NUMBER, name = "Start Message Delay", description = "How long to wait before sending the start message", category = "AutoGG", min = 50, max = 1000, increment = 50)
     var startMessageDelay = 100
 
+    @Property(
+        type = PropertyType.SWITCH,
+        name = "Win Sneak",
+        description = "Perform a quick sneak celebration after winning a duel.",
+        category = "General"
+    )
+    var winSneak = false
+
     @Property(type = PropertyType.NUMBER, name = "Auto Requeue Delay", description = "How long to wait after a game before re-queueing", category = "Auto Requeue", min = 500, max = 5000, increment = 50)
     var autoRqDelay = 2500
 
