@@ -10,10 +10,8 @@ import kotlin.math.round
 object OPTuner {
 
     data class OPParams(
-        val maxArrows: Int,
         val speedPots: Int,
         val regenPots: Int,
-        val gaps: Int,
         val minGapIntervalMs: Long,
         val longStrafeChance: Int,
         val rodCdCloseMsBase: Long,
@@ -77,10 +75,8 @@ object OPTuner {
         ParamSpec(key, min, max, step, def, ParamType.DOUBLE)
 
     private val specs = listOf(
-        specI("maxArrows", 12.0, 28.0, 1.0, 20.0),
         specI("speedPots", 1.0, 3.0, 1.0, 2.0),
         specI("regenPots", 1.0, 3.0, 1.0, 2.0),
-        specI("gaps", 4.0, 8.0, 1.0, 6.0),
         specL("minGapIntervalMs", 3500.0, 5500.0, 100.0, 4500.0),
         specI("longStrafeChance", 10.0, 40.0, 1.0, 25.0),
         specL("rodCdCloseMsBase", 300.0, 420.0, 10.0, 340.0),
@@ -129,10 +125,8 @@ object OPTuner {
     }
 
     private fun build(values: Map<String, Double>) = OPParams(
-        maxArrows = values.int("maxArrows"),
         speedPots = values.int("speedPots"),
         regenPots = values.int("regenPots"),
-        gaps = values.int("gaps"),
         minGapIntervalMs = values.long("minGapIntervalMs"),
         longStrafeChance = values.int("longStrafeChance"),
         rodCdCloseMsBase = values.long("rodCdCloseMsBase"),
