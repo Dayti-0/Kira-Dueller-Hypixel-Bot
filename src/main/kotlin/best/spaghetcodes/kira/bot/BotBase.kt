@@ -27,6 +27,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent
 import java.util.Timer
+import kotlin.math.max
 
 open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
@@ -35,7 +36,11 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var toggled = false
     fun toggled() = toggled
     fun toggle() {
-        toggled = !toggled
+        val newState = !toggled
+        if (!newState) {
+            cancelWinSneak()
+        }
+        toggled = newState
         Session.updateBotEnabled(toggled)
         ModeRotationManager.onBotToggle(toggled)
         if (!toggled) {
@@ -48,6 +53,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var opponent: EntityPlayer? = null
     private var opponentTimer: Timer? = null
     private var calledFoundOpponent = false
+
+    private val winSneakTimers = mutableListOf<Timer>()
+    private var winSneakCleanupTimer: Timer? = null
+    private var winSneakActiveUntil = 0L
 
     protected var combo = 0
     protected var opponentCombo = 0
@@ -147,6 +156,56 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
+    private fun triggerWinSneakCelebration() {
+        val cfg = kira.config ?: return
+        if (!cfg.winSneak) return
+        var delay = 0
+        val cycles = RandomUtils.randomIntInRange(4, 6)
+        repeat(cycles) { index ->
+            scheduleWinSneakAction(delay) { Movement.startSneaking() }
+            val hold = RandomUtils.randomIntInRange(70, 140)
+            scheduleWinSneakAction(delay + hold) { Movement.stopSneaking() }
+            delay += hold
+            if (index < cycles - 1) {
+                delay += RandomUtils.randomIntInRange(60, 110)
+            }
+        }
+        val totalDuration = delay + 200
+        winSneakActiveUntil = System.currentTimeMillis() + totalDuration
+        winSneakCleanupTimer?.cancel()
+        winSneakCleanupTimer = TimeUtils.setTimeout({ clearWinSneakTimers() }, totalDuration)
+    }
+
+    private fun scheduleWinSneakAction(delay: Int, action: () -> Unit) {
+        TimeUtils.setTimeout({
+            action()
+        }, delay)?.let { timer ->
+            synchronized(winSneakTimers) { winSneakTimers.add(timer) }
+        }
+    }
+
+    private fun cancelWinSneak() {
+        winSneakCleanupTimer?.cancel()
+        winSneakCleanupTimer = null
+        winSneakActiveUntil = 0L
+        synchronized(winSneakTimers) {
+            winSneakTimers.forEach { it.cancel() }
+            winSneakTimers.clear()
+        }
+        Movement.stopSneaking()
+    }
+
+    private fun clearWinSneakTimers() {
+        synchronized(winSneakTimers) { winSneakTimers.clear() }
+        winSneakCleanupTimer = null
+        winSneakActiveUntil = 0L
+    }
+
+    private fun winSneakDelayRemaining(): Int {
+        val remaining = winSneakActiveUntil - System.currentTimeMillis()
+        return if (remaining > 0) remaining.toInt() else 0
+    }
+
     private fun sendAntiDetectionMessage(message: String) {
         ChatUtils.sendAsPlayer("/ac $message")
     }
@@ -224,6 +283,16 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         hbLastHitAt = now
     }
 
+    private fun recordResult(iWon: Boolean) {
+        if (iWon) {
+            Session.wins++
+            triggerWinSneakCelebration()
+        } else {
+            Session.losses++
+            cancelWinSneak()
+        }
+    }
+
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
             when (packet) {
@@ -258,10 +327,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
                                     val (_, _, iWon) =
                                         if (unformatted.contains(me.lowercase())) {
-                                            Session.wins++
+                                            recordResult(true)
                                             Triple(me, lastOpponentName, true)
                                         } else {
-                                            Session.losses++
+                                            recordResult(false)
                                             Triple(p, me, false)
                                         }
 
@@ -395,11 +464,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 parseWinnerFromSummary(unformatted)?.let { (winner, _) ->
                     val me = mc.thePlayer.gameProfile.name
                     val iWon = winner.equals(me, ignoreCase = true)
-                    if (iWon) {
-                        Session.wins++
-                    } else {
-                        Session.losses++
-                    }
+                    recordResult(iWon)
                     resultCounted = true
                     ChatUtils.info(Session.getSession())
                 }
@@ -410,11 +475,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 parseKillLine(unformatted)?.let { (winner, _) ->
                     val me = mc.thePlayer.gameProfile.name
                     val iWon = winner.equals(me, ignoreCase = true)
-                    if (iWon) {
-                        Session.wins++
-                    } else {
-                        Session.losses++
-                    }
+                    recordResult(iWon)
                     resultCounted = true
                     ChatUtils.info(Session.getSession())
                 }
@@ -443,6 +504,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 resetVars()
                 LobbyMovement.stop()
                 Movement.clearAll()
+                cancelWinSneak()
                 Combat.stopRandomStrafe()
                 Mouse.stopLeftAC()
                 calledGameEnd = false
@@ -515,11 +577,13 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             val rotationDecision = ModeRotationManager.onGameCompleted(this)
             val targetBot = rotationDecision?.botToQueue ?: this
             val forceCommand = rotationDecision?.forceQueueCommand ?: false
-            val delay = kira.config?.autoRqDelay ?: 2000
+            val celebrationDelay = winSneakDelayRemaining()
             if (kira.config?.fastRequeue == true) {
-                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, RandomUtils.randomIntInRange(300, 500))
+                val baseDelay = RandomUtils.randomIntInRange(300, 500)
+                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, max(baseDelay, celebrationDelay))
             } else {
-                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, delay)
+                val baseDelay = kira.config?.autoRqDelay ?: 2000
+                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, max(baseDelay, celebrationDelay))
             }
         }
     }
@@ -546,6 +610,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     }
 
     private fun joinGame(second: Boolean = false, forceCommand: Boolean = false) {
+        cancelWinSneak()
         if (toggled() && StateManager.state != StateManager.States.PLAYING && !StateManager.gameFull) {
             if (StateManager.state == StateManager.States.GAME) {
                 val paper = !forceCommand && kira.config?.paperRequeue == true && Inventory.setInvItem("paper")
