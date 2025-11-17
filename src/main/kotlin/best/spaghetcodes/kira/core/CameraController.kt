@@ -46,7 +46,7 @@ object CameraController {
             storedDistances = DistanceAccess.snapshot(renderer)
         }
 
-        mc.gameSettings.thirdPersonView = 1
+        mc.gameSettings.thirdPersonView = 2
 
         DistanceAccess.apply(renderer, CINEMATIC_DISTANCE, CINEMATIC_DISTANCE)
     }
