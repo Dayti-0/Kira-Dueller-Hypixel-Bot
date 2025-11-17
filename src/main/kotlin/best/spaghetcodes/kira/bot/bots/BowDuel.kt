@@ -8,6 +8,7 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.bot.tuning.BowDuelTuner
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
@@ -61,9 +62,13 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
     // ------------------------------------------------
 
     override fun onGameStart() {
-        val params = try {
-            BowDuelTuner.pickParams()
-        } catch (_: Throwable) {
+        val params = if (kira.isTunerEnabled) {
+            try {
+                BowDuelTuner.pickParams()
+            } catch (_: Throwable) {
+                BowDuelTuner.defaults()
+            }
+        } else {
             BowDuelTuner.defaults()
         }
         applyParams(params)
@@ -97,7 +102,9 @@ class BowDuel : BotBase("/play duels_bow_duel"), Bow, MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        BowDuelTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            BowDuelTuner.report(win, 0)
+        }
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({

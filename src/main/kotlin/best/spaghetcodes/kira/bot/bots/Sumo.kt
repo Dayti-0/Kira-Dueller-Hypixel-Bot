@@ -346,7 +346,15 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
         lastGotHitAt = 0L
 
         // ====== PARAMS TUNER ======
-        val params = SumoTuner.pickParams()
+        val params = if (kira.isTunerEnabled) {
+            try {
+                SumoTuner.pickParams()
+            } catch (_: Throwable) {
+                SumoTuner.defaults()
+            }
+        } else {
+            SumoTuner.defaults()
+        }
 
         blockZoneJumpsForMsAfterStart = params.blockZoneLockMs
         rearmInnerDist = params.rearmInnerDist
@@ -442,7 +450,9 @@ class Sumo : BotBase("/play duels_sumo_duel"), MovePriority {
             Session.losses > Session.wins -> false
             else -> opponentOffEdge
         }
-        SumoTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            SumoTuner.report(win, 0)
+        }
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({

@@ -46,9 +46,13 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
     }
 
     override fun onGameStart() {
-        val params = try {
-            BlitzTuner.pickParams()
-        } catch (_: Throwable) {
+        val params = if (kira.isTunerEnabled) {
+            try {
+                BlitzTuner.pickParams()
+            } catch (_: Throwable) {
+                BlitzTuner.defaults()
+            }
+        } else {
             BlitzTuner.defaults()
         }
         applyParams(params)
@@ -74,7 +78,9 @@ class Blitz : BotBase("/play duels_blitz_duel"), MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        BlitzTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            BlitzTuner.report(win, 0)
+        }
         Mouse.stopLeftAC()
         val i = TimeUtils.setInterval(Mouse::stopLeftAC, 100, 100)
         TimeUtils.setTimeout({

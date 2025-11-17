@@ -198,76 +198,10 @@ object SumoTuner {
             chosen[spec.key] = value
         }
         save()
-        return Params(
-            blockZoneLockMs = chosen.long("blockZoneLockMs"),
-            rearmInnerDist = chosen.float("rearmInnerDist"),
-            zoneRearmDelayMs = chosen.long("zoneRearmDelayMs"),
-
-            attackStartDist = chosen.float("attackStartDist"),
-            attackLatchMs = chosen.long("attackLatchMs"),
-            prefireApproachDist = chosen.float("prefireApproachDist"),
-            prefireLatchMs = chosen.long("prefireLatchMs"),
-
-            hardAttackDist = chosen.float("hardAttackDist"),
-            preAimDot = chosen.float("preAimDot"),
-
-            wTapShortMs = chosen.long("wTapShortMs"),
-            wTapLongMs = chosen.long("wTapLongMs"),
-            postHitDriveMs = chosen.long("postHitDriveMs"),
-
-            stopForwardDist = chosen.float("stopForwardDist"),
-            reForwardDist = chosen.float("reForwardDist"),
-
-            edgeProbeNear = chosen.float("edgeProbeNear"),
-            edgeProbeFar = chosen.float("edgeProbeFar"),
-            predictiveProbeBonus = chosen.float("predictiveProbeBonus"),
-
-            holdMsMin = chosen.int("holdMsMin"),
-            holdMsMax = chosen.int("holdMsMax"),
-            burstMsMin = chosen.int("burstMsMin"),
-            burstMsMax = chosen.int("burstMsMax"),
-            coastMsMin = chosen.int("coastMsMin"),
-            coastMsMax = chosen.int("coastMsMax"),
-            burstFlipMin = chosen.int("burstFlipMin"),
-            burstFlipMax = chosen.int("burstFlipMax"),
-            burstSkipPercent = chosen.int("burstSkipPercent"),
-            longStrafeChance = chosen.int("longStrafeChance"),
-            longStrafeDurationMs = chosen.long("longStrafeDurationMs"),
-
-            strafeStyleInt = chosen.int("strafeStyleInt"),
-            strafeIntensity = chosen.int("strafeIntensity"),
-
-            closeInnerMin = chosen.long("closeInnerMin"),
-            closeInnerMax = chosen.long("closeInnerMax"),
-            closeMidMin = chosen.long("closeMidMin"),
-            closeMidMax = chosen.long("closeMidMax"),
-            closeFarMin = chosen.long("closeFarMin"),
-            closeFarMax = chosen.long("closeFarMax"),
-
-            antiStallEps = chosen.float("antiStallEps"),
-            antiStallDelayMs = chosen.long("antiStallDelayMs"),
-            centerBiasStrength = chosen.int("centerBiasStrength"),
-            centerBiasIntervalMs = chosen.long("centerBiasIntervalMs"),
-            edgeAggroWeight = chosen.int("edgeAggroWeight"),
-            edgeAggroRadiusBonus = chosen.float("edgeAggroRadiusBonus"),
-
-            startHopModeInt = chosen.int("startHopModeInt"),
-            startHopTimerFudgeMs = chosen.long("startHopTimerFudgeMs"),
-            startHopTimerTargetMs = chosen.long("startHopTimerTargetMs"),
-            groundTicksRequired = chosen.int("groundTicksRequired"),
-            groundMaxWaitMs = chosen.long("groundMaxWaitMs"),
-            startAntivoidDisableMs = chosen.long("startAntivoidDisableMs"),
-
-            hsEnableInt = chosen.int("hsEnableInt"),
-            hsMinMs = chosen.long("hsMinMs"),
-            hsMaxMs = chosen.long("hsMaxMs"),
-            hsLatchMs = chosen.long("hsLatchMs"),
-            hsMinDist = chosen.float("hsMinDist"),
-            hsMaxDist = chosen.float("hsMaxDist"),
-            hsAimDot = chosen.float("hsAimDot"),
-            hsOnlyIfOppOutsideInt = chosen.int("hsOnlyIfOppOutsideInt")
-        )
+        return buildParams(chosen)
     }
+
+    fun defaults(): Params = buildParams(specs.associate { it.key to it.def })
 
     fun report(win: Boolean, mistakes: Int) {
         ensureLoaded()
@@ -302,6 +236,76 @@ object SumoTuner {
     private fun Map<String, Double>.int(key: String): Int = clampNum(this[key], key).toInt()
     private fun Map<String, Double>.long(key: String): Long = clampNum(this[key], key).toLong()
     private fun clampNum(v: Double?, key: String): Double { val spec = specByKey[key]; val raw = v ?: spec?.def ?: 0.0; return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw }
+
+    private fun buildParams(values: Map<String, Double>): Params = Params(
+        blockZoneLockMs = values.long("blockZoneLockMs"),
+        rearmInnerDist = values.float("rearmInnerDist"),
+        zoneRearmDelayMs = values.long("zoneRearmDelayMs"),
+
+        attackStartDist = values.float("attackStartDist"),
+        attackLatchMs = values.long("attackLatchMs"),
+        prefireApproachDist = values.float("prefireApproachDist"),
+        prefireLatchMs = values.long("prefireLatchMs"),
+
+        hardAttackDist = values.float("hardAttackDist"),
+        preAimDot = values.float("preAimDot"),
+
+        wTapShortMs = values.long("wTapShortMs"),
+        wTapLongMs = values.long("wTapLongMs"),
+        postHitDriveMs = values.long("postHitDriveMs"),
+
+        stopForwardDist = values.float("stopForwardDist"),
+        reForwardDist = values.float("reForwardDist"),
+
+        edgeProbeNear = values.float("edgeProbeNear"),
+        edgeProbeFar = values.float("edgeProbeFar"),
+        predictiveProbeBonus = values.float("predictiveProbeBonus"),
+
+        holdMsMin = values.int("holdMsMin"),
+        holdMsMax = values.int("holdMsMax"),
+        burstMsMin = values.int("burstMsMin"),
+        burstMsMax = values.int("burstMsMax"),
+        coastMsMin = values.int("coastMsMin"),
+        coastMsMax = values.int("coastMsMax"),
+        burstFlipMin = values.int("burstFlipMin"),
+        burstFlipMax = values.int("burstFlipMax"),
+        burstSkipPercent = values.int("burstSkipPercent"),
+        longStrafeChance = values.int("longStrafeChance"),
+        longStrafeDurationMs = values.long("longStrafeDurationMs"),
+
+        strafeStyleInt = values.int("strafeStyleInt"),
+        strafeIntensity = values.int("strafeIntensity"),
+
+        closeInnerMin = values.long("closeInnerMin"),
+        closeInnerMax = values.long("closeInnerMax"),
+        closeMidMin = values.long("closeMidMin"),
+        closeMidMax = values.long("closeMidMax"),
+        closeFarMin = values.long("closeFarMin"),
+        closeFarMax = values.long("closeFarMax"),
+
+        antiStallEps = values.float("antiStallEps"),
+        antiStallDelayMs = values.long("antiStallDelayMs"),
+        centerBiasStrength = values.int("centerBiasStrength"),
+        centerBiasIntervalMs = values.long("centerBiasIntervalMs"),
+        edgeAggroWeight = values.int("edgeAggroWeight"),
+        edgeAggroRadiusBonus = values.float("edgeAggroRadiusBonus"),
+
+        startHopModeInt = values.int("startHopModeInt"),
+        startHopTimerFudgeMs = values.long("startHopTimerFudgeMs"),
+        startHopTimerTargetMs = values.long("startHopTimerTargetMs"),
+        groundTicksRequired = values.int("groundTicksRequired"),
+        groundMaxWaitMs = values.long("groundMaxWaitMs"),
+        startAntivoidDisableMs = values.long("startAntivoidDisableMs"),
+
+        hsEnableInt = values.int("hsEnableInt"),
+        hsMinMs = values.long("hsMinMs"),
+        hsMaxMs = values.long("hsMaxMs"),
+        hsLatchMs = values.long("hsLatchMs"),
+        hsMinDist = values.float("hsMinDist"),
+        hsMaxDist = values.float("hsMaxDist"),
+        hsAimDot = values.float("hsAimDot"),
+        hsOnlyIfOppOutsideInt = values.int("hsOnlyIfOppOutsideInt")
+    )
 
     private fun load(): StoredState {
         return try {

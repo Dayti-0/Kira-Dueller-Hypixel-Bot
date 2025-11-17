@@ -314,9 +314,13 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
 
     // ------------------- Lifecycle -------------------
     override fun onGameStart() {
-        val params = try {
-            ComboTuner.pickParams()
-        } catch (_: Throwable) {
+        val params = if (kira.isTunerEnabled) {
+            try {
+                ComboTuner.pickParams()
+            } catch (_: Throwable) {
+                ComboTuner.defaults()
+            }
+        } else {
             ComboTuner.defaults()
         }
         applyParams(params)
@@ -373,7 +377,9 @@ class Combo : BotBase("/play duels_combo_duel"), MovePriority, Gap, Potion {
             Session.losses > Session.wins -> false
             else -> false
         }
-        ComboTuner.report(win, 0)
+        if (kira.isTunerEnabled) {
+            ComboTuner.report(win, 0)
+        }
         TimeUtils.setTimeout({
             Movement.clearAll()
             Mouse.stopLeftAC()

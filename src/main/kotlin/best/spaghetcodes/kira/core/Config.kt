@@ -57,6 +57,14 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     var enableModeRotation = false
 
     @Property(
+        type = PropertyType.SWITCH,
+        name = "Enable Tuner",
+        description = "Allow duel bots to auto-tune their behaviour using past games.",
+        category = "General"
+    )
+    var enableTuner = true
+
+    @Property(
         type = PropertyType.NUMBER,
         name = "Games Per Mode",
         description = "How many games to play before switching to the next mode.",
