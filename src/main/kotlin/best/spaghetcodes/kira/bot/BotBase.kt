@@ -78,15 +78,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private var calledGameEnd = false
 
-    private var lastDuelDurationSeenAt = 0L
-
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
-
-    private val meleeSummaryRegex = Regex(
-        """^\\s*\\d+(?:\\.\\d+)?%?\\s*-\\s*(?:pr[eé]cision en\\s+melee|melee accuracy)\\s*-\\s*\\d+(?:\\.\\d+)?%?\\s*$""",
-        RegexOption.IGNORE_CASE
-    )
 
     private var antiDetectionStage = 0
     private var antiDetectionSequenceFinished = false
@@ -384,31 +377,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
-    private fun isCombatSummaryLine(raw: String): Boolean {
-        if (!raw.lowercase().contains("melee")) return false
-
-        val plain = ChatUtils.removeFormatting(raw).trim()
-        // Ignore standard chat lines like "[VIP+] Player: 100% - Melee Accuracy - 100%" that still
-        // contain a player prefix and colon. Real recap lines do not include a speaker prefix.
-        val chatPrefixed = Regex("^\\s*(\\[[^\\]]+\\]\\s*)?[A-Za-z0-9_]{2,16}\\s*:\\s*.+")
-        if (chatPrefixed.matches(plain)) return false
-        return meleeSummaryRegex.matches(plain)
-    }
-
-    private val duelDurationRegex = Regex("(?i)\\bduel\\b\\s*-\\s*\\d{2}:\\d{2}\\b")
-
-    private fun updateDuelDurationMarker(raw: String) {
-        val plain = ChatUtils.removeFormatting(raw)
-        if (duelDurationRegex.containsMatchIn(plain)) {
-            lastDuelDurationSeenAt = System.currentTimeMillis()
-        }
-    }
-
-    private fun hasRecentDuelDuration(): Boolean {
-        if (lastDuelDurationSeenAt == 0L) return false
-        return System.currentTimeMillis() - lastDuelDurationSeenAt <= 15_000
-    }
-
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
             when (packet) {
@@ -558,7 +526,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun onChat(ev: ClientChatReceivedEvent) {
         val unformatted = ev.message.unformattedText
         if (toggled() && mc.thePlayer != null) {
-            updateDuelDurationMarker(unformatted)
             maybeRespondToSuspicion(unformatted)
 
             if (unformatted.contains("The game starts in 1 second!") ||
@@ -574,10 +541,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 gameStart()
             }
 
-            // FR/EN : fin de partie détectée par le récapitulatif (ligne précision melee)
-            if (isCombatSummaryLine(unformatted) && hasRecentDuelDuration() && !calledGameEnd) {
+            // FR: fin de partie détectée par le récapitulatif
+            if (unformatted.contains("Melee") && !calledGameEnd) {
                 calledGameEnd = true
-                lastDuelDurationSeenAt = 0L
                 gameEnd()
             }
 
@@ -664,7 +630,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
-        lastDuelDurationSeenAt = 0L
         hasCombatContact = false
         hasBowBeenUsed = false
         antiDetectionSequenceFinished = false
