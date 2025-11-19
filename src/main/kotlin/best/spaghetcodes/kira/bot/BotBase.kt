@@ -82,7 +82,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var resultCounted = false
 
     private val meleeSummaryRegex = Regex(
-        """\\d+(?:\\.\\d+)?%?\\s*-\\s*(?:pr[eé]cision en\\s+melee|melee accuracy)\\s*-\\s*\\d+(?:\\.\\d+)?%?""",
+        """^\\s*\\d+(?:\\.\\d+)?%?\\s*-\\s*(?:pr[eé]cision en\\s+melee|melee accuracy)\\s*-\\s*\\d+(?:\\.\\d+)?%?\\s*$""",
         RegexOption.IGNORE_CASE
     )
 
@@ -386,7 +386,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         if (!raw.lowercase().contains("melee")) return false
 
         val plain = ChatUtils.removeFormatting(raw).trim()
-        return meleeSummaryRegex.containsMatchIn(plain)
+        return meleeSummaryRegex.matches(plain)
     }
 
     fun onPacket(packet: Packet<*>) {
