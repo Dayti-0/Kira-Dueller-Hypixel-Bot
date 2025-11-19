@@ -17,6 +17,7 @@ import net.minecraft.network.Packet
 import net.minecraft.network.play.server.S19PacketEntityStatus
 import net.minecraft.network.play.server.S45PacketTitle
 import net.minecraft.util.EnumChatFormatting
+import net.minecraft.item.ItemBow
 import net.minecraft.item.ItemSword
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.event.entity.EntityJoinWorldEvent
@@ -81,6 +82,36 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var resultCounted = false
 
     private var antiDetectionStage = 0
+    private var antiDetectionSequenceFinished = false
+    private var lastAntiDetectionReplyAt = 0L
+    private var hasCombatContact = false
+    private var hasBowBeenUsed = false
+
+    private val suspicionKeywords = listOf(
+        "bot",
+        "accuracy",
+        "cheat",
+        "hacker",
+        "hack",
+        "macro",
+        "autoclick",
+        "auto click",
+        "aimbot",
+        "reach"
+    )
+
+    private val suspicionResponses = listOf(
+        "wdym?",
+        "bro relax",
+        "lol I'm just clicking",
+        "??",
+        "what are you on about",
+        "stop coping",
+        "just play the game",
+        "nah I'm legit",
+        "lmao no",
+        "dude chill"
+    )
 
     fun opponent() = opponent
 
@@ -140,6 +171,21 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private fun resetAntiDetection() {
         antiDetectionStage = 0
+    }
+
+    private fun recordBowUsage() {
+        if (hasBowBeenUsed) return
+        val playerBow = isUsingBow(mc.thePlayer)
+        val opponentBow = isUsingBow(opponent)
+        if (playerBow || opponentBow) {
+            hasBowBeenUsed = true
+        }
+    }
+
+    private fun isUsingBow(entity: EntityPlayer?): Boolean {
+        if (entity == null || !entity.isUsingItem) return false
+        val item = entity.itemInUse?.item
+        return item is ItemBow
     }
 
     private fun performSneakCycles(cycles: Int) {
@@ -226,6 +272,15 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             return
         }
 
+        if (hasCombatContact) {
+            antiDetectionSequenceFinished = true
+            return
+        }
+
+        if (hasBowBeenUsed || antiDetectionSequenceFinished) {
+            return
+        }
+
         when (antiDetectionStage) {
             0 -> if (ticksSinceHit >= 30 * 20) {
                 performSneakCycles(RandomUtils.randomIntInRange(2, 3))
@@ -239,8 +294,37 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             2 -> if (ticksSinceHit >= 70 * 20) {
                 sendAntiDetectionMessage("You're wasting your time.")
                 antiDetectionStage = 3
+                antiDetectionSequenceFinished = true
             }
         }
+    }
+
+    private fun maybeRespondToSuspicion(rawMessage: String) {
+        val cfg = kira.config ?: return
+        if (!cfg.antiDetection) return
+        if (cfg.disableChatMessages == true) return
+
+        val opponentName = opponent?.gameProfile?.name ?: lastOpponentName
+        if (opponentName.isBlank()) return
+
+        val plain = ChatUtils.removeFormatting(rawMessage).trim()
+        val colonIndex = plain.indexOf(":")
+        if (colonIndex <= 0) return
+
+        var author = plain.substring(0, colonIndex).trim()
+        author = author.replace(Regex("\\[[^\\]]+\\]"), "").trim()
+        if (!author.equals(opponentName, ignoreCase = true)) return
+
+        val content = plain.substring(colonIndex + 1).lowercase()
+        val matchedKeyword = suspicionKeywords.any { keyword -> content.contains(keyword) }
+        if (!matchedKeyword) return
+
+        val now = System.currentTimeMillis()
+        if (now - lastAntiDetectionReplyAt < 6000) return
+        lastAntiDetectionReplyAt = now
+
+        val idx = RandomUtils.randomIntInRange(0, suspicionResponses.lastIndex)
+        sendAntiDetectionMessage(suspicionResponses[idx])
     }
 
     private fun maybeHitBlock() {
@@ -306,12 +390,14 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 combo++
                                 opponentCombo = 0
                                 ticksSinceHit = 0
+                                hasCombatContact = true
                                 resetAntiDetection()
                                 maybeHitBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
                                 combo = 0
                                 opponentCombo++
+                                hasCombatContact = true
                             }
                         }
                     }
@@ -390,6 +476,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         registerPacketListener()
         if (toggled) {
             onTick()
+            recordBowUsage()
 
             if (StateManager.state != StateManager.States.PLAYING) {
                 ticksSinceGameStart++
@@ -439,6 +526,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun onChat(ev: ClientChatReceivedEvent) {
         val unformatted = ev.message.unformattedText
         if (toggled() && mc.thePlayer != null) {
+            maybeRespondToSuspicion(unformatted)
 
             if (unformatted.contains("The game starts in 1 second!") ||
                 unformatted.contains("dans 1 secondes!")) {
@@ -542,6 +630,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
+        hasCombatContact = false
+        hasBowBeenUsed = false
+        antiDetectionSequenceFinished = false
         resetAntiDetection()
     }
 
