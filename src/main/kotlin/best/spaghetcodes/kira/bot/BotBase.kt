@@ -78,6 +78,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private var calledGameEnd = false
 
+    private var lastDuelDurationSeenAt = 0L
+
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
 
@@ -393,6 +395,20 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         return meleeSummaryRegex.matches(plain)
     }
 
+    private val duelDurationRegex = Regex("(?i)\\bduel\\b\\s*-\\s*\\d{2}:\\d{2}\\b")
+
+    private fun updateDuelDurationMarker(raw: String) {
+        val plain = ChatUtils.removeFormatting(raw)
+        if (duelDurationRegex.containsMatchIn(plain)) {
+            lastDuelDurationSeenAt = System.currentTimeMillis()
+        }
+    }
+
+    private fun hasRecentDuelDuration(): Boolean {
+        if (lastDuelDurationSeenAt == 0L) return false
+        return System.currentTimeMillis() - lastDuelDurationSeenAt <= 15_000
+    }
+
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
             when (packet) {
@@ -542,6 +558,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun onChat(ev: ClientChatReceivedEvent) {
         val unformatted = ev.message.unformattedText
         if (toggled() && mc.thePlayer != null) {
+            updateDuelDurationMarker(unformatted)
             maybeRespondToSuspicion(unformatted)
 
             if (unformatted.contains("The game starts in 1 second!") ||
@@ -558,8 +575,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             }
 
             // FR/EN : fin de partie détectée par le récapitulatif (ligne précision melee)
-            if (isCombatSummaryLine(unformatted) && !calledGameEnd) {
+            if (isCombatSummaryLine(unformatted) && hasRecentDuelDuration() && !calledGameEnd) {
                 calledGameEnd = true
+                lastDuelDurationSeenAt = 0L
                 gameEnd()
             }
 
@@ -646,6 +664,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         ticksSinceHit = 0
         ticksSinceGameStart = 0
         resultCounted = false
+        lastDuelDurationSeenAt = 0L
         hasCombatContact = false
         hasBowBeenUsed = false
         antiDetectionSequenceFinished = false
