@@ -10,8 +10,6 @@ import kotlin.math.round
 object OPTuner {
 
     data class OPParams(
-        val speedPots: Int,
-        val regenPots: Int,
         val minGapIntervalMs: Long,
         val longStrafeChance: Int,
         val rodCdCloseMsBase: Long,
@@ -33,7 +31,8 @@ object OPTuner {
         val bowSlowThreshold: Double,
         val bowSlowFramesNeeded: Int,
         val feetSplashSafeDistance: Double,
-        val feetSplashRetreatMaxMs: Long
+        val feetSplashRetreatMaxMs: Long,
+        val secondRegenGapDelayMs: Long
     )
 
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
@@ -75,8 +74,6 @@ object OPTuner {
         ParamSpec(key, min, max, step, def, ParamType.DOUBLE)
 
     private val specs = listOf(
-        specI("speedPots", 1.0, 3.0, 1.0, 2.0),
-        specI("regenPots", 1.0, 3.0, 1.0, 2.0),
         specL("minGapIntervalMs", 3500.0, 5500.0, 100.0, 4500.0),
         specI("longStrafeChance", 10.0, 40.0, 1.0, 25.0),
         specL("rodCdCloseMsBase", 300.0, 420.0, 10.0, 340.0),
@@ -98,7 +95,8 @@ object OPTuner {
         specD("bowSlowThreshold", 0.04, 0.12, 0.0025, 0.06),
         specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),
         specD("feetSplashSafeDistance", 4.5, 6.5, 0.05, 5.6),
-        specL("feetSplashRetreatMaxMs", 500.0, 1100.0, 20.0, 700.0)
+        specL("feetSplashRetreatMaxMs", 500.0, 1100.0, 20.0, 700.0),
+        specL("secondRegenGapDelayMs", 20000.0, 45000.0, 500.0, 30000.0)
     )
 
     private val specByKey = specs.associateBy { it.key }
@@ -125,8 +123,6 @@ object OPTuner {
     }
 
     private fun build(values: Map<String, Double>) = OPParams(
-        speedPots = values.int("speedPots"),
-        regenPots = values.int("regenPots"),
         minGapIntervalMs = values.long("minGapIntervalMs"),
         longStrafeChance = values.int("longStrafeChance"),
         rodCdCloseMsBase = values.long("rodCdCloseMsBase"),
@@ -148,7 +144,8 @@ object OPTuner {
         bowSlowThreshold = values.double("bowSlowThreshold"),
         bowSlowFramesNeeded = values.int("bowSlowFramesNeeded"),
         feetSplashSafeDistance = values.double("feetSplashSafeDistance"),
-        feetSplashRetreatMaxMs = values.long("feetSplashRetreatMaxMs")
+        feetSplashRetreatMaxMs = values.long("feetSplashRetreatMaxMs"),
+        secondRegenGapDelayMs = values.long("secondRegenGapDelayMs")
     )
 
     private fun pickValues(): Map<String, Double> {
