@@ -84,6 +84,10 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     // État potions (action en cours)
     private var takingPotion = false
 
+    // Verrou anti-saut contextuel (2e speed/regen)
+    private var jumpLockUntil = 0L
+    private var jumpLockPending = false
+
     var tapping = false
 
     // Anti double-gap strict
@@ -568,6 +572,10 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         Movement.stopSprinting()
         Mouse.setRunningAway(false)
         Mouse.setUsingProjectile(false)
+        if (jumpLockPending) {
+            beginSecondPotionJumpLock()
+            jumpLockPending = false
+        }
         val effectKey = when (damage) {
             speedDamage -> "speed"
             regenDamage -> "regeneration"
@@ -617,6 +625,16 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             }
             attempt(true)
         }
+    }
+
+    private fun beginSecondPotionJumpLock() {
+        jumpLockUntil = Long.MAX_VALUE
+        Movement.stopJumping()
+    }
+
+    private fun lockJumpFor(extraMs: Long) {
+        jumpLockUntil = System.currentTimeMillis() + extraMs
+        Movement.stopJumping()
     }
 
     // ---- GAP fiable (corrigée) ----
@@ -852,6 +870,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
         takingPotion = false
         aimFreezeUntil = 0L
+        jumpLockUntil = 0L
+        jumpLockPending = false
 
         // OUVERTURE : Speed en place, puis la Regen d'ouverture est différée (à ~20 blocs)
         TimeUtils.setTimeout({
@@ -925,6 +945,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
         takingPotion = false
         aimFreezeUntil = 0L
+        jumpLockUntil = 0L
+        jumpLockPending = false
 
         strafeDir = 1
         lastStrafeSwitch = 0L
@@ -1048,7 +1070,10 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             if (kira.config?.kiraHit == true && !retreating && !eatingGap && !takingPotion) Mouse.startLeftAC() else Mouse.stopLeftAC()
 
             // Sauts contextuels
-            if (distance > 8.8f && firstSpeedTaken) {
+            val jumpLocked = now < jumpLockUntil
+            if (jumpLocked) {
+                Movement.stopJumping()
+            } else if (distance > 8.8f && firstSpeedTaken) {
                 if (opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")) {
                     if (!Mouse.isRunningAway()) Movement.stopJumping()
                 } else {
@@ -1107,9 +1132,12 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             // ===== 2e SPEED : cast aux pieds =====
             if (openingDone && now >= openingPhaseUntil && !hasSpeed && speedPotsLeft > 0 && now - lastSpeedUse > 15000 &&
                 now - lastPotion > 3500 && !takingPotion) {
+                val lockJump = speedPotsLeft == 1
+                if (lockJump) jumpLockPending = true
                 feetSplash(speedDamage) {
                     speedPotsLeft--
                     lastSpeedUse = System.currentTimeMillis()
+                    if (lockJump) lockJumpFor(2000L)
                 }
             }
 
@@ -1148,9 +1176,12 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                         eatGoldenApple(distance, EntityUtils.entityFacingAway(p, opp))
                     } else if (regenPotsLeft > 0 && now - gameStartAt >= 120000 && now - lastRegenUse > 3500 && !openingRegenPending) {
                         // Optionnel : regen tardive si pas de gap dispo ou lock
+                        val lockJump = regenPotsLeft == 1
+                        if (lockJump) jumpLockPending = true
                         feetSplash(regenDamage) {
                             regenPotsLeft--
                             lastRegenUse = System.currentTimeMillis()
+                            if (lockJump) lockJumpFor(2000L)
                         }
                     }
                 }
@@ -1165,9 +1196,12 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
                 val handsFree = !Mouse.isUsingProjectile() && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !eatingGap
                 val enemyGate = forcedAfterAllGaps || !enemyEating
                 if (enemyGate && (forcedAfterAllGaps || noGapSinceThreshold) && cdsOk && handsFree) {
+                    val lockJump = regenPotsLeft == 1
+                    if (lockJump) jumpLockPending = true
                     feetSplash(regenDamage) {
                         regenPotsLeft--
                         lastRegenUse = System.currentTimeMillis()
+                        if (lockJump) lockJumpFor(2000L)
                     }
                 }
             }
