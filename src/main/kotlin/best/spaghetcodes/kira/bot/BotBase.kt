@@ -386,6 +386,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         if (!raw.lowercase().contains("melee")) return false
 
         val plain = ChatUtils.removeFormatting(raw).trim()
+        // Ignore standard chat lines like "[VIP+] Player: 100% - Melee Accuracy - 100%" that still
+        // contain a player prefix and colon. Real recap lines do not include a speaker prefix.
+        if (":" in plain) return false
         return meleeSummaryRegex.matches(plain)
     }
 
