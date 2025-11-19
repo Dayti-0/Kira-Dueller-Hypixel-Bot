@@ -81,11 +81,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
 
-    private val meleeSummaryRegex = Regex(
-        """^\\s*\\d+(?:\\.\\d+)?%?\\s*-\\s*(?:pr[eé]cision en\\s+melee|melee accuracy)\\s*-\\s*\\d+(?:\\.\\d+)?%?\\s*$""",
-        RegexOption.IGNORE_CASE
-    )
-
     private var antiDetectionStage = 0
     private var antiDetectionSequenceFinished = false
     private var lastAntiDetectionReplyAt = 0L
@@ -382,16 +377,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
-    private fun isCombatSummaryLine(raw: String): Boolean {
-        if (!raw.lowercase().contains("melee")) return false
-
-        val plain = ChatUtils.removeFormatting(raw).trim()
-        // Ignore standard chat lines like "[VIP+] Player: 100% - Melee Accuracy - 100%" that still
-        // contain a player prefix and colon. Real recap lines do not include a speaker prefix.
-        if (":" in plain) return false
-        return meleeSummaryRegex.matches(plain)
-    }
-
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
             when (packet) {
@@ -556,8 +541,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 gameStart()
             }
 
-            // FR/EN : fin de partie détectée par le récapitulatif (ligne précision melee)
-            if (isCombatSummaryLine(unformatted) && !calledGameEnd) {
+            // FR: fin de partie détectée par le récapitulatif
+            if (unformatted.contains("Melee") && !calledGameEnd) {
                 calledGameEnd = true
                 gameEnd()
             }
