@@ -23,6 +23,8 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     companion object {
         private const val DEFAULT_MAX_ARROWS = 20
         private const val DEFAULT_GAP_COUNT = 6
+        private const val DEFAULT_SPEED_POTS = 2
+        private const val DEFAULT_REGEN_POTS = 2
     }
 
     override fun getName(): String = "OP"
@@ -45,11 +47,11 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     var speedDamage = 16386
     var regenDamage = 16385
 
-    var speedPotsLeft = 2
-    var regenPotsLeft = 2
+    var speedPotsLeft = DEFAULT_SPEED_POTS
+    var regenPotsLeft = DEFAULT_REGEN_POTS
     var gapsLeft = DEFAULT_GAP_COUNT
-    private var baseSpeedPots = 2
-    private var baseRegenPots = 2
+    private var baseSpeedPots = DEFAULT_SPEED_POTS
+    private var baseRegenPots = DEFAULT_REGEN_POTS
     private var baseGapCount = DEFAULT_GAP_COUNT
 
     override var flintUses = 5
@@ -95,6 +97,9 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     private var closeStrafeNextAt = 0L
     private var longStrafeUntil = 0L
     private var longStrafeChance = 25
+
+    private var secondRegenGapDelayMs = 30_000L
+    private val forcedSecondRegenDelayMs = 6_000L
 
     // Verrou d'aim court pour stabiliser un cast
     private var aimFreezeUntil = 0L
@@ -166,8 +171,6 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     private fun applyParams(params: OPTuner.OPParams) {
         configuredMaxArrows = DEFAULT_MAX_ARROWS
-        baseSpeedPots = params.speedPots
-        baseRegenPots = params.regenPots
         baseGapCount = DEFAULT_GAP_COUNT
         minGapIntervalMs = params.minGapIntervalMs
         longStrafeChance = params.longStrafeChance
@@ -191,6 +194,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         bowSlowFramesNeeded = params.bowSlowFramesNeeded
         feetSplashSafeDistance = params.feetSplashSafeDistance.toFloat()
         feetSplashRetreatMaxMs = params.feetSplashRetreatMaxMs
+        secondRegenGapDelayMs = params.secondRegenGapDelayMs
     }
 
     // =====================  LOGIQUE ROD (import ClassicV2 améliorée)  =====================
@@ -1153,11 +1157,14 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             }
 
             // =====================  2e REGEN — logique opportuniste =====================
-            if (!takingPotion && !openingRegenPending && regenPotsLeft > 0 && !hasRegen && !enemyEating) {
-                val noGapSince30s = (now - lastGap) >= 30000L
+            if (!takingPotion && !openingRegenPending && regenPotsLeft > 0 && !hasRegen) {
+                val sinceLastGap = if (lastGap > 0L) now - lastGap else Long.MAX_VALUE
+                val noGapSinceThreshold = sinceLastGap >= max(secondRegenGapDelayMs, forcedSecondRegenDelayMs)
+                val forcedAfterAllGaps = gapsLeft <= 0 && sinceLastGap >= forcedSecondRegenDelayMs
                 val cdsOk = (now - lastRegenUse > 3500L) && (now - lastPotion > 3500L)
                 val handsFree = !Mouse.isUsingProjectile() && !Mouse.isRunningAway() && !Mouse.isUsingPotion() && !eatingGap
-                if (noGapSince30s && cdsOk && handsFree) {
+                val enemyGate = forcedAfterAllGaps || !enemyEating
+                if (enemyGate && (forcedAfterAllGaps || noGapSinceThreshold) && cdsOk && handsFree) {
                     feetSplash(regenDamage) {
                         regenPotsLeft--
                         lastRegenUse = System.currentTimeMillis()
