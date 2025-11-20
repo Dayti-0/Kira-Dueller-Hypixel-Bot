@@ -21,10 +21,10 @@ import kotlin.math.min
 class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, Flint {
 
     companion object {
-        private const val DEFAULT_MAX_ARROWS = 20
-        private const val DEFAULT_GAP_COUNT = 6
-        private const val DEFAULT_SPEED_POTS = 2
-        private const val DEFAULT_REGEN_POTS = 2
+        private const val DEFAULT_MAX_ARROWS = 20  // Nombre de flèches au départ
+        private const val DEFAULT_GAP_COUNT = 6   // Nombre de gaps au départ
+        private const val DEFAULT_SPEED_POTS = 2  // Nombre de speed pots au départ
+        private const val DEFAULT_REGEN_POTS = 2  // Nombre de regen pots au départ
     }
 
     override fun getName(): String = "OP"
@@ -91,7 +91,7 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     var tapping = false
 
     // Anti double-gap strict
-    private var minGapIntervalMs = 4500L
+    private val minGapIntervalMs = 4500L  // Valeur fixe (non tunable)
     private var gapLockUntil = 0L
 
     // =====================  STRAFE  =====================
@@ -174,9 +174,15 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
     }
 
     private fun applyParams(params: OPTuner.OPParams) {
-        configuredMaxArrows = DEFAULT_MAX_ARROWS
-        baseGapCount = DEFAULT_GAP_COUNT
-        minGapIntervalMs = params.minGapIntervalMs
+        // Les consommables utilisent les constantes (valeurs de départ)
+        configuredMaxArrows = DEFAULT_MAX_ARROWS  // 20 flèches
+        baseGapCount = DEFAULT_GAP_COUNT          // 6 gaps
+        baseSpeedPots = DEFAULT_SPEED_POTS        // 2 speed pots
+        baseRegenPots = DEFAULT_REGEN_POTS        // 2 regen pots
+        
+        // minGapIntervalMs est une valeur fixe (4500L), ne pas l'assigner
+        
+        // Paramètres de combat optimisés par le tuner
         longStrafeChance = params.longStrafeChance
         rodCdCloseMsBase = params.rodCdCloseMsBase
         rodCdFarMsBase = params.rodCdFarMsBase
