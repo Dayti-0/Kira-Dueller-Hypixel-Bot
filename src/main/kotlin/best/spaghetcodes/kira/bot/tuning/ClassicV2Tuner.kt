@@ -9,10 +9,7 @@ import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
-import kotlin.math.max
 import kotlin.math.round
-import kotlin.math.sqrt
-import kotlin.math.ln
 
 object ClassicV2Tuner {
 
@@ -110,20 +107,16 @@ object ClassicV2Tuner {
     // -------------------------- STORAGE --------------------------
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
     private data class ParamSpec(val key: String, val min: Double, val max: Double, val step: Double, val def: Double, val type: ParamType)
-    private data class ValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0) {
-        fun avg(): Double = if (plays > 0) totalReward / plays else 0.0
+    private data class ParamState(
+        var values: MutableList<Double> = mutableListOf(),
+        var lastValue: Double = 0.0,
+        var bandit: UcbBanditState? = null,
+        var lastArm: Int = 0
+    )
 
-        fun ucb(totalPlays: Int, c: Double = 1.4): Double {
-            if (plays == 0) return Double.POSITIVE_INFINITY
-            val exploitation = avg()
-            val exploration = c * sqrt(ln(totalPlays.toDouble()) / plays)
-            return exploitation + exploration
-        }
-    }
-    private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
-    private const val CURRENT_VERSION = 2
+    private const val CURRENT_VERSION = 3
     private const val MISTAKE_PENALTY = 0.25
     private const val TOP_N_KEEP = 16
 
@@ -283,7 +276,7 @@ object ClassicV2Tuner {
     }
 
     // ----------- UCB (Upper Confidence Bound) -----------
-    private fun pickWithUCB(): Map<String, Double> {
+    private fun pickWithBandit(): Map<String, Double> {
         val chosen = mutableMapOf<String, Double>()
 
         for (spec in specs) {
@@ -293,62 +286,38 @@ object ClassicV2Tuner {
                 initializeValues(p, spec)
             }
 
-            val shouldExplore = shouldExploreNew(p)
+            var bandit = banditFor(p)
+            val shouldExplore = shouldExploreNew(p, bandit)
 
-            val value = if (shouldExplore) {
+            val selectedArm = if (shouldExplore) {
                 val newValue = sample(spec)
-                val key = keyOf(newValue)
-                if (!p.values.containsKey(key)) {
-                    p.values[key] = ValueState(value = newValue)
-                }
-                newValue
+                val idx = ensureValue(p, newValue)
+                bandit = resizeBandit(bandit, p.values.size)
+                idx
             } else {
-                selectByUCB(p, spec)
+                bandit = resizeBandit(bandit, p.values.size)
+                bandit.selectArm()
             }
 
-            p.lastValue = value
-            chosen[spec.key] = value
+            p.lastArm = selectedArm
+            p.lastValue = p.values[selectedArm]
+            p.bandit = bandit.toState()
+            chosen[spec.key] = p.lastValue
         }
 
         save()
         return chosen
     }
 
-    private fun selectByUCB(ps: ParamState, spec: ParamSpec): Double {
-        if (ps.values.isEmpty()) {
-            return spec.def
-        }
-
-        var bestValue = spec.def
-        var bestScore = Double.NEGATIVE_INFINITY
-
-        val c = when {
-            ps.totalPlays < 50 -> 2.0
-            ps.totalPlays < 200 -> 1.4
-            ps.totalPlays < 500 -> 1.0
-            else -> 0.5
-        }
-
-        for ((_, vs) in ps.values) {
-            val score = vs.ucb(ps.totalPlays, c)
-            if (score > bestScore) {
-                bestScore = score
-                bestValue = vs.value
-            }
-        }
-
-        return clamp(bestValue, spec)
-    }
-
-    private fun shouldExploreNew(ps: ParamState): Boolean {
+    private fun shouldExploreNew(ps: ParamState, bandit: UcbBandit): Boolean {
         if (ps.values.size < 10) return RandomUtils.randomDoubleInRange(0.0, 1.0) < 0.3
 
-        if (ps.totalPlays > 0 && ps.totalPlays % 30 == 0) return true
+        if (bandit.totalPlays > 0 && bandit.totalPlays % 30 == 0L) return true
 
         val explorationRate = when {
-            ps.totalPlays < 100 -> 0.2
-            ps.totalPlays < 300 -> 0.1
-            ps.totalPlays < 1000 -> 0.05
+            bandit.totalPlays < 100 -> 0.2
+            bandit.totalPlays < 300 -> 0.1
+            bandit.totalPlays < 1000 -> 0.05
             else -> 0.02
         }
 
@@ -356,9 +325,9 @@ object ClassicV2Tuner {
     }
 
     private fun initializeValues(ps: ParamState, spec: ParamSpec) {
-        val defKey = keyOf(spec.def)
-        if (!ps.values.containsKey(defKey)) {
-            ps.values[defKey] = ValueState(value = spec.def)
+        val defaultKey = keyOf(spec.def)
+        if (!ps.values.any { keyOf(it) == defaultKey }) {
+            ps.values.add(spec.def)
         }
 
         val range = spec.max - spec.min
@@ -372,8 +341,8 @@ object ClassicV2Tuner {
             val quantized = quantize(value, spec.step)
             val clamped = clamp(quantized, spec)
             val key = keyOf(clamped)
-            if (!ps.values.containsKey(key)) {
-                ps.values[key] = ValueState(value = clamped)
+            if (!ps.values.any { keyOf(it) == key }) {
+                ps.values.add(clamped)
             }
         }
     }
@@ -382,13 +351,34 @@ object ClassicV2Tuner {
     private fun prune() {
         for ((_, ps) in state.params) {
             if (ps.values.size <= TOP_N_KEEP) continue
-            val sorted = ps.values.entries.sortedByDescending { it.value.avg() }
-            val keep = sorted.take(TOP_N_KEEP).associate { it.key to it.value }.toMutableMap()
-            val lastKey = keyOf(ps.lastValue)
-            if (!keep.containsKey(lastKey)) {
-                ps.values[lastKey]?.let { keep[lastKey] = it }
+            val bandit = banditFor(ps)
+            val banditState = bandit.toState()
+            val scores = ps.values.indices.map { idx ->
+                val plays = banditState.plays[idx]
+                if (plays > 0) banditState.rewards[idx] / plays else 0.0
             }
-            ps.values = keep
+            val sorted = ps.values.indices.sortedByDescending { scores[it] }
+            val keepIndices = sorted.take(TOP_N_KEEP).toMutableSet()
+            keepIndices.add(ps.lastArm)
+
+            val newValues = mutableListOf<Double>()
+            val newPlays = mutableListOf<Long>()
+            val newRewards = mutableListOf<Double>()
+            val indexMap = mutableMapOf<Int, Int>()
+            for (idx in ps.values.indices) {
+                if (keepIndices.contains(idx)) {
+                    indexMap[idx] = newValues.size
+                    newValues.add(ps.values[idx])
+                    newPlays.add(banditState.plays[idx])
+                    newRewards.add(banditState.rewards[idx])
+                }
+            }
+
+            ps.values = newValues
+            ps.lastArm = indexMap[ps.lastArm] ?: 0
+            ps.lastValue = ps.values.getOrElse(ps.lastArm) { 0.0 }
+            val totalPlays = newPlays.sum()
+            ps.bandit = UcbBandit(newValues.size, totalPlays, newPlays.toLongArray(), newRewards.toDoubleArray()).toState()
         }
     }
 
@@ -413,7 +403,7 @@ object ClassicV2Tuner {
     @Synchronized
     fun pickParams(): ClassicParams {
         ensureLoaded()
-        val chosen = pickWithUCB().toMutableMap()
+        val chosen = pickWithBandit().toMutableMap()
         normalize(chosen)
         val params = buildParams(chosen)
         lastPicked = params
@@ -429,11 +419,12 @@ object ClassicV2Tuner {
         val reward = (rewardBase - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
         for ((_, ps) in state.params) {
-            val entryKey = keyOf(ps.lastValue)
-            val vs = ps.values.getOrPut(entryKey) { ValueState(value = ps.lastValue) }
-            vs.plays += 1
-            vs.totalReward += reward
-            ps.totalPlays += 1
+            if (ps.values.isEmpty()) continue
+            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            val arm = ps.lastArm.coerceIn(ps.values.indices)
+            ps.lastArm = arm
+            ps.lastValue = ps.values[arm]
+            ps.bandit = bandit.update(arm, reward).toState()
             changed = true
         }
         if (changed) {
@@ -558,6 +549,31 @@ object ClassicV2Tuner {
     }
 
     private fun keyOf(v: Double): String = "%.4f".format(v)
+
+    private fun banditFor(ps: ParamState): UcbBandit {
+        require(ps.values.isNotEmpty()) { "bandit requested without available values" }
+        val plays = ps.bandit?.plays ?: LongArray(ps.values.size)
+        val rewards = ps.bandit?.rewards ?: DoubleArray(ps.values.size)
+        val total = ps.bandit?.totalPlays ?: 0L
+        return UcbBandit(ps.values.size, total, plays.copyOf(ps.values.size), rewards.copyOf(ps.values.size))
+    }
+
+    private fun resizeBandit(bandit: UcbBandit, size: Int): UcbBandit {
+        if (bandit.armCount == size) return bandit
+        val state = bandit.toState()
+        val plays = state.plays.copyOf(size)
+        val rewards = state.rewards.copyOf(size)
+        return UcbBandit(size, state.totalPlays, plays, rewards)
+    }
+
+    private fun ensureValue(ps: ParamState, value: Double): Int {
+        val key = keyOf(value)
+        ps.values.forEachIndexed { idx, existing ->
+            if (keyOf(existing) == key) return idx
+        }
+        ps.values.add(value)
+        return ps.values.lastIndex
+    }
 
     @Synchronized
     private fun ensureLoaded() {

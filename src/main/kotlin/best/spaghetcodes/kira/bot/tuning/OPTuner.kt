@@ -5,9 +5,8 @@ import best.spaghetcodes.kira.utils.RandomUtils
 import com.google.gson.reflect.TypeToken
 import java.io.File
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.round
-import kotlin.math.sqrt
-import kotlin.math.ln
 
 /**
  * OPTuner - Version Optimisée avec UCB
@@ -54,25 +53,11 @@ object OPTuner {
         val optimal: Double? = null  // Valeur optimale découverte lors des tests
     )
 
-    private data class ValueState(
-        var value: Double = 0.0,
-        var plays: Int = 0,
-        var totalReward: Double = 0.0
-    ) {
-        fun avg(): Double = if (plays > 0) totalReward / plays else 0.0
-
-        fun ucb(totalPlays: Int, c: Double = 1.4): Double {
-            if (plays == 0) return Double.POSITIVE_INFINITY
-            val exploitation = avg()
-            val exploration = c * sqrt(ln(totalPlays.toDouble()) / plays)
-            return exploitation + exploration
-        }
-    }
-
     private data class ParamState(
-        var values: MutableMap<String, ValueState> = mutableMapOf(),
+        var values: MutableList<Double> = mutableListOf(),
         var lastValue: Double = 0.0,
-        var totalPlays: Int = 0
+        var bandit: UcbBanditState? = null,
+        var lastArm: Int = 0
     )
 
     private data class StoredState(
@@ -80,7 +65,20 @@ object OPTuner {
         var params: MutableMap<String, ParamState> = mutableMapOf()
     )
 
-    private const val CURRENT_VERSION = 2
+    private data class LegacyValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0)
+
+    private data class LegacyParamState(
+        var values: MutableMap<String, LegacyValueState> = mutableMapOf(),
+        var lastValue: Double = 0.0,
+        var totalPlays: Int = 0
+    )
+
+    private data class LegacyStoredState(
+        var version: Int = 2,
+        var params: MutableMap<String, LegacyParamState> = mutableMapOf()
+    )
+
+    private const val CURRENT_VERSION = 3
     private const val MISTAKE_PENALTY = 0.25
 
     private fun specI(key: String, min: Double, max: Double, step: Double, def: Double, optimal: Double? = null) =
@@ -139,10 +137,10 @@ object OPTuner {
 
     fun pickParams(): OPParams {
         ensureLoaded()
-        
+
         // Optimisation continue avec exploration intelligente (UCB)
-        val values = pickWithUCB()
-        
+        val values = pickValues()
+
         return build(values)
     }
     
@@ -155,17 +153,18 @@ object OPTuner {
         val reward = (baseReward - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
 
         // Mise à jour des paramètres
+        var changed = false
         for ((_, ps) in state.params) {
-            val entryKey = keyOf(ps.lastValue)
-            val vs = ps.values.getOrPut(entryKey) { ValueState(value = ps.lastValue) }
-
-            vs.plays += 1
-            vs.totalReward += reward
-
-            ps.totalPlays += 1
+            if (ps.values.isEmpty()) continue
+            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            val arm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
+            val updated = bandit.update(arm, reward)
+            ps.bandit = updated.toState()
+            ps.lastArm = arm
+            ps.lastValue = ps.values[arm]
+            changed = true
         }
-
-        save()
+        if (changed) save()
     }
 
     private fun build(values: Map<String, Double>) = OPParams(
@@ -194,119 +193,85 @@ object OPTuner {
         secondRegenGapDelayMs = values.long("secondRegenGapDelayMs")
     )
 
-    private fun pickWithUCB(): Map<String, Double> {
+    private fun pickValues(): Map<String, Double> {
         val chosen = mutableMapOf<String, Double>()
-        
+
         for (spec in specs) {
             val p = state.params.getOrPut(spec.key) { ParamState() }
-            
-            // Initialiser avec la valeur optimale et quelques autres
+
             if (p.values.isEmpty()) {
                 initializeValues(p, spec)
             }
-            
-            // Décider si on explore une nouvelle valeur ou on exploite
-            val shouldExplore = shouldExploreNew(p)
-            
-            val value = if (shouldExplore) {
-                // Explorer une nouvelle valeur
+
+            var bandit = banditFor(p)
+            val shouldExplore = shouldExploreNew(p, bandit)
+
+            val selectedArm = if (shouldExplore) {
                 val newValue = sample(spec)
-                val key = keyOf(newValue)
-                if (!p.values.containsKey(key)) {
-                    p.values[key] = ValueState(value = newValue)
-                }
-                newValue
+                val idx = ensureValue(p, newValue, spec)
+                bandit = resizeBandit(bandit, p.values.size)
+                idx
             } else {
-                // Utiliser UCB pour sélectionner parmi les valeurs existantes
-                selectByUCB(p, spec)
+                bandit = resizeBandit(bandit, p.values.size)
+                bandit.selectArm()
             }
-            
-            p.lastValue = value
-            chosen[spec.key] = value
+
+            p.lastArm = selectedArm
+            p.lastValue = p.values[selectedArm]
+            p.bandit = bandit.toState()
+            chosen[spec.key] = p.lastValue
         }
-        
+
         save()
         return chosen
     }
 
-    private fun selectByUCB(ps: ParamState, spec: ParamSpec): Double {
-        if (ps.values.isEmpty()) {
-            return spec.optimal ?: spec.def
-        }
-        
-        var bestValue = spec.def
-        var bestScore = Double.NEGATIVE_INFINITY
-        
-        // Ajuster le facteur d'exploration selon le nombre de parties
-        val c = when {
-            ps.totalPlays < 50 -> 2.0     // Beaucoup d'exploration au début
-            ps.totalPlays < 200 -> 1.4    // Standard UCB
-            ps.totalPlays < 500 -> 1.0    // Réduction progressive
-            else -> 0.5                    // Exploitation principalement
-        }
-        
-        for ((_, vs) in ps.values) {
-            val score = vs.ucb(ps.totalPlays, c)
-            if (score > bestScore) {
-                bestScore = score
-                bestValue = vs.value
-            }
-        }
-        
-        return clamp(bestValue, spec)
-    }
-
-    private fun shouldExploreNew(ps: ParamState): Boolean {
-        // Explorer si on a peu de valeurs testées
+    private fun shouldExploreNew(ps: ParamState, bandit: UcbBandit): Boolean {
         if (ps.values.size < 10) return RandomUtils.randomDoubleInRange(0.0, 1.0) < 0.3
-        
-        // Explorer périodiquement pour découvrir de nouvelles valeurs
-        if (ps.totalPlays > 0 && ps.totalPlays % 30 == 0) return true
-        
-        // Exploration adaptative selon le nombre de parties
+        if (bandit.totalPlays > 0 && bandit.totalPlays % 30 == 0L) return true
+
         val explorationRate = when {
-            ps.totalPlays < 100 -> 0.2
-            ps.totalPlays < 300 -> 0.1
-            ps.totalPlays < 1000 -> 0.05
+            bandit.totalPlays < 100 -> 0.2
+            bandit.totalPlays < 300 -> 0.1
+            bandit.totalPlays < 1000 -> 0.05
             else -> 0.02
         }
-        
+
         return RandomUtils.randomDoubleInRange(0.0, 1.0) < explorationRate
     }
 
     private fun initializeValues(ps: ParamState, spec: ParamSpec) {
-        // Toujours ajouter la valeur optimale si elle existe
-        spec.optimal?.let {
-            val key = keyOf(it)
-            ps.values[key] = ValueState(value = it)
+        spec.optimal?.let { optimal ->
+            if (ps.values.none { keyOf(it) == keyOf(optimal) }) {
+                ps.values.add(optimal)
+            }
         }
-        
-        // Ajouter la valeur par défaut
+
         val defKey = keyOf(spec.def)
-        if (!ps.values.containsKey(defKey)) {
-            ps.values[defKey] = ValueState(value = spec.def)
+        if (!ps.values.any { keyOf(it) == defKey }) {
+            ps.values.add(spec.def)
         }
-        
-        // Ajouter quelques valeurs réparties dans la plage
+
         val range = spec.max - spec.min
         val initialValues = listOf(
             spec.min + range * 0.25,
             spec.min + range * 0.5,
             spec.min + range * 0.75
         )
-        
+
         for (value in initialValues) {
             val quantized = quantize(value, spec.step)
             val clamped = clamp(quantized, spec)
             val key = keyOf(clamped)
-            if (!ps.values.containsKey(key)) {
-                ps.values[key] = ValueState(value = clamped)
+            if (!ps.values.any { keyOf(it) == key }) {
+                ps.values.add(clamped)
             }
         }
     }
 
     private fun defaultValues(): Map<String, Double> = specs.associate { it.key to it.def }
 
+    @Synchronized
     private fun ensureLoaded() {
         if (!loaded) {
             state = load()
@@ -346,21 +311,28 @@ object OPTuner {
         return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
 
+    private fun ensureValue(ps: ParamState, value: Double, spec: ParamSpec): Int {
+        val clamped = clamp(quantize(value, spec.step), spec)
+        val key = keyOf(clamped)
+        val existing = ps.values.indexOfFirst { keyOf(it) == key }
+        if (existing >= 0) return existing
+        ps.values.add(clamped)
+        return ps.values.lastIndex
+    }
+
     private fun load(): StoredState {
         return try {
             val f = file()
             if (!f.exists()) {
                 f.parentFile?.mkdirs()
-                // Démarrer avec les valeurs optimales découvertes
                 val newState = StoredState()
-                // Pré-initialiser avec les valeurs optimales
                 for (spec in specs) {
                     spec.optimal?.let { optimalValue ->
                         val ps = ParamState()
-                        val key = keyOf(optimalValue)
-                        ps.values[key] = ValueState(value = optimalValue, plays = 1, totalReward = 1.0)
+                        ps.values.add(optimalValue)
                         ps.lastValue = optimalValue
-                        ps.totalPlays = 1
+                        ps.lastArm = 0
+                        ps.bandit = emptyBandit(1).update(0, 1.0).toState()
                         newState.params[spec.key] = ps
                     }
                 }
@@ -370,9 +342,9 @@ object OPTuner {
                     val type = object : TypeToken<StoredState>() {}.type
                     val loadedState = kira.gson.fromJson<StoredState>(reader, type)
                     if (loadedState == null || loadedState.version != CURRENT_VERSION) {
-                        StoredState()
+                        migrateLegacy()
                     } else {
-                        loadedState
+                        normalize(loadedState)
                     }
                 }
             }
@@ -391,6 +363,80 @@ object OPTuner {
         } catch (_: Exception) {
         }
     }
+
+    private fun normalize(stored: StoredState): StoredState {
+        for ((_, ps) in stored.params) {
+            if (ps.values.isEmpty()) continue
+            val size = ps.values.size
+            val bandit = ps.bandit?.let { UcbBandit.fromState(it) } ?: emptyBandit(size)
+            val resized = resizeBandit(bandit, size)
+            val arm = ps.lastArm.coerceIn(0, size - 1)
+            ps.lastArm = arm
+            ps.lastValue = ps.values[arm]
+            ps.bandit = resized.toState()
+        }
+        return stored
+    }
+
+    private fun migrateLegacy(): StoredState {
+        return try {
+            val f = file()
+            val type = object : TypeToken<LegacyStoredState>() {}.type
+            val legacy = f.reader().use { kira.gson.fromJson<LegacyStoredState>(it, type) } ?: LegacyStoredState()
+            val migrated = StoredState()
+            for ((key, lp) in legacy.params) {
+                val ps = ParamState()
+                val sorted = lp.values.entries.sortedBy { it.key }
+                val values = sorted.map { it.value.value }.toMutableList()
+                if (values.isEmpty()) continue
+                ps.values = values
+                val plays = LongArray(values.size)
+                val rewards = DoubleArray(values.size)
+                for ((idx, entry) in sorted.withIndex()) {
+                    plays[idx] = entry.value.plays.toLong()
+                    rewards[idx] = entry.value.totalReward
+                }
+                val total = max(lp.totalPlays.toLong(), plays.sum())
+                val bandit = UcbBandit(values.size, total, plays, rewards)
+                val arm = values.indexOfFirst { keyOf(it) == keyOf(lp.lastValue) }.takeIf { it >= 0 } ?: 0
+                ps.lastArm = arm
+                ps.lastValue = values[arm]
+                ps.bandit = bandit.toState()
+                migrated.params[key] = ps
+            }
+            normalize(migrated)
+        } catch (_: Exception) {
+            StoredState()
+        }
+    }
+
+    private fun banditFor(ps: ParamState): UcbBandit {
+        val size = ps.values.size
+        require(size > 0) { "bandit requested without available values" }
+        val plays = ps.bandit?.plays ?: LongArray(size)
+        val rewards = ps.bandit?.rewards ?: DoubleArray(size)
+        val total = ps.bandit?.totalPlays ?: 0L
+        val bandit = UcbBandit(size, total, plays, rewards)
+        val arm = ps.lastArm.coerceIn(0, size - 1)
+        ps.lastArm = arm
+        ps.lastValue = ps.values[arm]
+        return bandit
+    }
+
+    private fun resizeBandit(bandit: UcbBandit, size: Int): UcbBandit {
+        if (bandit.armCount == size) return bandit
+        val state = bandit.toState()
+        val plays = LongArray(size)
+        val rewards = DoubleArray(size)
+        for (i in 0 until min(size, state.plays.size)) {
+            plays[i] = state.plays[i]
+            rewards[i] = state.rewards[i]
+        }
+        val total = plays.sum()
+        return UcbBandit(size, total, plays, rewards)
+    }
+
+    private fun emptyBandit(size: Int) = UcbBandit(size, 0, LongArray(size), DoubleArray(size))
 
     private fun file(): File = File(configDir(), "op_tuner.json")
 

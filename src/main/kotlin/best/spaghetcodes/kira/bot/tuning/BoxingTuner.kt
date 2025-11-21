@@ -5,8 +5,6 @@ import best.spaghetcodes.kira.utils.RandomUtils
 import com.google.gson.reflect.TypeToken
 import java.io.File
 import kotlin.math.round
-import kotlin.math.sqrt
-import kotlin.math.ln
 
 object BoxingTuner {
 
@@ -61,24 +59,27 @@ object BoxingTuner {
 
     private enum class ParamType { FLOAT, INT, LONG }
     private data class ParamSpec(val key: String, val min: Double, val max: Double, val step: Double, val def: Double, val type: ParamType)
-    private data class ValueState(
-        var value: Double = 0.0,
-        var plays: Int = 0,
-        var totalReward: Double = 0.0
-    ) {
-        fun avg(): Double = if (plays > 0) totalReward / plays else 0.0
 
-        fun ucb(totalPlays: Int, c: Double = 1.4): Double {
-            if (plays == 0) return Double.POSITIVE_INFINITY
-            val exploitation = avg()
-            val exploration = c * sqrt(ln(totalPlays.toDouble()) / plays)
-            return exploitation + exploration
-        }
-    }
-    private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
+    private data class ParamState(
+        var values: MutableList<Double> = mutableListOf(),
+        var lastValue: Double = 0.0,
+        var bandit: UcbBanditState? = null,
+        var lastArm: Int = 0
+    )
+
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
-    private const val CURRENT_VERSION = 2
+    private data class LegacyValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0)
+
+    private data class LegacyParamState(
+        var values: MutableMap<String, LegacyValueState> = mutableMapOf(),
+        var lastValue: Double = 0.0,
+        var totalPlays: Int = 0
+    )
+
+    private data class LegacyStoredState(var version: Int = 2, var params: MutableMap<String, LegacyParamState> = mutableMapOf())
+
+    private const val CURRENT_VERSION = 3
     private const val MISTAKE_PENALTY = 0.25
 
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
@@ -139,107 +140,8 @@ object BoxingTuner {
     private var loaded = false
     private var state = StoredState()
 
-    fun pickParams(): Params {
-        ensureLoaded()
-        val chosen = pickWithUCB()
-        return Params(
-            jumpCooldownMs = chosen.long("jumpCooldownMs"),
-            noJumpCloseDist = chosen.float("noJumpCloseDist"),
-            warmupDistanceStop = chosen.float("warmupDistanceStop"),
-            warmupJumpEveryMin = chosen.int("warmupJumpEveryMin"),
-            warmupJumpEveryMax = chosen.int("warmupJumpEveryMax"),
-            warmupPressMin = chosen.int("warmupPressMin"),
-            warmupPressMax = chosen.int("warmupPressMax"),
-            comboLockMin = chosen.int("comboLockMin"),
-            comboLockMax = chosen.int("comboLockMax"),
-            forwardStickMinMs = chosen.int("forwardStickMinMs"),
-            forwardStickMaxMs = chosen.int("forwardStickMaxMs"),
-            meleeFocusMinMs = chosen.int("meleeFocusMinMs"),
-            meleeFocusMaxMs = chosen.int("meleeFocusMaxMs"),
-            microJitterMin = chosen.int("microJitterMin"),
-            microJitterMax = chosen.int("microJitterMax"),
-            stopForwardCloseDistCombo = chosen.float("stopForwardCloseDistCombo"),
-            resumeForwardDistCombo = chosen.float("resumeForwardDistCombo"),
-            stopForwardCloseDistDefault = chosen.float("stopForwardCloseDistDefault"),
-            resumeForwardDistDefault = chosen.float("resumeForwardDistDefault"),
-            kbRecoveryMin = chosen.int("kbRecoveryMin"),
-            kbRecoveryMax = chosen.int("kbRecoveryMax"),
-            heavyKbRecoveryMin = chosen.int("heavyKbRecoveryMin"),
-            heavyKbRecoveryMax = chosen.int("heavyKbRecoveryMax"),
-            heavyKbDelta = chosen.float("heavyKbDelta"),
-            targetDistComboMin = chosen.float("targetDistComboMin"),
-            targetDistComboMax = chosen.float("targetDistComboMax"),
-            targetDistNeutralMin = chosen.float("targetDistNeutralMin"),
-            targetDistNeutralMax = chosen.float("targetDistNeutralMax"),
-            burstFlipMin = chosen.int("burstFlipMin"),
-            burstFlipMax = chosen.int("burstFlipMax"),
-            burstWindowMin = chosen.int("burstWindowMin"),
-            burstWindowMax = chosen.int("burstWindowMax"),
-            holdWindowMin = chosen.int("holdWindowMin"),
-            holdWindowMax = chosen.int("holdWindowMax"),
-            longStrafeMin = chosen.int("longStrafeMin"),
-            longStrafeMax = chosen.int("longStrafeMax"),
-            longStrafeDistanceCap = chosen.float("longStrafeDistanceCap"),
-            longStrafeBaseChance = chosen.int("longStrafeBaseChance"),
-            antiStallEps = chosen.float("antiStallEps"),
-            antiStallDelay = chosen.int("antiStallDelay"),
-            aimSpikeDeg = chosen.float("aimSpikeDeg"),
-            aimSpikeCooldown = chosen.long("aimSpikeCooldown"),
-            wallNearMargin = chosen.float("wallNearMargin"),
-            wallEscapeTimeMsMin = chosen.int("wallEscapeTimeMsMin"),
-            wallEscapeTimeMsMax = chosen.int("wallEscapeTimeMsMax"),
-            enemyIframeSoft = chosen.int("enemyIframeSoft")
-        )
-    }
-
-    fun defaults(): Params = Params(
-        jumpCooldownMs = 900L,
-        noJumpCloseDist = 3.6f,
-        warmupDistanceStop = 7.0f,
-        warmupJumpEveryMin = 240,
-        warmupJumpEveryMax = 380,
-        warmupPressMin = 130,
-        warmupPressMax = 190,
-        comboLockMin = 560,
-        comboLockMax = 760,
-        forwardStickMinMs = 260,
-        forwardStickMaxMs = 340,
-        meleeFocusMinMs = 420,
-        meleeFocusMaxMs = 520,
-        microJitterMin = 120,
-        microJitterMax = 180,
-        stopForwardCloseDistCombo = 1.00f,
-        resumeForwardDistCombo = 1.45f,
-        stopForwardCloseDistDefault = 1.10f,
-        resumeForwardDistDefault = 1.60f,
-        kbRecoveryMin = 520,
-        kbRecoveryMax = 760,
-        heavyKbRecoveryMin = 650,
-        heavyKbRecoveryMax = 900,
-        heavyKbDelta = 0.45f,
-        targetDistComboMin = 1.08f,
-        targetDistComboMax = 1.50f,
-        targetDistNeutralMin = 1.75f,
-        targetDistNeutralMax = 2.35f,
-        burstFlipMin = 55,
-        burstFlipMax = 95,
-        burstWindowMin = 240,
-        burstWindowMax = 380,
-        holdWindowMin = 220,
-        holdWindowMax = 340,
-        longStrafeMin = 900,
-        longStrafeMax = 1600,
-        longStrafeDistanceCap = 3.4f,
-        longStrafeBaseChance = 30,
-        antiStallEps = 0.015f,
-        antiStallDelay = 260,
-        aimSpikeDeg = 14f,
-        aimSpikeCooldown = 180L,
-        wallNearMargin = 0.9f,
-        wallEscapeTimeMsMin = 600,
-        wallEscapeTimeMsMax = 900,
-        enemyIframeSoft = 3
-    )
+    fun pickParams(): Params = build(pickValues())
+    fun defaults(): Params = build(defaultValues())
 
     fun report(win: Boolean, mistakes: Int) {
         ensureLoaded()
@@ -247,18 +149,71 @@ object BoxingTuner {
         val reward = rewardRaw - mistakes * MISTAKE_PENALTY
         var changed = false
         for ((_, ps) in state.params) {
-            val entryKey = keyOf(ps.lastValue)
-            val vs = ps.values.getOrPut(entryKey) { ValueState(value = ps.lastValue) }
-            vs.plays += 1
-            vs.totalReward += reward
-            ps.totalPlays += 1
+            if (ps.values.isEmpty()) continue
+            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            val arm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
+            val updated = bandit.update(arm, reward)
+            ps.bandit = updated.toState()
+            ps.lastArm = arm
+            ps.lastValue = ps.values[arm]
             changed = true
         }
         if (changed) save()
     }
 
-    private fun ensureLoaded() { if (!loaded) { state = load(); loaded = true } }
-    private fun pickWithUCB(): Map<String, Double> {
+    private fun build(values: Map<String, Double>): Params {
+        return Params(
+            jumpCooldownMs = values.long("jumpCooldownMs"),
+            noJumpCloseDist = values.float("noJumpCloseDist"),
+            warmupDistanceStop = values.float("warmupDistanceStop"),
+            warmupJumpEveryMin = values.int("warmupJumpEveryMin"),
+            warmupJumpEveryMax = values.int("warmupJumpEveryMax"),
+            warmupPressMin = values.int("warmupPressMin"),
+            warmupPressMax = values.int("warmupPressMax"),
+            comboLockMin = values.int("comboLockMin"),
+            comboLockMax = values.int("comboLockMax"),
+            forwardStickMinMs = values.int("forwardStickMinMs"),
+            forwardStickMaxMs = values.int("forwardStickMaxMs"),
+            meleeFocusMinMs = values.int("meleeFocusMinMs"),
+            meleeFocusMaxMs = values.int("meleeFocusMaxMs"),
+            microJitterMin = values.int("microJitterMin"),
+            microJitterMax = values.int("microJitterMax"),
+            stopForwardCloseDistCombo = values.float("stopForwardCloseDistCombo"),
+            resumeForwardDistCombo = values.float("resumeForwardDistCombo"),
+            stopForwardCloseDistDefault = values.float("stopForwardCloseDistDefault"),
+            resumeForwardDistDefault = values.float("resumeForwardDistDefault"),
+            kbRecoveryMin = values.int("kbRecoveryMin"),
+            kbRecoveryMax = values.int("kbRecoveryMax"),
+            heavyKbRecoveryMin = values.int("heavyKbRecoveryMin"),
+            heavyKbRecoveryMax = values.int("heavyKbRecoveryMax"),
+            heavyKbDelta = values.float("heavyKbDelta"),
+            targetDistComboMin = values.float("targetDistComboMin"),
+            targetDistComboMax = values.float("targetDistComboMax"),
+            targetDistNeutralMin = values.float("targetDistNeutralMin"),
+            targetDistNeutralMax = values.float("targetDistNeutralMax"),
+            burstFlipMin = values.int("burstFlipMin"),
+            burstFlipMax = values.int("burstFlipMax"),
+            burstWindowMin = values.int("burstWindowMin"),
+            burstWindowMax = values.int("burstWindowMax"),
+            holdWindowMin = values.int("holdWindowMin"),
+            holdWindowMax = values.int("holdWindowMax"),
+            longStrafeMin = values.int("longStrafeMin"),
+            longStrafeMax = values.int("longStrafeMax"),
+            longStrafeDistanceCap = values.float("longStrafeDistanceCap"),
+            longStrafeBaseChance = values.int("longStrafeBaseChance"),
+            antiStallEps = values.float("antiStallEps"),
+            antiStallDelay = values.int("antiStallDelay"),
+            aimSpikeDeg = values.float("aimSpikeDeg"),
+            aimSpikeCooldown = values.long("aimSpikeCooldown"),
+            wallNearMargin = values.float("wallNearMargin"),
+            wallEscapeTimeMsMin = values.int("wallEscapeTimeMsMin"),
+            wallEscapeTimeMsMax = values.int("wallEscapeTimeMsMax"),
+            enemyIframeSoft = values.int("enemyIframeSoft")
+        )
+    }
+
+    private fun pickValues(): Map<String, Double> {
+        ensureLoaded()
         val chosen = mutableMapOf<String, Double>()
 
         for (spec in specs) {
@@ -268,59 +223,37 @@ object BoxingTuner {
                 initializeValues(p, spec)
             }
 
-            val value = if (shouldExploreNew(p)) {
+            var bandit = banditFor(p)
+            val shouldExplore = shouldExploreNew(p, bandit)
+
+            val selectedArm = if (shouldExplore) {
                 val newValue = sample(spec)
-                val key = keyOf(newValue)
-                if (!p.values.containsKey(key)) {
-                    p.values[key] = ValueState(value = newValue)
-                }
-                newValue
+                val idx = ensureValue(p, newValue)
+                bandit = resizeBandit(bandit, p.values.size)
+                idx
             } else {
-                selectByUCB(p, spec)
+                bandit = resizeBandit(bandit, p.values.size)
+                bandit.selectArm()
             }
 
-            p.lastValue = value
-            chosen[spec.key] = value
+            p.lastArm = selectedArm
+            p.lastValue = p.values[selectedArm]
+            p.bandit = bandit.toState()
+            chosen[spec.key] = p.lastValue
         }
 
         save()
         return chosen
     }
 
-    private fun selectByUCB(ps: ParamState, spec: ParamSpec): Double {
-        if (ps.values.isEmpty()) {
-            return spec.def
-        }
-
-        var bestValue = spec.def
-        var bestScore = Double.NEGATIVE_INFINITY
-
-        val c = when {
-            ps.totalPlays < 50 -> 2.0
-            ps.totalPlays < 200 -> 1.4
-            ps.totalPlays < 500 -> 1.0
-            else -> 0.5
-        }
-
-        for ((_, vs) in ps.values) {
-            val score = vs.ucb(ps.totalPlays, c)
-            if (score > bestScore) {
-                bestScore = score
-                bestValue = vs.value
-            }
-        }
-
-        return clamp(bestValue, spec)
-    }
-
-    private fun shouldExploreNew(ps: ParamState): Boolean {
+    private fun shouldExploreNew(ps: ParamState, bandit: UcbBandit): Boolean {
         if (ps.values.size < 10) return RandomUtils.randomDoubleInRange(0.0, 1.0) < 0.3
-        if (ps.totalPlays > 0 && ps.totalPlays % 30 == 0) return true
+        if (bandit.totalPlays > 0 && bandit.totalPlays % 30 == 0L) return true
 
         val explorationRate = when {
-            ps.totalPlays < 100 -> 0.2
-            ps.totalPlays < 300 -> 0.1
-            ps.totalPlays < 1000 -> 0.05
+            bandit.totalPlays < 100 -> 0.2
+            bandit.totalPlays < 300 -> 0.1
+            bandit.totalPlays < 1000 -> 0.05
             else -> 0.02
         }
 
@@ -329,8 +262,8 @@ object BoxingTuner {
 
     private fun initializeValues(ps: ParamState, spec: ParamSpec) {
         val defKey = keyOf(spec.def)
-        if (!ps.values.containsKey(defKey)) {
-            ps.values[defKey] = ValueState(value = spec.def)
+        if (ps.values.none { keyOf(it) == defKey }) {
+            ps.values.add(spec.def)
         }
 
         val range = spec.max - spec.min
@@ -343,14 +276,12 @@ object BoxingTuner {
         for (value in initialValues) {
             val quantized = quantize(value, spec.step)
             val clamped = clamp(quantized, spec)
-            val key = keyOf(clamped)
-            if (!ps.values.containsKey(key)) {
-                ps.values[key] = ValueState(value = clamped)
-            }
+            ensureValue(ps, clamped)
         }
     }
 
     private fun sample(spec: ParamSpec): Double = clamp(quantize(RandomUtils.randomDoubleInRange(spec.min, spec.max), spec.step), spec)
+
     private fun clamp(v: Double, spec: ParamSpec): Double {
         val c = v.coerceIn(spec.min, spec.max)
         return when (spec.type) {
@@ -359,33 +290,127 @@ object BoxingTuner {
             ParamType.LONG -> round(c).toLong().toDouble()
         }
     }
-    private fun quantize(v: Double, step: Double): Double { if (step <= 0.0) return v; val s = round(v / step); return s * step }
+
+    private fun quantize(v: Double, step: Double): Double {
+        if (step <= 0.0) return v
+        val s = round(v / step)
+        return s * step
+    }
+
     private fun keyOf(v: Double): String = "%.4f".format(v)
 
     private fun Map<String, Double>.float(key: String): Float = clampNum(this[key], key).toFloat()
     private fun Map<String, Double>.int(key: String): Int = clampNum(this[key], key).toInt()
     private fun Map<String, Double>.long(key: String): Long = clampNum(this[key], key).toLong()
+
     private fun clampNum(v: Double?, key: String): Double {
         val spec = specByKey[key]
         val raw = v ?: spec?.def ?: 0.0
         return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
 
+    private fun defaultValues(): Map<String, Double> = specs.associate { it.key to it.def }
+
+    private fun banditFor(ps: ParamState): UcbBandit {
+        val size = ps.values.size
+        require(size > 0) { "bandit requested without available values" }
+        val plays = ps.bandit?.plays ?: LongArray(size)
+        val rewards = ps.bandit?.rewards ?: DoubleArray(size)
+        val total = ps.bandit?.totalPlays ?: 0L
+        return UcbBandit(size, total, plays.copyOf(size), rewards.copyOf(size))
+    }
+
+    private fun resizeBandit(bandit: UcbBandit, size: Int): UcbBandit {
+        if (bandit.armCount == size) return bandit
+        val state = bandit.toState()
+        val plays = state.plays.copyOf(size)
+        val rewards = state.rewards.copyOf(size)
+        return UcbBandit(size, state.totalPlays, plays, rewards)
+    }
+
+    private fun ensureValue(ps: ParamState, value: Double): Int {
+        val key = keyOf(value)
+        ps.values.forEachIndexed { idx, existing ->
+            if (keyOf(existing) == key) return idx
+        }
+        ps.values.add(value)
+        return ps.values.lastIndex
+    }
+
+    private fun migrateLegacy(legacy: LegacyStoredState): StoredState {
+        val migrated = StoredState(version = CURRENT_VERSION)
+        for ((key, legacyParam) in legacy.params) {
+            val ps = ParamState()
+            val orderedValues = legacyParam.values.toSortedMap().values.toList()
+            orderedValues.forEach { ps.values.add(it.value) }
+
+            if (ps.values.isEmpty()) {
+                specByKey[key]?.let { initializeValues(ps, it) }
+            }
+
+            if (ps.values.isNotEmpty()) {
+                val plays = LongArray(ps.values.size)
+                val rewards = DoubleArray(ps.values.size)
+                orderedValues.forEachIndexed { idx, vs ->
+                    plays[idx] = vs.plays.toLong()
+                    rewards[idx] = vs.totalReward
+                }
+                val total = legacyParam.totalPlays.toLong().coerceAtLeast(plays.sum())
+                ps.bandit = UcbBandit(ps.values.size, total, plays, rewards).toState()
+                val lastArm = ps.values.indexOfFirst { keyOf(it) == keyOf(legacyParam.lastValue) }
+                ps.lastArm = if (lastArm >= 0) lastArm else 0
+                ps.lastValue = ps.values.getOrElse(ps.lastArm) { ps.values.first() }
+            }
+
+            migrated.params[key] = ps
+        }
+        return normalize(migrated)
+    }
+
+    private fun normalize(state: StoredState): StoredState {
+        for ((key, ps) in state.params) {
+            if (ps.values.isEmpty()) {
+                specByKey[key]?.let { initializeValues(ps, it) }
+            }
+            if (ps.values.isEmpty()) continue
+            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            ps.bandit = bandit.toState()
+            ps.lastArm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
+            if (ps.lastValue !in ps.values) {
+                ps.lastValue = ps.values[ps.lastArm]
+            }
+        }
+        state.version = CURRENT_VERSION
+        return state
+    }
+
     private fun load(): StoredState {
+        val f = file()
+        if (!f.exists()) return StoredState()
+
         return try {
-            val file = file()
-            if (!file.exists()) {
-                file.parentFile?.mkdirs()
-                StoredState()
-            } else {
-                file.reader().use { reader ->
-                    val type = object : TypeToken<StoredState>() {}.type
-                    kira.gson.fromJson<StoredState>(reader, type) ?: StoredState()
+            f.reader().use { reader ->
+                val type = object : TypeToken<StoredState>() {}.type
+                val loadedState = kira.gson.fromJson<StoredState>(reader, type)
+                if (loadedState != null && loadedState.version == CURRENT_VERSION) {
+                    normalize(loadedState)
+                } else {
+                    tryLegacy(f) ?: StoredState()
                 }
             }
-        } catch (ex: Exception) {
-            ex.printStackTrace()
-            StoredState()
+        } catch (_: Exception) {
+            tryLegacy(f) ?: StoredState()
+        }
+    }
+
+    private fun tryLegacy(f: File): StoredState? {
+        return try {
+            f.reader().use { reader ->
+                val type = object : TypeToken<LegacyStoredState>() {}.type
+                kira.gson.fromJson<LegacyStoredState>(reader, type)?.let { migrateLegacy(it) }
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -398,5 +423,20 @@ object BoxingTuner {
         }
     }
 
-    private fun file(): File = File(kira.tunerDir, "boxing_tuner.json")
+    private fun ensureLoaded() {
+        if (!loaded) {
+            state = load()
+            loaded = true
+        }
+    }
+
+    private fun file(): File = File(configDir(), "boxing_tuner.json")
+
+    private fun configDir(): File {
+        return try {
+            kira.tunerDir
+        } catch (_: Throwable) {
+            File(File(File(System.getProperty("user.home"), ".kira"), "config"), "Kira/Tuner")
+        }
+    }
 }
