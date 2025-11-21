@@ -85,6 +85,33 @@ class UcbBandit(
         return normalized.coerceIn(0.0, 1.0)
     }
 
+    fun armStats(): List<ArmStats> {
+        return (0 until armCount)
+            .map { index ->
+                val playsCount = plays[index]
+                val averageReward = if (playsCount > 0) rewards[index] / playsCount else 0.0
+                ArmStats(index, playsCount, averageReward)
+            }
+            .sortedWith(compareByDescending<ArmStats> { it.averageReward }.thenBy { it.index })
+    }
+
+    fun bestArmIndex(): Int {
+        var bestIndex = 0
+        var bestAverage = if (plays[0] > 0) rewards[0] / plays[0] else 0.0
+
+        for (i in 1 until armCount) {
+            val playsCount = plays[i]
+            val averageReward = if (playsCount > 0) rewards[i] / playsCount else 0.0
+
+            if (averageReward > bestAverage || (averageReward == bestAverage && i < bestIndex)) {
+                bestAverage = averageReward
+                bestIndex = i
+            }
+        }
+
+        return bestIndex
+    }
+
     fun toState(): UcbBanditState =
         UcbBanditState(totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward, strategy)
 
@@ -127,6 +154,12 @@ class UcbBandit(
         UCB_TUNED,
     }
 }
+
+data class ArmStats(
+    val index: Int,
+    val plays: Long,
+    val averageReward: Double,
+)
 
 /**
  * Snapshot of a bandit's state for JSON serialization.
