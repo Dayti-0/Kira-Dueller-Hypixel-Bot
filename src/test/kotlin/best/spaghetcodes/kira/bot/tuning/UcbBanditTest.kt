@@ -16,6 +16,7 @@ class UcbBanditTest {
         }
 
         val dto = bandit.toDto()
+        assertEquals(UcbBandit.Strategy.UCB1, dto.strategy)
         dto.plays.forEachIndexed { index, plays ->
             assertTrue(plays > 0, "Arm $index should have been explored at least once")
         }
@@ -64,5 +65,26 @@ class UcbBanditTest {
         assertTrue(dto.rewards.contentEquals(restoredDto.rewards))
         assertEquals(dto.minReward, restoredDto.minReward)
         assertEquals(dto.maxReward, restoredDto.maxReward)
+        assertEquals(dto.strategy, restoredDto.strategy)
+    }
+
+    @Test
+    fun `ucb tuned favors better arm`() {
+        var bandit = UcbBandit(
+            armCount = 2,
+            totalPlays = 0,
+            plays = LongArray(2),
+            rewards = DoubleArray(2),
+            strategy = UcbBandit.Strategy.UCB_TUNED,
+        )
+
+        repeat(200) {
+            val arm = bandit.selectArm()
+            val reward = if (arm == 0) 0.2 else 0.8
+            bandit = bandit.update(arm, reward)
+        }
+
+        val dto = bandit.toDto()
+        assertTrue(dto.plays[1] > dto.plays[0], "UCB_TUNED should favor the higher reward arm")
     }
 }
