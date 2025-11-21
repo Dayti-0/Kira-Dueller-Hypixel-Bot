@@ -87,4 +87,43 @@ class UcbBanditTest {
         val dto = bandit.toDto()
         assertTrue(dto.plays[1] > dto.plays[0], "UCB_TUNED should favor the higher reward arm")
     }
+
+    @Test
+    fun `armStats exposes averages for each arm`() {
+        val bandit = UcbBandit(
+            armCount = 3,
+            totalPlays = 6,
+            plays = longArrayOf(2, 1, 3),
+            rewards = doubleArrayOf(1.0, 0.5, 2.4),
+        )
+
+        val stats = bandit.armStats()
+
+        assertEquals(3, stats.size)
+        assertEquals(listOf(2, 0, 1), stats.map { it.index })
+
+        val statsByIndex = stats.associateBy { it.index }
+        val arm0 = statsByIndex.getValue(0)
+        val arm1 = statsByIndex.getValue(1)
+        val arm2 = statsByIndex.getValue(2)
+
+        assertEquals(2L, arm0.plays)
+        assertEquals(1L, arm1.plays)
+        assertEquals(3L, arm2.plays)
+        assertEquals(0.5, arm0.averageReward, 1e-9)
+        assertEquals(0.5, arm1.averageReward, 1e-9)
+        assertEquals(0.8, arm2.averageReward, 1e-9)
+    }
+
+    @Test
+    fun `bestArmIndex returns highest average arm`() {
+        var bandit = UcbBandit.withArms(armCount = 3)
+
+        bandit = bandit.update(0, reward = 0.4)
+        bandit = bandit.update(1, reward = 0.5)
+        bandit = bandit.update(2, reward = 0.9)
+        bandit = bandit.update(2, reward = 0.8)
+
+        assertEquals(2, bandit.bestArmIndex())
+    }
 }
