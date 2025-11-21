@@ -2,6 +2,7 @@ package best.spaghetcodes.kira.bot.tuning
 
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
@@ -13,7 +14,8 @@ class UcbBandit(
     plays: LongArray,
     rewards: DoubleArray,
     val minReward: Double = 0.0,
-    val maxReward: Double = 1.0
+    val maxReward: Double = 1.0,
+    val strategy: Strategy = Strategy.UCB1,
 ) {
     private val plays: LongArray = plays.copyOf()
     private val rewards: DoubleArray = rewards.copyOf()
@@ -26,7 +28,7 @@ class UcbBandit(
     }
 
     /**
-     * Selects the next arm to play using the standard UCB1 policy.
+     * Selects the next arm to play using the configured strategy.
      */
     fun selectArm(): Int {
         for (i in 0 until armCount) {
@@ -34,13 +36,25 @@ class UcbBandit(
         }
 
         val t = max(totalPlays.toDouble(), 1.0)
+        val logN = ln(t)
         var bestArm = 0
         var bestScore = Double.NEGATIVE_INFINITY
 
         for (i in 0 until armCount) {
             val averageReward = rewards[i] / plays[i]
-            val explorationBonus = sqrt(2.0 * ln(t) / plays[i])
-            val score = averageReward + explorationBonus
+            val score = when (strategy) {
+                Strategy.UCB1 -> {
+                    val explorationBonus = sqrt(2.0 * logN / plays[i])
+                    averageReward + explorationBonus
+                }
+
+                Strategy.UCB_TUNED -> {
+                    val variance = averageReward * (1 - averageReward)
+                    val v = variance + sqrt(2.0 * logN / plays[i])
+                    val bonus = sqrt((logN / plays[i]) * min(0.25, v))
+                    averageReward + bonus
+                }
+            }
 
             if (score > bestScore) {
                 bestScore = score
@@ -63,7 +77,7 @@ class UcbBandit(
         updatedPlays[arm] += 1L
         updatedRewards[arm] += reward
 
-        return UcbBandit(armCount, totalPlays + 1, updatedPlays, updatedRewards, minReward, maxReward)
+        return UcbBandit(armCount, totalPlays + 1, updatedPlays, updatedRewards, minReward, maxReward, strategy)
     }
 
     fun normalizeReward(reward: Double): Double {
@@ -71,10 +85,11 @@ class UcbBandit(
         return normalized.coerceIn(0.0, 1.0)
     }
 
-    fun toState(): UcbBanditState = UcbBanditState(totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward)
+    fun toState(): UcbBanditState =
+        UcbBanditState(totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward, strategy)
 
     fun toDto(): UcbBanditDto =
-        UcbBanditDto(armCount, totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward)
+        UcbBanditDto(armCount, totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward, strategy)
 
     companion object {
         fun withArms(armCount: Int, minReward: Double = 0.0, maxReward: Double = 1.0): UcbBandit {
@@ -85,10 +100,31 @@ class UcbBandit(
         }
 
         fun fromState(state: UcbBanditState): UcbBandit =
-            UcbBandit(state.plays.size, state.totalPlays, state.plays, state.rewards, state.minReward, state.maxReward)
+            UcbBandit(
+                state.plays.size,
+                state.totalPlays,
+                state.plays,
+                state.rewards,
+                state.minReward,
+                state.maxReward,
+                state.strategy,
+            )
 
         fun fromDto(dto: UcbBanditDto): UcbBandit =
-            UcbBandit(dto.armCount, dto.totalPlays, dto.plays, dto.rewards, dto.minReward, dto.maxReward)
+            UcbBandit(
+                dto.armCount,
+                dto.totalPlays,
+                dto.plays,
+                dto.rewards,
+                dto.minReward,
+                dto.maxReward,
+                dto.strategy,
+            )
+    }
+
+    enum class Strategy {
+        UCB1,
+        UCB_TUNED,
     }
 }
 
@@ -100,7 +136,8 @@ data class UcbBanditState(
     val plays: LongArray,
     val rewards: DoubleArray,
     val minReward: Double = 0.0,
-    val maxReward: Double = 1.0
+    val maxReward: Double = 1.0,
+    val strategy: UcbBandit.Strategy = UcbBandit.Strategy.UCB1,
 )
 
 data class UcbBanditDto(
@@ -109,5 +146,6 @@ data class UcbBanditDto(
     val plays: LongArray,
     val rewards: DoubleArray,
     val minReward: Double,
-    val maxReward: Double
+    val maxReward: Double,
+    val strategy: UcbBandit.Strategy = UcbBandit.Strategy.UCB1,
 )
