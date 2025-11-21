@@ -6,8 +6,6 @@ import com.google.gson.reflect.TypeToken
 import java.io.File
 import kotlin.math.max
 import kotlin.math.round
-import kotlin.math.sqrt
-import kotlin.math.ln
 
 object ComboTuner {
 
@@ -45,21 +43,11 @@ object ComboTuner {
         val type: ParamType
     )
 
-    private data class ValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0) {
-        fun avg(): Double = if (plays > 0) totalReward / plays else 0.0
-
-        fun ucb(totalPlays: Int, c: Double = 1.4): Double {
-            if (plays == 0) return Double.POSITIVE_INFINITY
-            val exploitation = avg()
-            val exploration = c * sqrt(ln(totalPlays.toDouble()) / plays)
-            return exploitation + exploration
-        }
-    }
-
     private data class ParamState(
-        var values: MutableMap<String, ValueState> = mutableMapOf(),
+        var values: MutableList<Double> = mutableListOf(),
         var lastValue: Double = 0.0,
-        var totalPlays: Int = 0
+        var bandit: UcbBanditState? = null,
+        var lastArm: Int = 0
     )
 
     private data class StoredState(
@@ -67,7 +55,20 @@ object ComboTuner {
         var params: MutableMap<String, ParamState> = mutableMapOf()
     )
 
-    private const val CURRENT_VERSION = 2
+    private data class LegacyValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0)
+
+    private data class LegacyParamState(
+        var values: MutableMap<String, LegacyValueState> = mutableMapOf(),
+        var lastValue: Double = 0.0,
+        var totalPlays: Int = 0
+    )
+
+    private data class LegacyStoredState(
+        var version: Int = 2,
+        var params: MutableMap<String, LegacyParamState> = mutableMapOf()
+    )
+
+    private const val CURRENT_VERSION = 3
     private const val MISTAKE_PENALTY = 0.25
 
     private fun specF(key: String, min: Double, max: Double, step: Double, def: Double) =
@@ -118,11 +119,13 @@ object ComboTuner {
         val reward = (rewardRaw - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
         for ((_, ps) in state.params) {
-            val entryKey = keyOf(ps.lastValue)
-            val vs = ps.values.getOrPut(entryKey) { ValueState(value = ps.lastValue) }
-            vs.plays += 1
-            vs.totalReward += reward
-            ps.totalPlays += 1
+            if (ps.values.isEmpty()) continue
+            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            val arm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
+            val updated = bandit.update(arm, reward)
+            ps.bandit = updated.toState()
+            ps.lastArm = arm
+            ps.lastValue = ps.values[arm]
             changed = true
         }
         if (changed) save()
@@ -168,59 +171,36 @@ object ComboTuner {
                 initializeValues(p, spec)
             }
 
-            val shouldExplore = shouldExploreNew(p)
-            val value = if (shouldExplore) {
+            var bandit = banditFor(p)
+            val shouldExplore = shouldExploreNew(p, bandit)
+
+            val selectedArm = if (shouldExplore) {
                 val newValue = sample(spec)
-                val key = keyOf(newValue)
-                if (!p.values.containsKey(key)) {
-                    p.values[key] = ValueState(value = newValue)
-                }
-                newValue
+                val idx = ensureValue(p, newValue)
+                bandit = resizeBandit(bandit, p.values.size)
+                idx
             } else {
-                selectByUCB(p, spec)
+                bandit = resizeBandit(bandit, p.values.size)
+                bandit.selectArm()
             }
 
-            p.lastValue = value
-            chosen[spec.key] = value
+            p.lastArm = selectedArm
+            p.lastValue = p.values[selectedArm]
+            p.bandit = bandit.toState()
+            chosen[spec.key] = p.lastValue
         }
         save()
         return chosen
     }
 
-    private fun selectByUCB(ps: ParamState, spec: ParamSpec): Double {
-        if (ps.values.isEmpty()) {
-            return spec.def
-        }
-
-        var bestValue = spec.def
-        var bestScore = Double.NEGATIVE_INFINITY
-
-        val c = when {
-            ps.totalPlays < 50 -> 2.0
-            ps.totalPlays < 200 -> 1.4
-            ps.totalPlays < 500 -> 1.0
-            else -> 0.5
-        }
-
-        for ((_, vs) in ps.values) {
-            val score = vs.ucb(ps.totalPlays, c)
-            if (score > bestScore) {
-                bestScore = score
-                bestValue = vs.value
-            }
-        }
-
-        return clamp(bestValue, spec)
-    }
-
-    private fun shouldExploreNew(ps: ParamState): Boolean {
+    private fun shouldExploreNew(ps: ParamState, bandit: UcbBandit): Boolean {
         if (ps.values.size < 10) return RandomUtils.randomDoubleInRange(0.0, 1.0) < 0.3
-        if (ps.totalPlays > 0 && ps.totalPlays % 30 == 0) return true
+        if (bandit.totalPlays > 0 && bandit.totalPlays % 30 == 0L) return true
 
         val explorationRate = when {
-            ps.totalPlays < 100 -> 0.2
-            ps.totalPlays < 300 -> 0.1
-            ps.totalPlays < 1000 -> 0.05
+            bandit.totalPlays < 100 -> 0.2
+            bandit.totalPlays < 300 -> 0.1
+            bandit.totalPlays < 1000 -> 0.05
             else -> 0.02
         }
 
@@ -229,8 +209,8 @@ object ComboTuner {
 
     private fun initializeValues(ps: ParamState, spec: ParamSpec) {
         val defKey = keyOf(spec.def)
-        if (!ps.values.containsKey(defKey)) {
-            ps.values[defKey] = ValueState(value = spec.def)
+        if (!ps.values.any { keyOf(it) == defKey }) {
+            ps.values.add(spec.def)
         }
 
         val range = spec.max - spec.min
@@ -244,14 +224,15 @@ object ComboTuner {
             val quantized = quantize(value, spec.step)
             val clamped = clamp(quantized, spec)
             val key = keyOf(clamped)
-            if (!ps.values.containsKey(key)) {
-                ps.values[key] = ValueState(value = clamped)
+            if (!ps.values.any { keyOf(it) == key }) {
+                ps.values.add(clamped)
             }
         }
     }
 
     private fun defaultValues(): Map<String, Double> = specs.associate { it.key to it.def }
 
+    @Synchronized
     private fun ensureLoaded() {
         if (!loaded) {
             state = load()
@@ -292,25 +273,103 @@ object ComboTuner {
         return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
 
+    private fun banditFor(ps: ParamState): UcbBandit {
+        val size = ps.values.size
+        require(size > 0) { "bandit requested without available values" }
+        val plays = ps.bandit?.plays ?: LongArray(size)
+        val rewards = ps.bandit?.rewards ?: DoubleArray(size)
+        val total = ps.bandit?.totalPlays ?: 0L
+        return UcbBandit(size, total, plays.copyOf(size), rewards.copyOf(size))
+    }
+
+    private fun resizeBandit(bandit: UcbBandit, size: Int): UcbBandit {
+        if (bandit.armCount == size) return bandit
+        val state = bandit.toState()
+        val plays = state.plays.copyOf(size)
+        val rewards = state.rewards.copyOf(size)
+        return UcbBandit(size, state.totalPlays, plays, rewards)
+    }
+
+    private fun ensureValue(ps: ParamState, value: Double): Int {
+        val key = keyOf(value)
+        ps.values.forEachIndexed { idx, existing ->
+            if (keyOf(existing) == key) return idx
+        }
+        ps.values.add(value)
+        return ps.values.lastIndex
+    }
+
+    private fun migrateLegacy(legacy: LegacyStoredState): StoredState {
+        val migrated = StoredState(version = CURRENT_VERSION)
+        for ((key, legacyParam) in legacy.params) {
+            val ps = ParamState()
+            val orderedValues = legacyParam.values.toSortedMap().values.toList()
+            orderedValues.forEach { ps.values.add(it.value) }
+
+            if (ps.values.isEmpty()) {
+                specByKey[key]?.let { initializeValues(ps, it) }
+            }
+
+            if (ps.values.isNotEmpty()) {
+                val plays = LongArray(ps.values.size)
+                val rewards = DoubleArray(ps.values.size)
+                orderedValues.forEachIndexed { idx, vs ->
+                    plays[idx] = vs.plays.toLong()
+                    rewards[idx] = vs.totalReward
+                }
+                val total = legacyParam.totalPlays.toLong().coerceAtLeast(plays.sum())
+                ps.bandit = UcbBandit(ps.values.size, total, plays, rewards).toState()
+                val lastArm = ps.values.indexOfFirst { keyOf(it) == keyOf(legacyParam.lastValue) }
+                ps.lastArm = if (lastArm >= 0) lastArm else 0
+                ps.lastValue = ps.values.getOrElse(ps.lastArm) { ps.values.first() }
+            }
+
+            migrated.params[key] = ps
+        }
+        return normalize(migrated)
+    }
+
+    private fun normalize(state: StoredState): StoredState {
+        for ((_, ps) in state.params) {
+            if (ps.values.isEmpty()) continue
+            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            ps.bandit = bandit.toState()
+            ps.lastArm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
+            if (ps.lastValue !in ps.values) {
+                ps.lastValue = ps.values[ps.lastArm]
+            }
+        }
+        state.version = CURRENT_VERSION
+        return state
+    }
+
     private fun load(): StoredState {
+        val f = file()
+        if (!f.exists()) return StoredState()
+
         return try {
-            val f = file()
-            if (!f.exists()) {
-                f.parentFile?.mkdirs()
-                StoredState()
-            } else {
-                f.reader().use { reader ->
-                    val type = object : TypeToken<StoredState>() {}.type
-                    val loadedState = kira.gson.fromJson<StoredState>(reader, type)
-                    if (loadedState == null || loadedState.version != CURRENT_VERSION) {
-                        StoredState()
-                    } else {
-                        loadedState
-                    }
+            f.reader().use { reader ->
+                val type = object : TypeToken<StoredState>() {}.type
+                val loadedState = kira.gson.fromJson<StoredState>(reader, type)
+                if (loadedState != null && loadedState.version == CURRENT_VERSION) {
+                    normalize(loadedState)
+                } else {
+                    tryLegacy(f) ?: StoredState()
                 }
             }
         } catch (_: Exception) {
-            StoredState()
+            tryLegacy(f) ?: StoredState()
+        }
+    }
+
+    private fun tryLegacy(f: File): StoredState? {
+        return try {
+            f.reader().use { reader ->
+                val type = object : TypeToken<LegacyStoredState>() {}.type
+                kira.gson.fromJson<LegacyStoredState>(reader, type)?.let { migrateLegacy(it) }
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 
