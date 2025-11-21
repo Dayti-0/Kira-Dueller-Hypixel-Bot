@@ -64,8 +64,8 @@ object BoxingTuner {
     private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
-    private const val CURRENT_VERSION = 1
-    private const val MISTAKE_PENALTY = 0.1
+    private const val CURRENT_VERSION = 2
+    private const val MISTAKE_PENALTY = 0.25
 
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
     private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)

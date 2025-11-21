@@ -57,54 +57,31 @@ object OPTuner {
     private data class ValueState(
         var value: Double = 0.0,
         var plays: Int = 0,
-        var totalReward: Double = 0.0,
-        var lastPlayed: Long = System.currentTimeMillis(),
-        var winStreak: Int = 0,
-        var bestStreak: Int = 0
+        var totalReward: Double = 0.0
     ) {
         fun avg(): Double = if (plays > 0) totalReward / plays else 0.0
-        
+
         fun ucb(totalPlays: Int, c: Double = 1.4): Double {
             if (plays == 0) return Double.POSITIVE_INFINITY
             val exploitation = avg()
             val exploration = c * sqrt(ln(totalPlays.toDouble()) / plays)
-            // Pénalité légère pour les valeurs non jouées récemment
-            val recency = if (totalPlays > 100) {
-                0.001 * (System.currentTimeMillis() - lastPlayed) / (1000 * 60 * 60)
-            } else 0.0
-            return exploitation + exploration - recency
+            return exploitation + exploration
         }
     }
 
     private data class ParamState(
         var values: MutableMap<String, ValueState> = mutableMapOf(),
         var lastValue: Double = 0.0,
-        var totalPlays: Int = 0,
-        var locked: Boolean = false,
-        var lockedValue: Double? = null
+        var totalPlays: Int = 0
     )
-
-    private data class GlobalStats(
-        var totalGames: Int = 0,
-        var totalWins: Int = 0,
-        var bestStreak: Int = 0,
-        var currentStreak: Int = 0,
-        var lastUpdate: Long = System.currentTimeMillis()
-    ) {
-        fun winRate(): Double = if (totalGames > 0) totalWins.toDouble() / totalGames else 0.0
-    }
 
     private data class StoredState(
         var version: Int = CURRENT_VERSION,
-        var params: MutableMap<String, ParamState> = mutableMapOf(),
-        var globalStats: GlobalStats = GlobalStats()
+        var params: MutableMap<String, ParamState> = mutableMapOf()
     )
 
-    private const val CURRENT_VERSION = 3
-    private const val MISTAKE_PENALTY = 0.1
-    private const val WIN_STREAK_BONUS = 0.02
-    private const val LOCK_THRESHOLD_PLAYS = 100
-    private const val LOCK_THRESHOLD_WINRATE = 0.995
+    private const val CURRENT_VERSION = 2
+    private const val MISTAKE_PENALTY = 0.25
 
     private fun specI(key: String, min: Double, max: Double, step: Double, def: Double, optimal: Double? = null) =
         ParamSpec(key, min, max, step, def, ParamType.INT, optimal)
@@ -166,11 +143,6 @@ object OPTuner {
         // Optimisation continue avec exploration intelligente (UCB)
         val values = pickWithUCB()
         
-        // Log périodique du progrès
-        if (state.globalStats.totalGames > 0 && state.globalStats.totalGames % 100 == 0) {
-            println("[OPTuner] ${state.globalStats.totalGames} parties | WR: ${(state.globalStats.winRate() * 100).toInt()}% | Série: ${state.globalStats.currentStreak}")
-        }
-        
         return build(values)
     }
     
@@ -178,69 +150,22 @@ object OPTuner {
 
     fun report(win: Boolean, mistakes: Int = 0) {
         ensureLoaded()
-        
-        // Mise à jour des stats globales
-        state.globalStats.totalGames++
-        state.globalStats.lastUpdate = System.currentTimeMillis()
-        
-        if (win) {
-            state.globalStats.totalWins++
-            state.globalStats.currentStreak++
-            if (state.globalStats.currentStreak > state.globalStats.bestStreak) {
-                state.globalStats.bestStreak = state.globalStats.currentStreak
-            }
-        } else {
-            state.globalStats.currentStreak = 0
-        }
-        
-        // Calcul de la récompense avec bonus/malus
+
         val baseReward = if (win) 1.0 else 0.0
-        val mistakePenalty = mistakes * MISTAKE_PENALTY
-        val streakBonus = if (win && state.globalStats.currentStreak > 5) {
-            state.globalStats.currentStreak * WIN_STREAK_BONUS
-        } else 0.0
-        
-        val reward = (baseReward + streakBonus - mistakePenalty)
-            .coerceAtLeast(0.0)
-            .coerceAtMost(1.5)
-        
+        val reward = (baseReward - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
+
         // Mise à jour des paramètres
-        for ((key, ps) in state.params) {
+        for ((_, ps) in state.params) {
             val entryKey = keyOf(ps.lastValue)
             val vs = ps.values.getOrPut(entryKey) { ValueState(value = ps.lastValue) }
-            
+
             vs.plays += 1
             vs.totalReward += reward
-            vs.lastPlayed = System.currentTimeMillis()
-            
-            if (win) {
-                vs.winStreak++
-                if (vs.winStreak > vs.bestStreak) {
-                    vs.bestStreak = vs.winStreak
-                }
-            } else {
-                vs.winStreak = 0
-            }
-            
+
             ps.totalPlays += 1
-            
-            // Vérification du verrouillage automatique (paramètres excellents)
-            if (!ps.locked && vs.plays >= LOCK_THRESHOLD_PLAYS) {
-                val winRate = vs.avg()
-                if (winRate >= LOCK_THRESHOLD_WINRATE) {
-                    ps.locked = true
-                    ps.lockedValue = vs.value
-                    println("[OPTuner] Paramètre ${key} verrouillé: ${vs.value} (${(winRate * 100).toInt()}% WR sur ${vs.plays} parties)")
-                }
-            }
         }
-        
+
         save()
-        
-        // Affichage périodique des statistiques
-        if (state.globalStats.totalGames % 500 == 0) {
-            printDetailedStats()
-        }
     }
 
     private fun build(values: Map<String, Double>) = OPParams(
@@ -274,13 +199,6 @@ object OPTuner {
         
         for (spec in specs) {
             val p = state.params.getOrPut(spec.key) { ParamState() }
-            
-            // Si verrouillé, utiliser la valeur verrouillée
-            if (p.locked && p.lockedValue != null) {
-                chosen[spec.key] = p.lockedValue!!
-                p.lastValue = p.lockedValue!!
-                continue
-            }
             
             // Initialiser avec la valeur optimale et quelques autres
             if (p.values.isEmpty()) {
@@ -384,36 +302,6 @@ object OPTuner {
             if (!ps.values.containsKey(key)) {
                 ps.values[key] = ValueState(value = clamped)
             }
-        }
-    }
-
-    private fun printDetailedStats() {
-        val stats = state.globalStats
-        println("=== OPTuner Statistiques Détaillées ===")
-        println("Parties: ${stats.totalGames} | Win Rate: ${(stats.winRate() * 100).toInt()}%")
-        println("Meilleure série: ${stats.bestStreak}")
-        
-        // Afficher les top 3 valeurs pour quelques paramètres clés
-        val keyParams = listOf("longStrafeChance", "rodCdCloseMsBase", "rodCdFarMsBase")
-        for (paramKey in keyParams) {
-            state.params[paramKey]?.let { ps ->
-                val top3 = ps.values.values
-                    .filter { it.plays >= 10 }
-                    .sortedByDescending { it.avg() }
-                    .take(3)
-                
-                if (top3.isNotEmpty()) {
-                    println("$paramKey:")
-                    top3.forEach { vs ->
-                        println("  ${vs.value}: ${(vs.avg() * 100).toInt()}% WR (${vs.plays} parties)")
-                    }
-                }
-            }
-        }
-        
-        val locked = state.params.filter { it.value.locked }
-        if (locked.isNotEmpty()) {
-            println("Paramètres verrouillés: ${locked.size}/22")
         }
     }
 

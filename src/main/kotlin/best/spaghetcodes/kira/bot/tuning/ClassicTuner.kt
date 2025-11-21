@@ -74,7 +74,7 @@ object ClassicTuner {
     )
 
     private const val CURRENT_VERSION = 2
-    private const val MISTAKE_PENALTY = 0.1
+    private const val MISTAKE_PENALTY = 0.25
 
     private fun specF(key: String, min: Double, max: Double, step: Double, def: Double) =
         ParamSpec(key, min, max, step, def, ParamType.FLOAT)
