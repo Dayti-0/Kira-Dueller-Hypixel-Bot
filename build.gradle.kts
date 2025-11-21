@@ -44,9 +44,12 @@ dependencies {
 
     compileOnly("org.spongepowered:mixin:0.8.5-SNAPSHOT")
     annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT:processor")
+
+    testImplementation(kotlin("test-junit"))
 }
 
 repositories {
+    mavenCentral()
     maven("https://repo.essential.gg/repository/maven-public")
     maven("https://repo.spongepowered.org/repository/maven-public")
 }

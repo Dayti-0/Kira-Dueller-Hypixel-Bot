@@ -11,7 +11,9 @@ class UcbBandit(
     val armCount: Int,
     val totalPlays: Long,
     plays: LongArray,
-    rewards: DoubleArray
+    rewards: DoubleArray,
+    val minReward: Double = 0.0,
+    val maxReward: Double = 1.0
 ) {
     private val plays: LongArray = plays.copyOf()
     private val rewards: DoubleArray = rewards.copyOf()
@@ -20,6 +22,7 @@ class UcbBandit(
         require(armCount > 0) { "armCount must be positive" }
         require(this.plays.size == armCount) { "plays size must match armCount" }
         require(this.rewards.size == armCount) { "rewards size must match armCount" }
+        require(maxReward > minReward) { "maxReward must be greater than minReward" }
     }
 
     /**
@@ -60,14 +63,32 @@ class UcbBandit(
         updatedPlays[arm] += 1L
         updatedRewards[arm] += reward
 
-        return UcbBandit(armCount, totalPlays + 1, updatedPlays, updatedRewards)
+        return UcbBandit(armCount, totalPlays + 1, updatedPlays, updatedRewards, minReward, maxReward)
     }
 
-    fun toState(): UcbBanditState = UcbBanditState(totalPlays, plays.copyOf(), rewards.copyOf())
+    fun normalizeReward(reward: Double): Double {
+        val normalized = (reward - minReward) / (maxReward - minReward)
+        return normalized.coerceIn(0.0, 1.0)
+    }
+
+    fun toState(): UcbBanditState = UcbBanditState(totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward)
+
+    fun toDto(): UcbBanditDto =
+        UcbBanditDto(armCount, totalPlays, plays.copyOf(), rewards.copyOf(), minReward, maxReward)
 
     companion object {
+        fun withArms(armCount: Int, minReward: Double = 0.0, maxReward: Double = 1.0): UcbBandit {
+            require(armCount > 0) { "armCount must be positive" }
+            require(maxReward > minReward) { "maxReward must be greater than minReward" }
+
+            return UcbBandit(armCount, 0, LongArray(armCount), DoubleArray(armCount), minReward, maxReward)
+        }
+
         fun fromState(state: UcbBanditState): UcbBandit =
-            UcbBandit(state.plays.size, state.totalPlays, state.plays, state.rewards)
+            UcbBandit(state.plays.size, state.totalPlays, state.plays, state.rewards, state.minReward, state.maxReward)
+
+        fun fromDto(dto: UcbBanditDto): UcbBandit =
+            UcbBandit(dto.armCount, dto.totalPlays, dto.plays, dto.rewards, dto.minReward, dto.maxReward)
     }
 }
 
@@ -77,5 +98,16 @@ class UcbBandit(
 data class UcbBanditState(
     val totalPlays: Long,
     val plays: LongArray,
-    val rewards: DoubleArray
+    val rewards: DoubleArray,
+    val minReward: Double = 0.0,
+    val maxReward: Double = 1.0
+)
+
+data class UcbBanditDto(
+    val armCount: Int,
+    val totalPlays: Long,
+    val plays: LongArray,
+    val rewards: DoubleArray,
+    val minReward: Double,
+    val maxReward: Double
 )
