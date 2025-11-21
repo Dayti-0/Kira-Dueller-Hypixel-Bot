@@ -11,6 +11,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.math.max
 import kotlin.math.round
+import kotlin.math.sqrt
+import kotlin.math.ln
 
 object ClassicV2Tuner {
 
@@ -109,7 +111,14 @@ object ClassicV2Tuner {
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
     private data class ParamSpec(val key: String, val min: Double, val max: Double, val step: Double, val def: Double, val type: ParamType)
     private data class ValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0) {
-        fun avg() = if (plays > 0) totalReward / plays else Double.NEGATIVE_INFINITY
+        fun avg(): Double = if (plays > 0) totalReward / plays else 0.0
+
+        fun ucb(totalPlays: Int, c: Double = 1.4): Double {
+            if (plays == 0) return Double.POSITIVE_INFINITY
+            val exploitation = avg()
+            val exploration = c * sqrt(ln(totalPlays.toDouble()) / plays)
+            return exploitation + exploration
+        }
     }
     private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
@@ -273,16 +282,101 @@ object ClassicV2Tuner {
         chosen.order("rodAntiSpamFarActiveMin", "rodAntiSpamFarActiveMax")
     }
 
-    // ----------- Epsilon simple comme l'ancien -----------
-    private fun epsilon(totalPlays: Int): Double {
-        val base = 0.12  // V4: Réduit de 0.15 à 0.12 pour plus d'exploitation des optimums
-        val minE = 0.02
-        val decay = totalPlays / 25.0  // V4: Decay plus rapide (30 → 25)
-        return max(minE, base / (1.0 + decay))
+    // ----------- UCB (Upper Confidence Bound) -----------
+    private fun pickWithUCB(): Map<String, Double> {
+        val chosen = mutableMapOf<String, Double>()
+
+        for (spec in specs) {
+            val p = state.params.getOrPut(spec.key) { ParamState() }
+
+            if (p.values.isEmpty()) {
+                initializeValues(p, spec)
+            }
+
+            val shouldExplore = shouldExploreNew(p)
+
+            val value = if (shouldExplore) {
+                val newValue = sample(spec)
+                val key = keyOf(newValue)
+                if (!p.values.containsKey(key)) {
+                    p.values[key] = ValueState(value = newValue)
+                }
+                newValue
+            } else {
+                selectByUCB(p, spec)
+            }
+
+            p.lastValue = value
+            chosen[spec.key] = value
+        }
+
+        save()
+        return chosen
     }
-    
-    private fun exploreNow(epsilon: Double): Boolean =
-        RandomUtils.randomDoubleInRange(0.0, 1.0) < epsilon
+
+    private fun selectByUCB(ps: ParamState, spec: ParamSpec): Double {
+        if (ps.values.isEmpty()) {
+            return spec.def
+        }
+
+        var bestValue = spec.def
+        var bestScore = Double.NEGATIVE_INFINITY
+
+        val c = when {
+            ps.totalPlays < 50 -> 2.0
+            ps.totalPlays < 200 -> 1.4
+            ps.totalPlays < 500 -> 1.0
+            else -> 0.5
+        }
+
+        for ((_, vs) in ps.values) {
+            val score = vs.ucb(ps.totalPlays, c)
+            if (score > bestScore) {
+                bestScore = score
+                bestValue = vs.value
+            }
+        }
+
+        return clamp(bestValue, spec)
+    }
+
+    private fun shouldExploreNew(ps: ParamState): Boolean {
+        if (ps.values.size < 10) return RandomUtils.randomDoubleInRange(0.0, 1.0) < 0.3
+
+        if (ps.totalPlays > 0 && ps.totalPlays % 30 == 0) return true
+
+        val explorationRate = when {
+            ps.totalPlays < 100 -> 0.2
+            ps.totalPlays < 300 -> 0.1
+            ps.totalPlays < 1000 -> 0.05
+            else -> 0.02
+        }
+
+        return RandomUtils.randomDoubleInRange(0.0, 1.0) < explorationRate
+    }
+
+    private fun initializeValues(ps: ParamState, spec: ParamSpec) {
+        val defKey = keyOf(spec.def)
+        if (!ps.values.containsKey(defKey)) {
+            ps.values[defKey] = ValueState(value = spec.def)
+        }
+
+        val range = spec.max - spec.min
+        val initialValues = listOf(
+            spec.min + range * 0.25,
+            spec.min + range * 0.5,
+            spec.min + range * 0.75
+        )
+
+        for (value in initialValues) {
+            val quantized = quantize(value, spec.step)
+            val clamped = clamp(quantized, spec)
+            val key = keyOf(clamped)
+            if (!ps.values.containsKey(key)) {
+                ps.values[key] = ValueState(value = clamped)
+            }
+        }
+    }
 
     // ----------- Pruning -----------
     private fun prune() {
@@ -319,20 +413,7 @@ object ClassicV2Tuner {
     @Synchronized
     fun pickParams(): ClassicParams {
         ensureLoaded()
-        val chosen = mutableMapOf<String, Double>()
-        for (spec in specs) {
-            val p = state.params.getOrPut(spec.key) { ParamState() }
-            val eps = epsilon(p.totalPlays)
-            val value = when {
-                p.values.isEmpty() -> spec.def
-                exploreNow(eps)    -> sample(spec)
-                else               -> bestValue(p, spec)
-            }
-            val key = keyOf(value)
-            if (!p.values.containsKey(key)) p.values[key] = ValueState(value = value)
-            p.lastValue = value
-            chosen[spec.key] = value
-        }
+        val chosen = pickWithUCB().toMutableMap()
         normalize(chosen)
         val params = buildParams(chosen)
         lastPicked = params
@@ -456,9 +537,6 @@ object ClassicV2Tuner {
         val raw = v ?: spec?.def ?: 0.0
         return spec?.let { raw.coerceIn(it.min, it.max) } ?: raw
     }
-
-    private fun bestValue(ps: ParamState, spec: ParamSpec): Double =
-        clamp(ps.values.values.maxByOrNull { it.avg() }?.value ?: spec.def, spec)
 
     private fun sample(spec: ParamSpec): Double =
         clamp(quantize(RandomUtils.randomDoubleInRange(spec.min, spec.max), if (spec.step <= 0.0) 1.0 else spec.step), spec)
