@@ -90,8 +90,8 @@ object SumoTuner {
     private data class ParamState(var values: MutableMap<String, ValueState> = mutableMapOf(), var lastValue: Double = 0.0, var totalPlays: Int = 0)
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
-    private const val CURRENT_VERSION = 1
-    private const val MISTAKE_PENALTY = 0.1
+    private const val CURRENT_VERSION = 2
+    private const val MISTAKE_PENALTY = 0.25
 
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
     private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)
@@ -206,7 +206,7 @@ object SumoTuner {
     fun report(win: Boolean, mistakes: Int) {
         ensureLoaded()
         val rewardRaw = if (win) 1.0 else 0.0
-        val reward = rewardRaw - mistakes * MISTAKE_PENALTY
+        val reward = (rewardRaw - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
         for ((_, ps) in state.params) {
             val entryKey = keyOf(ps.lastValue)
