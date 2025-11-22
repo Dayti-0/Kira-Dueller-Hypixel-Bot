@@ -34,9 +34,33 @@ object BowDuelTuner {
         var lastArm: Int = 0
     )
 
+    private data class GlobalStats(
+        var wins: Int = 0,
+        var losses: Int = 0,
+        var draws: Int = 0,
+        var totalGames: Int = 0,
+        var winRate: Double = 0.0,
+    ) {
+        fun record(win: Boolean, draw: Boolean = false) {
+            when {
+                draw -> draws++
+                win -> wins++
+                else -> losses++
+            }
+            normalize()
+        }
+
+        fun normalize(): GlobalStats {
+            totalGames = wins + losses + draws
+            winRate = if (totalGames > 0) wins.toDouble() / totalGames else 0.0
+            return this
+        }
+    }
+
     private data class StoredState(
         var version: Int = CURRENT_VERSION,
-        var params: MutableMap<String, ParamState> = mutableMapOf()
+        var params: MutableMap<String, ParamState> = mutableMapOf(),
+        var globalStats: GlobalStats = GlobalStats(),
     )
 
     private data class LegacyValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0)
@@ -84,6 +108,8 @@ object BowDuelTuner {
         val rewardRaw = if (win) 1.0 else 0.0
         val reward = (rewardRaw - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
+        state.globalStats.record(win)
+        changed = true
         for ((_, ps) in state.params) {
             if (ps.values.isEmpty()) continue
 
@@ -287,6 +313,7 @@ object BowDuelTuner {
             }
         }
         state.version = CURRENT_VERSION
+        state.globalStats.normalize()
         return state
     }
 
