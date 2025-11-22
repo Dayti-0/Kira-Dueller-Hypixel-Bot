@@ -60,33 +60,9 @@ object OPTuner {
         var lastArm: Int = 0
     )
 
-    private data class GlobalStats(
-        var wins: Int = 0,
-        var losses: Int = 0,
-        var draws: Int = 0,
-        var totalGames: Int = 0,
-        var winRate: Double = 0.0,
-    ) {
-        fun record(win: Boolean, draw: Boolean = false) {
-            when {
-                draw -> draws++
-                win -> wins++
-                else -> losses++
-            }
-            normalize()
-        }
-
-        fun normalize(): GlobalStats {
-            totalGames = wins + losses + draws
-            winRate = if (totalGames > 0) wins.toDouble() / totalGames else 0.0
-            return this
-        }
-    }
-
     private data class StoredState(
         var version: Int = CURRENT_VERSION,
         var params: MutableMap<String, ParamState> = mutableMapOf(),
-        var globalStats: GlobalStats = GlobalStats(),
     )
 
     private data class LegacyValueState(var value: Double = 0.0, var plays: Int = 0, var totalReward: Double = 0.0)
@@ -102,6 +78,24 @@ object OPTuner {
         var params: MutableMap<String, LegacyParamState> = mutableMapOf()
     )
 
+    private data class LegacyValueStateV3(
+        var value: Double = 0.0,
+        var plays: Int = 0,
+        var totalReward: Double = 0.0,
+    )
+
+    private data class LegacyParamStateV3(
+        var values: MutableList<LegacyValueStateV3> = mutableListOf(),
+        var lastValue: Double = 0.0,
+        var lastArm: Int = 0,
+    )
+
+    private data class LegacyStoredStateV3(
+        var version: Int = CURRENT_VERSION,
+        var params: MutableMap<String, LegacyParamStateV3> = mutableMapOf(),
+    )
+
+    // Schéma aligné sur ClassicV2 (version 3)
     private const val CURRENT_VERSION = 3
     private const val MISTAKE_PENALTY = 0.25
 
@@ -178,8 +172,6 @@ object OPTuner {
 
         // Mise à jour des paramètres
         var changed = false
-        state.globalStats.record(win)
-        changed = true
         for ((_, ps) in state.params) {
             if (ps.values.isEmpty()) continue
             val bandit = resizeBandit(banditFor(ps), ps.values.size)
@@ -347,35 +339,39 @@ object OPTuner {
     }
 
     private fun load(): StoredState {
-        return try {
-            val f = file()
-            if (!f.exists()) {
-                f.parentFile?.mkdirs()
-                val newState = StoredState()
-                for (spec in specs) {
-                    spec.optimal?.let { optimalValue ->
-                        val ps = ParamState()
-                        ps.values.add(optimalValue)
-                        ps.lastValue = optimalValue
-                        ps.lastArm = 0
-                        ps.bandit = emptyBandit(1).update(0, 1.0).toState()
-                        newState.params[spec.key] = ps
-                    }
-                }
-                newState
-            } else {
-                f.reader().use { reader ->
-                    val type = object : TypeToken<StoredState>() {}.type
-                    val loadedState = kira.gson.fromJson<StoredState>(reader, type)
-                    if (loadedState == null || loadedState.version != CURRENT_VERSION) {
-                        migrateLegacy()
-                    } else {
-                        normalize(loadedState)
-                    }
+        val f = file()
+        if (!f.exists()) {
+            f.parentFile?.mkdirs()
+            val newState = StoredState()
+            for (spec in specs) {
+                spec.optimal?.let { optimalValue ->
+                    val ps = ParamState()
+                    ps.values.add(optimalValue)
+                    ps.lastValue = optimalValue
+                    ps.lastArm = 0
+                    ps.bandit = emptyBandit(1).update(0, 1.0).toState()
+                    newState.params[spec.key] = ps
                 }
             }
+            return newState
+        }
+
+        val json = try {
+            f.readText()
         } catch (_: Exception) {
-            StoredState()
+            return StoredState()
+        }
+
+        return try {
+            val type = object : TypeToken<StoredState>() {}.type
+            val loadedState = kira.gson.fromJson<StoredState>(json, type)
+            if (loadedState?.version == CURRENT_VERSION) {
+                normalize(loadedState)
+            } else {
+                migrateLegacy(json)
+            }
+        } catch (_: Exception) {
+            migrateLegacy(json)
         }
     }
 
@@ -402,15 +398,58 @@ object OPTuner {
             ps.bandit = resized.toState()
         }
         stored.version = CURRENT_VERSION
-        stored.globalStats.normalize()
         return stored
     }
 
-    private fun migrateLegacy(): StoredState {
+    private fun migrateLegacy(json: String): StoredState {
+        migrateFromLegacyV3(json)?.let { return it }
+        migrateFromLegacyV2(json)?.let { return it }
+        return StoredState()
+    }
+
+    private fun migrateFromLegacyV3(json: String): StoredState? {
         return try {
-            val f = file()
+            val type = object : TypeToken<LegacyStoredStateV3>() {}.type
+            val legacy = kira.gson.fromJson<LegacyStoredStateV3>(json, type) ?: return null
+            if (legacy.params.isEmpty()) return null
+
+            val migrated = StoredState()
+            for ((key, lp) in legacy.params) {
+                if (lp.values.isEmpty()) continue
+                val ps = ParamState()
+                val plays = LongArray(lp.values.size)
+                val rewards = DoubleArray(lp.values.size)
+                val numericValues = mutableListOf<Double>()
+
+                lp.values.forEachIndexed { idx, entry ->
+                    numericValues.add(entry.value)
+                    plays[idx] = entry.plays.toLong()
+                    rewards[idx] = entry.totalReward
+                }
+
+                val bandit = UcbBandit(numericValues.size, plays.sum(), plays, rewards)
+                val arm = numericValues.indexOfFirst { keyOf(it) == keyOf(lp.lastValue) }.takeIf { it >= 0 } ?: 0
+
+                ps.values = numericValues
+                ps.lastArm = arm.coerceIn(0, numericValues.lastIndex)
+                ps.lastValue = numericValues[ps.lastArm]
+                ps.bandit = bandit.toState()
+                migrated.params[key] = ps
+            }
+
+            if (migrated.params.isEmpty()) return null
+            normalize(migrated)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun migrateFromLegacyV2(json: String): StoredState? {
+        return try {
             val type = object : TypeToken<LegacyStoredState>() {}.type
-            val legacy = f.reader().use { kira.gson.fromJson<LegacyStoredState>(it, type) } ?: LegacyStoredState()
+            val legacy = kira.gson.fromJson<LegacyStoredState>(json, type) ?: return null
+            if (legacy.params.isEmpty()) return null
+
             val migrated = StoredState()
             for ((key, lp) in legacy.params) {
                 val ps = ParamState()
@@ -432,9 +471,10 @@ object OPTuner {
                 ps.bandit = bandit.toState()
                 migrated.params[key] = ps
             }
+            if (migrated.params.isEmpty()) return null
             normalize(migrated)
         } catch (_: Exception) {
-            StoredState()
+            null
         }
     }
 
