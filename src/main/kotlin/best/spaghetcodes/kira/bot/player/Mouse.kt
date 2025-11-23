@@ -36,6 +36,12 @@ object Mouse {
     private var splashAim = 0.0
 
     // ---- Bow ballistic compensation (pitch) ----
+    private var bowPitchBias = 0f
+
+    fun setBowPitchBias(bias: Float) {
+        bowPitchBias = bias
+    }
+
     private fun bowDistanceToOpponent(): Float {
         val p = kira.mc.thePlayer ?: return 0f
         val opp = kira.bot?.opponent() ?: return 0f
@@ -50,7 +56,7 @@ object Mouse {
      * Ajustement: mid-range 15–25 blocs un peu **moins haut**.
      */
     private fun bowPitchComp(distance: Float): Float {
-        return when {
+        val base = when {
             distance < 30f -> 0.0f
             distance < 32f -> 0.4f
             distance < 35f -> 0.8f
@@ -66,6 +72,7 @@ object Mouse {
             distance < 80f -> 5.5f
             else           -> 5.6f
         }
+        return base + bowPitchBias
     }
     // --------------------------------------------
 
