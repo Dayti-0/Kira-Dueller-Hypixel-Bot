@@ -119,6 +119,7 @@ object ClassicV2Tuner {
 
     private const val CURRENT_VERSION = 3
     private const val TOP_N_KEEP = 16
+    private const val BANDIT_DECAY = 0.999
 
     // -------------------------- SPECS --------------------------
     private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
@@ -436,7 +437,7 @@ object ClassicV2Tuner {
         var changed = false
         for ((_, ps) in state.params) {
             if (ps.values.isEmpty()) continue
-            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            val bandit = resizeBandit(banditFor(ps), ps.values.size).decay(BANDIT_DECAY)
             val arm = ps.lastArm.coerceIn(ps.values.indices)
             ps.lastArm = arm
             ps.lastValue = ps.values[arm]

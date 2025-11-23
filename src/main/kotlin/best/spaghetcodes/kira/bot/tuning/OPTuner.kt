@@ -98,6 +98,7 @@ object OPTuner {
 
     // Schéma aligné sur ClassicV2 (version 3)
     private const val CURRENT_VERSION = 3
+    private const val BANDIT_DECAY = 0.999
 
     private fun specI(key: String, min: Double, max: Double, step: Double, def: Double, optimal: Double? = null) =
         ParamSpec(key, min, max, step, def, ParamType.INT, optimal)
@@ -198,7 +199,7 @@ object OPTuner {
         var changed = false
         for ((_, ps) in state.params) {
             if (ps.values.isEmpty()) continue
-            val bandit = resizeBandit(banditFor(ps), ps.values.size)
+            val bandit = resizeBandit(banditFor(ps), ps.values.size).decay(BANDIT_DECAY)
             val arm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
             val updated = bandit.update(arm, reward)
             ps.bandit = updated.toState()
