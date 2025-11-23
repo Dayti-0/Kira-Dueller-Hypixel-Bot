@@ -10,6 +10,7 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.bot.tuning.ClassicV2Tuner
+import best.spaghetcodes.kira.bot.tuning.MistakeSummary
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
@@ -37,6 +38,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var fullDrawMsMax = 980
     private var bowCancelCloseDist = 8.0f
     private var bowMinUseDist = 9.0f
+    private var bowAimPitchBias = 0.0f
 
     private var openVolleyMax = 1
     private var openVolleyFired = 0
@@ -359,7 +361,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        val mistakes = if (kira.isTunerEnabled) ClassicV2Tuner.takeAndResetMistakes() else 0
+        val mistakes = if (kira.isTunerEnabled) ClassicV2Tuner.takeAndResetMistakes(rodHits, rodMisses, shotsFired) else MistakeSummary.ZERO
         if (kira.isTunerEnabled) {
             ClassicV2Tuner.report(win, mistakes)
         }
@@ -458,6 +460,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         antiJumpZoneDist = p.antiJumpZoneDist
         startupJumpDelayMs = p.startupJumpDelayMs
         continuousJumpMinIntervalMs = p.continuousJumpMinIntervalMs
+
+        bowAimPitchBias = p.bowAimPitchBias
+        Mouse.setBowPitchBias(bowAimPitchBias)
     }
 
     override fun onAttack() {
@@ -516,6 +521,21 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private fun castRodNow(distanceNow: Float) {
         fun doClick() {
             val nowClick = System.currentTimeMillis()
+
+            if (kira.isTunerEnabled) {
+                val distanceMargin = 0.2f
+                if (distanceNow < rodBanMeleeDist - distanceMargin || distanceNow > rodMaxRangeHard + distanceMargin) {
+                    ClassicV2Tuner.noteRodMistake()
+                }
+
+                val cdClose = (rodCdCloseMsBase * rodCdBias).toLong()
+                val cdFar = (rodCdFarMsBase * rodCdBias).toLong()
+                val requiredCd = if (distanceNow <= rodCloseMax) cdClose else cdFar
+                val cdReady = (nowClick - lastRodUse) >= requiredCd || nowClick < reentryRodGraceUntil
+                if (!cdReady) {
+                    ClassicV2Tuner.noteRodMistake()
+                }
+            }
 
             Mouse.setUsingProjectile(true)
             if (Mouse.rClickDown) Mouse.rClickUp()
@@ -730,6 +750,9 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         if (projectileActive && Mouse.rClickDown && projectileKind == KIND_BOW && distance < bowCancelCloseDist) {
+            if (kira.isTunerEnabled) {
+                ClassicV2Tuner.noteBowMistake()
+            }
             Mouse.rClickUp()
             bowHardLockUntil = 0L
             projectileGraceUntil = 0L
@@ -921,6 +944,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
                 val lock = chargeMsFor(distance, opening = true)
 
+                if (kira.isTunerEnabled && distance < (bowMinUseDist - 1f)) {
+                    ClassicV2Tuner.noteBowMistake()
+                }
+
                 Movement.stopJumping()
                 continuousJumping = false
 
@@ -951,6 +978,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
 
                 val lock = chargeMsFor(distance, opening = false)
 
+                if (kira.isTunerEnabled && distance < (bowMinUseDist - 1f)) {
+                    ClassicV2Tuner.noteBowMistake()
+                }
+
                 Movement.stopJumping()
                 continuousJumping = false
 
@@ -971,6 +1002,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
                 if ((away && distance in 3.5f..30f) || (!away && distance in 28.0f..33.0f)) {
 
                     val lock = chargeMsFor(distance, opening = false)
+
+                    if (kira.isTunerEnabled && distance < (bowMinUseDist - 1f)) {
+                        ClassicV2Tuner.noteBowMistake()
+                    }
 
                     Movement.stopJumping()
                     continuousJumping = false

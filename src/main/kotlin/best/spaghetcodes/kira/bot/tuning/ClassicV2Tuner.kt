@@ -20,6 +20,7 @@ object ClassicV2Tuner {
         val fullDrawMsMax: Int,
         val bowCancelCloseDist: Float,
         val bowMinUseDist: Float,
+        val bowAimPitchBias: Float,
         val openVolleyMax: Int,
         val openSpacingMin: Long,
         val openSpacingMax: Long,
@@ -117,7 +118,6 @@ object ClassicV2Tuner {
     private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
     private const val CURRENT_VERSION = 3
-    private const val MISTAKE_PENALTY = 0.25
     private const val TOP_N_KEEP = 16
 
     // -------------------------- SPECS --------------------------
@@ -133,6 +133,7 @@ object ClassicV2Tuner {
         specI("fullDrawMsMax", 1080.0, 1120.0, 10.0, 1100.0),       // V4: 1060→1100 (100% WR!), plage resserrée 1020-1100→1080-1120
         specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),          // inchangé
         specF("bowMinUseDist", 7.0, 11.0, 0.1, 10.5),              // default 9→10.5 (proche de 10.7 optimal)
+        specF("bowAimPitchBias", -1.2, 1.2, 0.1, 0.0),             // nouvel offset : fine-tune l'angle de visée arc
         
         specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),                // verrouillé (prouvé)
         
@@ -383,20 +384,36 @@ object ClassicV2Tuner {
     }
 
     // ----------- Hooks -----------
-    private var currentMistakes: Int = 0
+    private var mistakesJump: Int = 0
+    private var mistakesRod: Int = 0
+    private var mistakesBow: Int = 0
     private var lastPicked: ClassicParams? = null
+
+    fun noteJumpMistake() {
+        mistakesJump += 1
+    }
+
+    fun noteRodMistake() {
+        mistakesRod += 1
+    }
+
+    fun noteBowMistake() {
+        mistakesBow += 1
+    }
 
     fun noteCloseJump(distance: Float, holdingBow: Boolean) {
         val zone = lastPicked?.antiJumpZoneDist ?: 8.0f
         if (holdingBow || distance <= zone) {
-            currentMistakes += 1
+            noteJumpMistake()
         }
     }
-    
-    fun takeAndResetMistakes(): Int {
-        val m = currentMistakes
-        currentMistakes = 0
-        return m
+
+    fun takeAndResetMistakes(rodHits: Int, rodMisses: Int, bowShots: Int): MistakeSummary {
+        val summary = MistakeSummary(mistakesJump, mistakesRod, mistakesBow, rodHits, rodMisses, bowShots)
+        mistakesJump = 0
+        mistakesRod = 0
+        mistakesBow = 0
+        return summary
     }
 
     // -------------------------- API --------------------------
@@ -413,10 +430,9 @@ object ClassicV2Tuner {
     }
 
     @Synchronized
-    fun report(win: Boolean, mistakes: Int) {
+    fun report(win: Boolean, mistakes: MistakeSummary) {
         ensureLoaded()
-        val rewardBase = if (win) 1.0 else 0.0
-        val reward = (rewardBase - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
+        val reward = computeReward(win, mistakes)
         var changed = false
         for ((_, ps) in state.params) {
             if (ps.values.isEmpty()) continue
@@ -441,6 +457,7 @@ object ClassicV2Tuner {
         fullDrawMsMax = map.int("fullDrawMsMax"),
         bowCancelCloseDist = map.float("bowCancelCloseDist"),
         bowMinUseDist = map.float("bowMinUseDist"),
+        bowAimPitchBias = map.float("bowAimPitchBias"),
         openVolleyMax = map.int("openVolleyMax"),
         openSpacingMin = map.long("openSpacingMin"),
         openSpacingMax = map.long("openSpacingMax"),

@@ -1,5 +1,6 @@
 package best.spaghetcodes.kira.bot.tuning
 
+import best.spaghetcodes.kira.bot.tuning.MistakeSummary.Companion.ZERO
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.RandomUtils
 import com.google.gson.reflect.TypeToken
@@ -97,7 +98,6 @@ object OPTuner {
 
     // Schéma aligné sur ClassicV2 (version 3)
     private const val CURRENT_VERSION = 3
-    private const val MISTAKE_PENALTY = 0.25
 
     private fun specI(key: String, min: Double, max: Double, step: Double, def: Double, optimal: Double? = null) =
         ParamSpec(key, min, max, step, def, ParamType.INT, optimal)
@@ -153,6 +153,31 @@ object OPTuner {
     private var loaded = false
     private var state = StoredState()
 
+    // ----------- Hooks -----------
+    private var mistakesJump: Int = 0
+    private var mistakesRod: Int = 0
+    private var mistakesBow: Int = 0
+
+    fun noteJumpMistake() {
+        mistakesJump += 1
+    }
+
+    fun noteRodMistake() {
+        mistakesRod += 1
+    }
+
+    fun noteBowMistake() {
+        mistakesBow += 1
+    }
+
+    fun takeAndResetMistakes(rodHits: Int, rodMisses: Int, bowShots: Int): MistakeSummary {
+        val summary = MistakeSummary(mistakesJump, mistakesRod, mistakesBow, rodHits, rodMisses, bowShots)
+        mistakesJump = 0
+        mistakesRod = 0
+        mistakesBow = 0
+        return summary
+    }
+
     fun pickParams(): OPParams {
         ensureLoaded()
 
@@ -161,14 +186,13 @@ object OPTuner {
 
         return build(values)
     }
-    
+
     fun defaults(): OPParams = build(defaultValues())
 
-    fun report(win: Boolean, mistakes: Int = 0) {
+    fun report(win: Boolean, mistakes: MistakeSummary = ZERO) {
         ensureLoaded()
 
-        val baseReward = if (win) 1.0 else 0.0
-        val reward = (baseReward - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
+        val reward = computeReward(win, mistakes)
 
         // Mise à jour des paramètres
         var changed = false
