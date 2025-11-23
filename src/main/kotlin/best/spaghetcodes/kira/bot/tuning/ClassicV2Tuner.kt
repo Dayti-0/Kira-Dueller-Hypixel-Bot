@@ -32,12 +32,12 @@ object ClassicV2Tuner {
         val bowSlowThreshold: Double,
         val bowSlowFramesNeeded: Int,
 
-        // Réserves
+        // Réserves flèches
         val reserveTightMs: Long,
         val earlyReserve: Int,
         val midReserve: Int,
 
-        // Rod
+        // ROD (cd, ranges)
         val rodCdCloseMsBase: Long,
         val rodCdFarMsBase: Long,
         val rodCdBiasMax: Float,
@@ -54,6 +54,7 @@ object ClassicV2Tuner {
         val farThreshold: Float,
         val reentryRodGraceMs: Long,
 
+        // ROD (hold + anti-spam)
         val rodHoldCloseMinMs: Int,
         val rodHoldCloseMaxMs: Int,
         val rodHoldMidMinMs: Int,
@@ -65,6 +66,7 @@ object ClassicV2Tuner {
         val rodAntiSpamMidPassiveMax: Int,
         val rodAntiSpamFarPassiveMin: Int,
         val rodAntiSpamFarPassiveMax: Int,
+
         val rodAntiSpamCloseActiveMin: Int,
         val rodAntiSpamCloseActiveMax: Int,
         val rodAntiSpamMidActiveMin: Int,
@@ -72,7 +74,7 @@ object ClassicV2Tuner {
         val rodAntiSpamFarActiveMin: Int,
         val rodAntiSpamFarActiveMax: Int,
 
-        // Parry
+        // PARADE épée
         val parryCloseCancelDist: Float,
         val parryCooldownMs: Long,
         val parryHoldMinMs: Int,
@@ -82,7 +84,7 @@ object ClassicV2Tuner {
         val parryJumpCd: Long,
         val allowParryDelayMs: Long,
 
-        // Strafe proche
+        // STRAFE proche
         val closeBurstWindowMinMs: Int,
         val closeBurstWindowMaxMs: Int,
         val closeBurstFlipMinMs: Int,
@@ -90,7 +92,7 @@ object ClassicV2Tuner {
         val closeHoldWindowMinMs: Int,
         val closeHoldWindowMaxMs: Int,
 
-        // Post-hit
+        // POST-HIT
         val forwardStickMinMs: Int,
         val forwardStickMaxMs: Int,
         val meleeFocusMinMs: Int,
@@ -104,16 +106,7 @@ object ClassicV2Tuner {
 
     // -------------------------- STORAGE --------------------------
     private enum class ParamType { FLOAT, INT, LONG, DOUBLE }
-
-    private data class ParamSpec(
-        val key: String,
-        val min: Double,
-        val max: Double,
-        val step: Double,
-        val def: Double,
-        val type: ParamType
-    )
-
+    private data class ParamSpec(val key: String, val min: Double, val max: Double, val step: Double, val def: Double, val type: ParamType)
     private data class ParamState(
         var values: MutableList<Double> = mutableListOf(),
         var lastValue: Double = 0.0,
@@ -121,105 +114,82 @@ object ClassicV2Tuner {
         var lastArm: Int = 0
     )
 
-    private data class StoredState(
-        var version: Int = CURRENT_VERSION,
-        var params: MutableMap<String, ParamState> = mutableMapOf()
-    )
+    private data class StoredState(var version: Int = CURRENT_VERSION, var params: MutableMap<String, ParamState> = mutableMapOf())
 
     private const val CURRENT_VERSION = 3
     private const val MISTAKE_PENALTY = 0.25
     private const val TOP_N_KEEP = 16
 
-    // Limite "effective" pour éviter que les bandits soient figés sur de très vieux samples.
-    private const val MAX_EFFECTIVE_TOTAL_PLAYS: Long = 2000L
-
-    // Lissage des rewards : on garde une inertie sur les bras très joués.
-    private const val SMOOTHING_MIN_PLAYS_PER_ARM: Long = 10L
-    private const val SMOOTHING_LEARNING_RATE: Double = 0.35
-
-    // Stratégie par défaut pour ce tuner : UCB_TUNED est plus stable que UCB1 sur des rewards 0/1.
-    private val DEFAULT_STRATEGY: UcbBandit.Strategy = UcbBandit.Strategy.UCB_TUNED
-
-    // Reward de base en cas de défaite (permet de distinguer une bonne et une mauvaise défaite).
-    private const val LOSS_BASE_REWARD: Double = 0.35
-
     // -------------------------- SPECS --------------------------
-    private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) =
-        ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
-
-    private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) =
-        ParamSpec(k, mi, ma, st, de, ParamType.INT)
-
-    private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double) =
-        ParamSpec(k, mi, ma, st, de, ParamType.LONG)
-
-    private fun specD(k: String, mi: Double, ma: Double, st: Double, de: Double) =
-        ParamSpec(k, mi, ma, st, de, ParamType.DOUBLE)
+    private fun specF(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.FLOAT)
+    private fun specI(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.INT)
+    private fun specL(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.LONG)
+    private fun specD(k: String, mi: Double, ma: Double, st: Double, de: Double) = ParamSpec(k, mi, ma, st, de, ParamType.DOUBLE)
 
     // VERSION HYBRID : Plages larges de l'ancien + defaults ajustés d'après les données
     private val specs = listOf(
         // BOW - Defaults V4 basés sur découvertes session (867 et 779 parties)
-        specI("fullDrawMsMin", 780.0, 820.0, 10.0, 800.0),
-        specI("fullDrawMsMax", 1080.0, 1120.0, 10.0, 1100.0),
-        specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),
-        specF("bowMinUseDist", 7.0, 11.0, 0.1, 10.5),
+        specI("fullDrawMsMin", 780.0, 820.0, 10.0, 800.0),        // V4: 750→800 (99.4% WR), plage resserrée 700-800→780-820
+        specI("fullDrawMsMax", 1080.0, 1120.0, 10.0, 1100.0),       // V4: 1060→1100 (100% WR!), plage resserrée 1020-1100→1080-1120
+        specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),          // inchangé
+        specF("bowMinUseDist", 7.0, 11.0, 0.1, 10.5),              // default 9→10.5 (proche de 10.7 optimal)
+        
+        specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),                // verrouillé (prouvé)
+        
+        specL("openSpacingMin", 450.0, 850.0, 10.0, 450.0),        // default 650→450 (données)
+        specL("openSpacingMax", 700.0, 1150.0, 10.0, 870.0),       // default 900→870 (données)
+        specF("openShotMinDist", 7.0, 12.0, 0.1, 11.5),            // default 9→11.5 (proche de 11.8)
+        specL("reactiveCdMs", 450.0, 900.0, 10.0, 670.0),          // default 650→670 (données)
 
-        specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),
-
-        specL("openSpacingMin", 450.0, 850.0, 10.0, 450.0),
-        specL("openSpacingMax", 700.0, 1150.0, 10.0, 870.0),
-        specF("openShotMinDist", 10.0, 16.0, 0.1, 13.0),
-        specL("reactiveCdMs", 420.0, 780.0, 10.0, 600.0),
-
-        // Détection mouvement
-        specD("stillFrameThreshold", 0.02, 0.08, 0.002, 0.045),
+        // Détection mouvement - inchangé
+        specD("stillFrameThreshold", 0.008, 0.02, 0.0005, 0.0125),
         specI("stillFramesNeeded", 6.0, 16.0, 1.0, 10.0),
         specD("bowSlowThreshold", 0.04, 0.09, 0.002, 0.06),
         specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),
 
-        // Réserves
+        // Réserves - inchangé
         specL("reserveTightMs", 7000.0, 13000.0, 100.0, 10000.0),
         specI("earlyReserve", 2.0, 5.0, 1.0, 3.0),
         specI("midReserve", 1.0, 4.0, 1.0, 2.0),
 
-        // ROD
-        specL("rodCdCloseMsBase", 280.0, 420.0, 10.0, 310.0),
-        specL("rodCdFarMsBase", 360.0, 620.0, 10.0, 480.0),
-        specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),
-        specF("rodBanMeleeDist", 3.0, 5.0, 0.05, 4.0),
-        specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),
-        specF("rodCloseMax", 2.4, 3.4, 0.05, 2.9),
-        specF("rodMainMin", 2.8, 3.8, 0.05, 3.2),
-        specF("rodMainMax", 3.6, 4.6, 0.05, 4.1),
-        specF("rodInterceptMin", 3.9, 5.0, 0.05, 4.4),
-        specF("rodInterceptMax", 5.0, 6.0, 0.05, 5.6),
-        specF("rodMaxRangeHard", 6.5, 8.0, 0.05, 7.2),
-        specF("rodMidInstantMin", 4.8, 6.2, 0.05, 5.5),
-        specF("rodMidInstantMax", 6.2, 7.6, 0.05, 7.0),
-        specF("farThreshold", 9.0, 14.0, 0.1, 11.0),
-        specL("reentryRodGraceMs", 200.0, 500.0, 10.0, 300.0),
+        // ROD - Plages larges conservées, defaults légèrement ajustés
+        specL("rodCdCloseMsBase", 280.0, 420.0, 10.0, 310.0),      // default 340→310 (données)
+        specL("rodCdFarMsBase", 360.0, 620.0, 10.0, 480.0),        // inchangé (bon)
+        specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),              // inchangé
+        specF("rodBanMeleeDist", 3.0, 5.0, 0.05, 4.0),             // inchangé
+        specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),                 // inchangé
+        specF("rodCloseMax", 2.6, 4.0, 0.05, 3.4),                 // inchangé
+        specF("rodMainMin", 2.4, 3.6, 0.05, 2.8),                  // default 3.0→2.8 (données)
+        specF("rodMainMax", 5.5, 8.2, 0.05, 7.0),                  // default 6.8→7.0 (données)
+        specF("rodInterceptMin", 4.8, 6.4, 0.05, 5.8),             // inchangé
+        specF("rodInterceptMax", 6.2, 8.2, 0.05, 7.2),             // inchangé
+        specF("rodMaxRangeHard", 6.5, 8.0, 0.05, 7.2),             // inchangé
+        specF("rodMidInstantMin", 4.8, 6.2, 0.05, 5.5),            // inchangé
+        specF("rodMidInstantMax", 6.2, 7.6, 0.05, 7.0),            // inchangé
+        specF("farThreshold", 9.0, 14.0, 0.1, 11.0),               // inchangé
+        specL("reentryRodGraceMs", 200.0, 500.0, 10.0, 300.0),     // inchangé
 
-        specI("rodHoldCloseMinMs", 90.0, 160.0, 5.0, 118.0),
-        specI("rodHoldCloseMaxMs", 110.0, 190.0, 5.0, 142.0),
-        specI("rodHoldMidMinMs", 160.0, 260.0, 5.0, 208.0),
-        specI("rodHoldMidMaxMs", 180.0, 300.0, 5.0, 232.0),
+        specI("rodHoldCloseMinMs", 90.0, 160.0, 5.0, 118.0),       // inchangé
+        specI("rodHoldCloseMaxMs", 110.0, 190.0, 5.0, 142.0),      // inchangé
+        specI("rodHoldMidMinMs", 160.0, 260.0, 5.0, 208.0),        // inchangé
+        specI("rodHoldMidMaxMs", 180.0, 300.0, 5.0, 232.0),        // inchangé
 
-        // Rod anti-spam
+        // Rod anti-spam - Plages larges, defaults ajustés
         specI("rodAntiSpamClosePassiveMin", 260.0, 420.0, 10.0, 340.0),
         specI("rodAntiSpamClosePassiveMax", 340.0, 520.0, 10.0, 420.0),
-        specI("rodAntiSpamMidPassiveMin", 400.0, 640.0, 10.0, 420.0),
-        specI("rodAntiSpamMidPassiveMax", 520.0, 760.0, 10.0, 580.0),
-        specI("rodAntiSpamFarPassiveMin", 480.0, 720.0, 10.0, 520.0),
-        specI("rodAntiSpamFarPassiveMax", 600.0, 880.0, 10.0, 700.0),
+        specI("rodAntiSpamMidPassiveMin", 400.0, 640.0, 10.0, 420.0),    // default 520→420 (données)
+        specI("rodAntiSpamMidPassiveMax", 520.0, 820.0, 10.0, 680.0),
+        specI("rodAntiSpamFarPassiveMin", 400.0, 640.0, 10.0, 520.0),
+        specI("rodAntiSpamFarPassiveMax", 540.0, 860.0, 10.0, 700.0),
 
-        specI("rodAntiSpamCloseActiveMin", 200.0, 360.0, 10.0, 200.0),
+        specI("rodAntiSpamCloseActiveMin", 200.0, 360.0, 10.0, 200.0),   // default 260→200 (données)
         specI("rodAntiSpamCloseActiveMax", 260.0, 420.0, 10.0, 320.0),
         specI("rodAntiSpamMidActiveMin", 280.0, 480.0, 10.0, 380.0),
         specI("rodAntiSpamMidActiveMax", 400.0, 640.0, 10.0, 520.0),
         specI("rodAntiSpamFarActiveMin", 320.0, 520.0, 10.0, 400.0),
         specI("rodAntiSpamFarActiveMax", 420.0, 700.0, 10.0, 560.0),
 
-        // Parry
+        // PARRY - Plages larges conservées
         specF("parryCloseCancelDist", 11.0, 19.0, 0.2, 15.0),
         specL("parryCooldownMs", 600.0, 1200.0, 10.0, 900.0),
         specI("parryHoldMinMs", 520.0, 820.0, 10.0, 650.0),
@@ -229,98 +199,125 @@ object ClassicV2Tuner {
         specL("parryJumpCd", 400.0, 800.0, 10.0, 580.0),
         specL("allowParryDelayMs", 2000.0, 3600.0, 50.0, 2800.0),
 
-        // Strafe proche
-        specI("closeBurstWindowMinMs", 200.0, 360.0, 10.0, 200.0),
-        specI("closeBurstWindowMaxMs", 320.0, 520.0, 10.0, 300.0),
+        // STRAFE PROCHE - Plages larges, defaults ajustés
+        specI("closeBurstWindowMinMs", 200.0, 360.0, 10.0, 200.0),       // default 280→200 (données)
+        specI("closeBurstWindowMaxMs", 320.0, 520.0, 10.0, 300.0),       // default 420→300 (données)
         specI("closeBurstFlipMinMs", 40.0, 100.0, 5.0, 60.0),
         specI("closeBurstFlipMaxMs", 80.0, 160.0, 5.0, 110.0),
-        specI("closeHoldWindowMinMs", 160.0, 300.0, 10.0, 200.0),
-        specI("closeHoldWindowMaxMs", 260.0, 420.0, 10.0, 300.0),
+        specI("closeHoldWindowMinMs", 160.0, 300.0, 10.0, 200.0),        // default 220→200 (données)
+        specI("closeHoldWindowMaxMs", 260.0, 420.0, 10.0, 300.0),        // default 340→300 (données)
 
-        // Post-hit
-        specI("forwardStickMinMs", 160.0, 300.0, 10.0, 170.0),
-        specI("forwardStickMaxMs", 250.0, 310.0, 10.0, 270.0),
-        specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 370.0),
-        specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),
+        // POST-HIT - Plages larges, defaults ajustés
+        specI("forwardStickMinMs", 160.0, 300.0, 10.0, 170.0),           // default 220→170 (données)
+        specI("forwardStickMaxMs", 250.0, 310.0, 10.0, 270.0),           // default 280→330→270 (découverte 95.6% WR!)
+        specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 370.0),             // default 300→370 (données)
+        specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),             // default 340→390 (données)
 
-        // --- NOUVEAU : tuning des sauts ---
-        specF("antiJumpZoneDist", 5.0, 10.0, 0.2, 8.0),
-        specI("startupJumpDelayMs", 80.0, 220.0, 5.0, 140.0),
-        specI("continuousJumpMinIntervalMs", 220.0, 520.0, 10.0, 320.0),
+        // JUMP - Zone anti-jump optimale à 8.20 (99.7% WR sur 309 parties!)
+        specF("antiJumpZoneDist", 8.0, 8.4, 0.05, 8.20),                 // V3: default 8.0→8.20, plage resserrée autour optimal
+        specI("startupJumpDelayMs", 260.0, 275.0, 5.0, 265.0),           // V3: default 300→270→265 (97.2% WR!), plage resserrée
+        specI("continuousJumpMinIntervalMs", 180.0, 260.0, 5.0, 215.0)   // default 220→215 (données)
     )
 
-    private val specByKey: Map<String, ParamSpec> = specs.associateBy { it.key }
+    private val specByKey = specs.associateBy { it.key }
 
-    // ------------------------ RUNTIME STATE ------------------------
-    private var state: StoredState = StoredState()
-    private var loaded: Boolean = false
+    // -------------------------- STATE --------------------------
+    private var loaded = false
+    private var state = StoredState()
 
-    // ------------------------ PUBLIC API ------------------------
-    @Synchronized
-    fun pickParams(): ClassicParams {
-        ensureLoaded()
+    private val localGson: Gson by lazy { GsonBuilder().setPrettyPrinting().create() }
+    private val gson: Gson
+        get() = try {
+            kira.gson
+        } catch (_: Throwable) {
+            localGson
+        }
+
+    private fun configDir(): File {
+        return try {
+            kira.tunerDir
+        } catch (_: Throwable) {
+            File(File(File(System.getProperty("user.home"), ".kira"), "config"), "Kira/Tuner")
+        }
+    }
+    private fun file(): File = File(configDir(), "classicv2_tuner.json")
+
+    // ----------- Normalisation anti-crash des paires -----------
+    private fun MutableMap<String, Double>.order(a: String, b: String) {
+        val av = this[a] ?: return
+        val bv = this[b] ?: return
+        if (av > bv) { this[a] = bv; this[b] = av }
+    }
+    private fun normalize(chosen: MutableMap<String, Double>) {
+        chosen.order("fullDrawMsMin", "fullDrawMsMax")
+        chosen.order("openSpacingMin", "openSpacingMax")
+        chosen.order("parryHoldMinMs", "parryHoldMaxMs")
+        chosen.order("parryStickMinMs", "parryStickMaxMs")
+        chosen.order("closeBurstWindowMinMs", "closeBurstWindowMaxMs")
+        chosen.order("closeBurstFlipMinMs", "closeBurstFlipMaxMs")
+        chosen.order("closeHoldWindowMinMs", "closeHoldWindowMaxMs")
+        chosen.order("forwardStickMinMs", "forwardStickMaxMs")
+        chosen.order("meleeFocusMinMs", "meleeFocusMaxMs")
+
+        chosen.order("rodCloseMin", "rodCloseMax")
+        chosen.order("rodMainMin", "rodMainMax")
+        chosen.order("rodInterceptMin", "rodInterceptMax")
+        chosen.order("rodMidInstantMin", "rodMidInstantMax")
+
+        chosen.order("rodHoldCloseMinMs", "rodHoldCloseMaxMs")
+        chosen.order("rodHoldMidMinMs", "rodHoldMidMaxMs")
+
+        chosen.order("rodAntiSpamClosePassiveMin", "rodAntiSpamClosePassiveMax")
+        chosen.order("rodAntiSpamMidPassiveMin", "rodAntiSpamMidPassiveMax")
+        chosen.order("rodAntiSpamFarPassiveMin", "rodAntiSpamFarPassiveMax")
+        chosen.order("rodAntiSpamCloseActiveMin", "rodAntiSpamCloseActiveMax")
+        chosen.order("rodAntiSpamMidActiveMin", "rodAntiSpamMidActiveMax")
+        chosen.order("rodAntiSpamFarActiveMin", "rodAntiSpamFarActiveMax")
+    }
+
+    // ----------- UCB (Upper Confidence Bound) -----------
+    private fun pickWithBandit(): Map<String, Double> {
         val chosen = mutableMapOf<String, Double>()
 
         for (spec in specs) {
-            val ps = state.params.getOrPut(spec.key) { ParamState() }
+            val p = state.params.getOrPut(spec.key) { ParamState() }
 
-            if (ps.values.isEmpty()) {
-                initializeValues(ps, spec)
+            if (p.values.isEmpty()) {
+                initializeValues(p, spec)
             }
 
-            val bandit = banditFor(ps)
-            val shouldExplore = shouldExploreNew(ps, bandit)
+            var bandit = banditFor(p)
+            val shouldExplore = shouldExploreNew(p, bandit)
 
             val selectedArm = if (shouldExplore) {
                 val newValue = sample(spec)
-                val idx = ensureValue(ps, newValue)
-                val resized = resizeBandit(bandit, ps.values.size)
-                ps.bandit = resized.toState()
+                val idx = ensureValue(p, newValue)
+                bandit = resizeBandit(bandit, p.values.size)
                 idx
             } else {
-                val resized = resizeBandit(bandit, ps.values.size)
-                ps.bandit = resized.toState()
-                resized.selectArm()
+                bandit = resizeBandit(bandit, p.values.size)
+                bandit.selectArm()
             }
 
-            ps.lastArm = selectedArm
-            ps.lastValue = ps.values[selectedArm]
-            chosen[spec.key] = ps.lastValue
+            p.lastArm = selectedArm
+            p.lastValue = p.values[selectedArm]
+            p.bandit = bandit.toState()
+            chosen[spec.key] = p.lastValue
         }
 
         save()
-        val params = buildParams(chosen)
-        lastPicked = params
-        return params
+        return chosen
     }
 
     private fun shouldExploreNew(ps: ParamState, bandit: UcbBandit): Boolean {
-        // 1) On remplit d'abord un petit "pool" de valeurs différentes pour ce paramètre.
-        val targetValues = 12
-        if (ps.values.size < targetValues) {
-            // Probabilité décroissante d'ajouter une nouvelle valeur à mesure qu'on se rapproche du pool.
-            val base = 0.35 - 0.02 * ps.values.size
-            val p = base.coerceIn(0.12, 0.35)
-            return RandomUtils.randomDoubleInRange(0.0, 1.0) < p
-        }
+        if (ps.values.size < 10) return RandomUtils.randomDoubleInRange(0.0, 1.0) < 0.3
 
-        // 2) Tant que certains bras ont très peu de plays, on se concentre sur l'exploration UCB des bras existants.
-        val state = bandit.toState()
-        val minPlays = state.plays.minOrNull() ?: 0L
-        if (minPlays < SMOOTHING_MIN_PLAYS_PER_ARM) {
-            return false
-        }
+        if (bandit.totalPlays > 0 && bandit.totalPlays % 30 == 0L) return true
 
-        // 3) Exploration "forcée" périodique : toutes les N parties on tente un nouveau point.
-        if (state.totalPlays > 0 && state.totalPlays % 50L == 0L) {
-            return true
-        }
-
-        // 4) Exploration de fond qui décroît doucement avec le temps.
         val explorationRate = when {
-            state.totalPlays < 150 -> 0.15
-            state.totalPlays < 400 -> 0.08
-            state.totalPlays < 1200 -> 0.04
+            bandit.totalPlays < 100 -> 0.2
+            bandit.totalPlays < 300 -> 0.1
+            bandit.totalPlays < 1000 -> 0.05
             else -> 0.02
         }
 
@@ -340,8 +337,9 @@ object ClassicV2Tuner {
             spec.min + range * 0.75
         )
 
-        for (v in initialValues) {
-            val clamped = clamp(quantize(v, spec.step), spec)
+        for (value in initialValues) {
+            val quantized = quantize(value, spec.step)
+            val clamped = clamp(quantized, spec)
             val key = keyOf(clamped)
             if (!ps.values.any { keyOf(it) == key }) {
                 ps.values.add(clamped)
@@ -349,36 +347,16 @@ object ClassicV2Tuner {
         }
     }
 
-    private fun ensureValue(ps: ParamState, value: Double): Int {
-        val key = keyOf(value)
-        ps.values.forEachIndexed { idx, existing ->
-            if (keyOf(existing) == key) return idx
-        }
-        ps.values.add(value)
-        return ps.values.lastIndex
-    }
-
     // ----------- Pruning -----------
     private fun prune() {
         for ((_, ps) in state.params) {
             if (ps.values.size <= TOP_N_KEEP) continue
-
             val bandit = banditFor(ps)
             val banditState = bandit.toState()
-
             val scores = ps.values.indices.map { idx ->
-                val plays = banditState.plays.getOrElse(idx) { 0L }
-                val avg = if (plays > 0L) banditState.rewards[idx] / plays else 0.0
-
-                // Petit bonus pour les bras jamais / très peu testés pour éviter de tuer la diversité trop tôt.
-                val explorationBonus = when {
-                    plays == 0L -> 0.05
-                    plays < 5L -> 0.02
-                    else -> 0.0
-                }
-                avg + explorationBonus
+                val plays = banditState.plays[idx]
+                if (plays > 0) banditState.rewards[idx] / plays else 0.0
             }
-
             val sorted = ps.values.indices.sortedByDescending { scores[it] }
             val keepIndices = sorted.take(TOP_N_KEEP).toMutableSet()
             keepIndices.add(ps.lastArm)
@@ -387,13 +365,12 @@ object ClassicV2Tuner {
             val newPlays = mutableListOf<Long>()
             val newRewards = mutableListOf<Double>()
             val indexMap = mutableMapOf<Int, Int>()
-
             for (idx in ps.values.indices) {
                 if (keepIndices.contains(idx)) {
                     indexMap[idx] = newValues.size
                     newValues.add(ps.values[idx])
-                    newPlays.add(banditState.plays.getOrElse(idx) { 0L })
-                    newRewards.add(banditState.rewards.getOrElse(idx) { 0.0 })
+                    newPlays.add(banditState.plays[idx])
+                    newRewards.add(banditState.rewards[idx])
                 }
             }
 
@@ -401,16 +378,7 @@ object ClassicV2Tuner {
             ps.lastArm = indexMap[ps.lastArm] ?: 0
             ps.lastValue = ps.values.getOrElse(ps.lastArm) { 0.0 }
             val totalPlays = newPlays.sum()
-
-            ps.bandit = UcbBandit(
-                newValues.size,
-                totalPlays,
-                newPlays.toLongArray(),
-                newRewards.toDoubleArray(),
-                banditState.minReward,
-                banditState.maxReward,
-                DEFAULT_STRATEGY,
-            ).toState()
+            ps.bandit = UcbBandit(newValues.size, totalPlays, newPlays.toLongArray(), newRewards.toDoubleArray()).toState()
         }
     }
 
@@ -424,52 +392,41 @@ object ClassicV2Tuner {
             currentMistakes += 1
         }
     }
-
+    
     fun takeAndResetMistakes(): Int {
         val m = currentMistakes
         currentMistakes = 0
         return m
     }
 
+    // -------------------------- API --------------------------
+    @Synchronized
+    fun pickParams(): ClassicParams {
+        ensureLoaded()
+        val chosen = pickWithBandit().toMutableMap()
+        normalize(chosen)
+        val params = buildParams(chosen)
+        lastPicked = params
+        prune()
+        save()
+        return params
+    }
+
     @Synchronized
     fun report(win: Boolean, mistakes: Int) {
         ensureLoaded()
-
-        val clampedMistakes = mistakes.coerceAtLeast(0)
-        val rewardBase = if (win) 1.0 else LOSS_BASE_REWARD
-        val rawReward = rewardBase - clampedMistakes * MISTAKE_PENALTY
-        val reward = rawReward.coerceIn(0.0, 1.0)
-
+        val rewardBase = if (win) 1.0 else 0.0
+        val reward = (rewardBase - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
         var changed = false
-
         for ((_, ps) in state.params) {
             if (ps.values.isEmpty()) continue
-
             val bandit = resizeBandit(banditFor(ps), ps.values.size)
-            val state = bandit.toState()
-
             val arm = ps.lastArm.coerceIn(ps.values.indices)
             ps.lastArm = arm
             ps.lastValue = ps.values[arm]
-
-            val armPlays = state.plays.getOrElse(arm) { 0L }
-            val armAvg = if (armPlays > 0L) {
-                state.rewards[arm] / armPlays
-            } else {
-                // Valeur neutre : milieu de l'intervalle [minReward, maxReward]
-                (state.minReward + state.maxReward) * 0.5
-            }
-
-            // Bras peu joué → on prend quasiment la nouvelle reward.
-            // Bras très joué → on garde une grosse inertie sur la moyenne actuelle.
-            val lr = if (armPlays < SMOOTHING_MIN_PLAYS_PER_ARM) 1.0 else SMOOTHING_LEARNING_RATE
-            val mixedReward = armAvg * (1.0 - lr) + reward * lr
-
-            val boundedReward = bandit.normalizeReward(mixedReward)
-            ps.bandit = bandit.update(arm, boundedReward).toState()
+            ps.bandit = bandit.update(arm, reward).toState()
             changed = true
         }
-
         if (changed) {
             prune()
             save()
@@ -526,6 +483,7 @@ object ClassicV2Tuner {
         rodAntiSpamMidPassiveMax = map.int("rodAntiSpamMidPassiveMax"),
         rodAntiSpamFarPassiveMin = map.int("rodAntiSpamFarPassiveMin"),
         rodAntiSpamFarPassiveMax = map.int("rodAntiSpamFarPassiveMax"),
+
         rodAntiSpamCloseActiveMin = map.int("rodAntiSpamCloseActiveMin"),
         rodAntiSpamCloseActiveMax = map.int("rodAntiSpamCloseActiveMax"),
         rodAntiSpamMidActiveMin = map.int("rodAntiSpamMidActiveMin"),
@@ -556,7 +514,7 @@ object ClassicV2Tuner {
 
         antiJumpZoneDist = map.float("antiJumpZoneDist"),
         startupJumpDelayMs = map.int("startupJumpDelayMs"),
-        continuousJumpMinIntervalMs = map.int("continuousJumpMinIntervalMs"),
+        continuousJumpMinIntervalMs = map.int("continuousJumpMinIntervalMs")
     )
 
     // ------------------------ HELPERS ------------------------
@@ -575,114 +533,46 @@ object ClassicV2Tuner {
         clamp(quantize(RandomUtils.randomDoubleInRange(spec.min, spec.max), if (spec.step <= 0.0) 1.0 else spec.step), spec)
 
     private fun clamp(v: Double, spec: ParamSpec): Double {
-        return when {
-            v < spec.min -> spec.min
-            v > spec.max -> spec.max
-            else -> v
+        val c = v.coerceIn(spec.min, spec.max)
+        return when (spec.type) {
+            ParamType.FLOAT -> c
+            ParamType.INT -> round(c).toInt().toDouble()
+            ParamType.LONG -> round(c).toLong().toDouble()
+            ParamType.DOUBLE -> c
         }
     }
 
-    private fun quantize(v: Double, step: Double): Double =
-        if (step <= 0.0) v else round(v / step) * step
+    private fun quantize(v: Double, step: Double): Double {
+        if (step <= 0.0) return v
+        val s = round(v / step)
+        return s * step
+    }
 
     private fun keyOf(v: Double): String = "%.4f".format(v)
 
-    // ------------------------ BANDIT HELPERS ------------------------
-    // On "re-scale" l'état d'un bandit si trop de parties ont été accumulées.
-    // On garde les moyennes reward par bras, mais on réduit artificiellement les plays.
-    private fun capState(state: UcbBanditState): UcbBanditState {
-        if (state.totalPlays <= MAX_EFFECTIVE_TOTAL_PLAYS) return state
-
-        val plays = state.plays
-        val rewards = state.rewards
-        val total = plays.sum()
-
-        // Si jamais totalPlays est déjà cohérent et pas si énorme que ça, on met juste à jour.
-        if (total <= MAX_EFFECTIVE_TOTAL_PLAYS) {
-            return state.copy(totalPlays = total)
-        }
-
-        val scale = MAX_EFFECTIVE_TOTAL_PLAYS.toDouble() / total.toDouble()
-        val newPlays = LongArray(plays.size)
-        val newRewards = DoubleArray(rewards.size)
-
-        for (i in plays.indices) {
-            val p = plays[i]
-            if (p <= 0L) continue
-            val avg = rewards[i] / p
-            val scaledPlays = (p.toDouble() * scale).toLong().coerceAtLeast(1L)
-            newPlays[i] = scaledPlays
-            newRewards[i] = avg * scaledPlays
-        }
-
-        val newTotal = newPlays.sum()
-        return state.copy(
-            totalPlays = newTotal,
-            plays = newPlays,
-            rewards = newRewards,
-        )
-    }
-
     private fun banditFor(ps: ParamState): UcbBandit {
         require(ps.values.isNotEmpty()) { "bandit requested without available values" }
-
-        val baseState = ps.bandit ?: UcbBandit.withArms(ps.values.size).toState()
-        val capped = capState(baseState)
-
-        val armCount = ps.values.size
-        val plays = capped.plays.copyOf(armCount)
-        val rewards = capped.rewards.copyOf(armCount)
-        val total = plays.sum()
-
-        return UcbBandit(
-            armCount,
-            total,
-            plays,
-            rewards,
-            capped.minReward,
-            capped.maxReward,
-            DEFAULT_STRATEGY,
-        )
+        val plays = ps.bandit?.plays ?: LongArray(ps.values.size)
+        val rewards = ps.bandit?.rewards ?: DoubleArray(ps.values.size)
+        val total = ps.bandit?.totalPlays ?: 0L
+        return UcbBandit(ps.values.size, total, plays.copyOf(ps.values.size), rewards.copyOf(ps.values.size))
     }
 
     private fun resizeBandit(bandit: UcbBandit, size: Int): UcbBandit {
         if (bandit.armCount == size) return bandit
-
-        val capped = capState(bandit.toState())
-        val plays = capped.plays.copyOf(size)
-        val rewards = capped.rewards.copyOf(size)
-        val total = plays.sum()
-
-        return UcbBandit(
-            size,
-            total,
-            plays,
-            rewards,
-            capped.minReward,
-            capped.maxReward,
-            DEFAULT_STRATEGY,
-        )
+        val state = bandit.toState()
+        val plays = state.plays.copyOf(size)
+        val rewards = state.rewards.copyOf(size)
+        return UcbBandit(size, state.totalPlays, plays, rewards)
     }
 
-    // ------------------------ PERSISTENCE ------------------------
-    private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
-
-    private fun file(): File = File(kira.dataFolder, "classicv2_tuner.json")
-
-    @Synchronized
-    private fun save() {
-        val f = file()
-        try {
-            if (!f.exists()) {
-                f.parentFile?.mkdirs()
-                f.createNewFile()
-            }
-            f.writer().use { w ->
-                gson.toJson(state, w)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+    private fun ensureValue(ps: ParamState, value: Double): Int {
+        val key = keyOf(value)
+        ps.values.forEachIndexed { idx, existing ->
+            if (keyOf(existing) == key) return idx
         }
+        ps.values.add(value)
+        return ps.values.lastIndex
     }
 
     @Synchronized
@@ -700,12 +590,7 @@ object ClassicV2Tuner {
         return try {
             f.reader().use { r ->
                 val type = object : TypeToken<StoredState>() {}.type
-                val loadedState: StoredState = gson.fromJson(r, type)
-                if (loadedState.version != CURRENT_VERSION) {
-                    migrate(loadedState)
-                } else {
-                    loadedState
-                }
+                gson.fromJson<StoredState>(r, type) ?: StoredState()
             }
         } catch (ex: Exception) {
             tryBackupCorrupt(f, ex)
@@ -713,10 +598,19 @@ object ClassicV2Tuner {
         }
     }
 
-    private fun migrate(old: StoredState): StoredState {
-        // Pour l’instant, CURRENT_VERSION = 3 → pas de migration complexe.
-        old.version = CURRENT_VERSION
-        return old
+    @Synchronized
+    private fun save() {
+        val f = file()
+        try {
+            f.parentFile?.mkdirs()
+            val tmp = File(f.parentFile, f.name + ".tmp")
+            tmp.writer().use { w -> gson.toJson(state, w) }
+            if (!tmp.renameTo(f)) {
+                tmp.copyTo(f, overwrite = true)
+                tmp.delete()
+            }
+        } catch (_: Exception) {
+        }
     }
 
     private fun tryBackupCorrupt(f: File, ex: Exception) {
