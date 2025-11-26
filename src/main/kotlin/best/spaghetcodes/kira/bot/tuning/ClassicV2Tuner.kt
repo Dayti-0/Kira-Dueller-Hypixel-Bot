@@ -132,40 +132,40 @@ object ClassicV2Tuner {
 
     // VERSION HYBRID : Plages larges de l'ancien + defaults ajustés d'après les données
     private val specs = listOf(
-        // BOW - Defaults V4 basés sur découvertes session (867 et 779 parties)
-        specI("fullDrawMsMin", 780.0, 820.0, 10.0, 800.0),        // V4: 750→800 (99.4% WR), plage resserrée 700-800→780-820
-        specI("fullDrawMsMax", 1080.0, 1120.0, 10.0, 1100.0),       // V4: 1060→1100 (100% WR!), plage resserrée 1020-1100→1080-1120
-        specF("bowCancelCloseDist", 6.0, 10.0, 0.1, 8.0),          // inchangé
-        specF("bowMinUseDist", 7.0, 11.0, 0.1, 10.5),              // default 9→10.5 (proche de 10.7 optimal)
-        specF("bowAimPitchBias", -1.2, 1.2, 0.1, 0.0),             // nouvel offset : fine-tune l'angle de visée arc
+        // BOW - V5 basé sur nouvelle session
+        specI("fullDrawMsMin", 770.0, 810.0, 10.0, 780.0),        // 800→780 (64% gain)
+        specI("fullDrawMsMax", 1070.0, 1110.0, 10.0, 1080.0),     // 1100→1080 (91% gain, LOW conf)
+        specF("bowCancelCloseDist", 6.0, 8.0, 0.1, 6.8),          // 8.0→6.8 ⭐ HIGH conf
+        specF("bowMinUseDist", 7.0, 10.0, 0.1, 8.9),              // 10.5→8.9 (215% gain)
+        specF("bowAimPitchBias", -0.3, 0.1, 0.05, -0.1),          // 0.0→-0.1 ⭐ HIGH conf, plage resserrée
         
         specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),                // verrouillé (prouvé)
         
-        specL("openSpacingMin", 450.0, 850.0, 10.0, 450.0),        // default 650→450 (données)
-        specL("openSpacingMax", 700.0, 1150.0, 10.0, 870.0),       // default 900→870 (données)
-        specF("openShotMinDist", 7.0, 12.0, 0.1, 11.5),            // default 9→11.5 (proche de 11.8)
-        specL("reactiveCdMs", 450.0, 900.0, 10.0, 670.0),          // default 650→670 (données)
+        specL("openSpacingMin", 650.0, 850.0, 10.0, 750.0),       // 450→750 (données)
+        specL("openSpacingMax", 750.0, 900.0, 10.0, 810.0),       // 870→810 ⭐ HIGH conf
+        specF("openShotMinDist", 10.0, 12.5, 0.1, 11.5),          // inchangé, confirmé bon
+        specL("reactiveCdMs", 550.0, 700.0, 10.0, 610.0),         // 670→610 (218% gain)
 
-        // Détection mouvement - inchangé
-        specD("stillFrameThreshold", 0.008, 0.02, 0.0005, 0.0125),
-        specI("stillFramesNeeded", 6.0, 16.0, 1.0, 10.0),
-        specD("bowSlowThreshold", 0.04, 0.09, 0.002, 0.06),
-        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),
+        // Détection mouvement - ajustements
+        specD("stillFrameThreshold", 0.015, 0.022, 0.0005, 0.0195), // 0.0125→0.0195 ⭐ HIGH
+        specI("stillFramesNeeded", 6.0, 16.0, 1.0, 10.0),          // inchangé
+        specD("bowSlowThreshold", 0.04, 0.07, 0.002, 0.05),        // 0.06→0.05 ⭐ HIGH conf
+        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),          // confirmé
 
-        // Réserves - inchangé
-        specL("reserveTightMs", 7000.0, 13000.0, 100.0, 10000.0),
-        specI("earlyReserve", 2.0, 5.0, 1.0, 3.0),
-        specI("midReserve", 1.0, 4.0, 1.0, 2.0),
+        // Réserves - ajustements
+        specL("reserveTightMs", 11000.0, 13000.0, 100.0, 12300.0), // 10000→12300 ⭐ HIGH
+        specI("earlyReserve", 3.0, 5.0, 1.0, 4.0),                 // 3→4 (léger ajustement)
+        specI("midReserve", 2.0, 4.0, 1.0, 3.0),                   // 2→3 (+45%)
 
-        // ROD - Plages larges conservées, defaults légèrement ajustés
-        specL("rodCdCloseMsBase", 280.0, 420.0, 10.0, 310.0),      // default 340→310 (données)
-        specL("rodCdFarMsBase", 360.0, 620.0, 10.0, 480.0),        // inchangé (bon)
+        // ROD - Cooldowns plus conservateurs
+        specL("rodCdCloseMsBase", 320.0, 400.0, 10.0, 340.0),      // 310→340 ⭐ HIGH
+        specL("rodCdFarMsBase", 480.0, 580.0, 10.0, 520.0),        // 480→520 ⭐ HIGH
         specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),              // inchangé
         specF("rodBanMeleeDist", 3.0, 5.0, 0.05, 4.0),             // inchangé
         specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),                 // inchangé
         specF("rodCloseMax", 2.6, 4.0, 0.05, 3.4),                 // inchangé
-        specF("rodMainMin", 2.4, 3.6, 0.05, 2.8),                  // default 3.0→2.8 (données)
-        specF("rodMainMax", 5.5, 8.2, 0.05, 7.0),                  // default 6.8→7.0 (données)
+        specF("rodMainMin", 3.2, 3.8, 0.05, 3.55),                 // 2.8→3.55 ⭐ HIGH, plage resserrée
+        specF("rodMainMax", 6.0, 7.0, 0.05, 6.5),                  // 7.0→6.5 ⭐ HIGH
         specF("rodInterceptMin", 4.8, 6.4, 0.05, 5.8),             // inchangé
         specF("rodInterceptMax", 6.2, 8.2, 0.05, 7.2),             // inchangé
         specF("rodMaxRangeHard", 6.5, 8.0, 0.05, 7.2),             // inchangé
@@ -218,10 +218,10 @@ object ClassicV2Tuner {
         specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 370.0),             // default 300→370 (données)
         specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),             // default 340→390 (données)
 
-        // JUMP - Zone anti-jump optimale à 8.20 (99.7% WR sur 309 parties!)
-        specF("antiJumpZoneDist", 8.0, 8.4, 0.05, 8.20),                 // V3: default 8.0→8.20, plage resserrée autour optimal
-        specI("startupJumpDelayMs", 260.0, 275.0, 5.0, 265.0),           // V3: default 300→270→265 (97.2% WR!), plage resserrée
-        specI("continuousJumpMinIntervalMs", 180.0, 260.0, 5.0, 215.0)   // default 220→215 (données)
+        // JUMP
+        specF("antiJumpZoneDist", 8.0, 8.2, 0.05, 8.05),                 // 8.2→8.05 (légère réduction)
+        specI("startupJumpDelayMs", 255.0, 270.0, 5.0, 260.0),           // 265→260
+        specI("continuousJumpMinIntervalMs", 190.0, 230.0, 5.0, 195.0)   // 215→195
     )
 
     private val specByKey = specs.associateBy { it.key }
