@@ -600,7 +600,7 @@ class CustomConfigGUI : GuiScreen() {
             width,
             { cfg.hitBlockMode },
             { cfg.hitBlockMode = it },
-            listOf("Chance", "Cooldown Hits")
+            listOf("Chance", "Cooldown Hits", "Prediction")
         ); y += ROW_HEIGHT
         number(
             "H&B Chance (%)",
@@ -633,6 +633,61 @@ class CustomConfigGUI : GuiScreen() {
             { cfg.hitBlockMaxHits = it },
             1,
             10,
+            1
+        ); y += ROW_HEIGHT
+        number(
+            "H&B Combo Ticks",
+            x,
+            y,
+            width,
+            { cfg.hitBlockComboTicks },
+            { cfg.hitBlockComboTicks = it },
+            1,
+            20,
+            1
+        ); y += ROW_HEIGHT
+        slider(
+            "H&B Trade Distance",
+            x,
+            y,
+            width,
+            { cfg.hitBlockTradeDistance },
+            { cfg.hitBlockTradeDistance = it },
+            2.5f,
+            5f,
+            0.05f
+        ); y += ROW_HEIGHT
+        number(
+            "H&B Block Duration (ticks)",
+            x,
+            y,
+            width,
+            { cfg.hitBlockDurationTicks },
+            { cfg.hitBlockDurationTicks = it },
+            1,
+            10,
+            1
+        ); y += ROW_HEIGHT
+        number(
+            "H&B Recent Self Hit (ticks)",
+            x,
+            y,
+            width,
+            { cfg.recentHitSelfTicks },
+            { cfg.recentHitSelfTicks = it },
+            1,
+            20,
+            1
+        ); y += ROW_HEIGHT
+        number(
+            "H&B Recent Target Hit (ticks)",
+            x,
+            y,
+            width,
+            { cfg.recentHitTargetTicks },
+            { cfg.recentHitTargetTicks = it },
+            1,
+            20,
             1
         ); y += ROW_HEIGHT + SECTION_SPACING
 

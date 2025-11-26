@@ -143,7 +143,7 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
         name = "Hit & Block Mode",
         description = "How Hit & Block triggers.",
         category = "Combat",
-        options = ["Chance", "Cooldown Hits"]
+        options = ["Chance", "Cooldown Hits", "Prediction"]
     )
     var hitBlockMode = 0
 
@@ -155,6 +155,21 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(type = PropertyType.NUMBER, name = "Hit & Block Max Hits", description = "Maximum successful hits before Hit & Block when in Cooldown mode.", category = "Combat", min = 1, max = 10, increment = 1)
     var hitBlockMaxHits = 4
+
+    @Property(type = PropertyType.NUMBER, name = "H&B Combo Ticks", description = "How long after a hit we still consider having the combo.", category = "Combat", min = 1, max = 20, increment = 1)
+    var hitBlockComboTicks = 8
+
+    @Property(type = PropertyType.DECIMAL_SLIDER, name = "H&B Trade Distance", description = "Maximum distance to consider a trade for Prediction mode.", category = "Combat", minF = 2.5f, maxF = 5f)
+    var hitBlockTradeDistance = 3.8f
+
+    @Property(type = PropertyType.NUMBER, name = "H&B Block Duration (ticks)", description = "Duration to hold block in Prediction mode.", category = "Combat", min = 1, max = 10, increment = 1)
+    var hitBlockDurationTicks = 3
+
+    @Property(type = PropertyType.NUMBER, name = "H&B Recent Self Hit (ticks)", description = "Ticks to treat a hit taken as recent for Prediction mode.", category = "Combat", min = 1, max = 20, increment = 1)
+    var recentHitSelfTicks = 8
+
+    @Property(type = PropertyType.NUMBER, name = "H&B Recent Target Hit (ticks)", description = "Ticks to treat a hit dealt as recent for Prediction mode.", category = "Combat", min = 1, max = 20, increment = 1)
+    var recentHitTargetTicks = 6
 
     @Property(type = PropertyType.SWITCH, name = "Enable AutoGG", description = "Send a gg message after every game", category = "AutoGG")
     var sendAutoGG = true
