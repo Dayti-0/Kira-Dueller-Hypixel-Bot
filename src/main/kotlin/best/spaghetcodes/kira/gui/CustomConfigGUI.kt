@@ -1,6 +1,7 @@
 package best.spaghetcodes.kira.gui
 
 import best.spaghetcodes.kira.bot.Session
+import best.spaghetcodes.kira.core.RequeueMode
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.stats.StatsManager
 import best.spaghetcodes.kira.utils.ChatUtils
@@ -367,8 +368,16 @@ class CustomConfigGUI : GuiScreen() {
             enabled = !cfg.enableModeRotation
         ); y += ROW_HEIGHT
         toggle("Lobby Movement", x, y, width, { cfg.lobbyMovement }, { cfg.lobbyMovement = it }); y += ROW_HEIGHT
-        toggle("Fast Requeue", x, y, width, { cfg.fastRequeue }, { cfg.fastRequeue = it }); y += ROW_HEIGHT
-        toggle("Paper Requeue", x, y, width, { cfg.paperRequeue }, { cfg.paperRequeue = it }); y += ROW_HEIGHT
+        val requeueModes = RequeueMode.values()
+        selector(
+            "Requeue Mode",
+            x,
+            y,
+            width,
+            { requeueModes.indexOf(cfg.getRequeueMode()) },
+            { idx -> cfg.setRequeueMode(requeueModes.getOrElse(idx) { RequeueMode.FAST }) },
+            requeueModes.map { it.displayName }
+        ); y += ROW_HEIGHT
         toggle(
             "Tuner",
             x,
