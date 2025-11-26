@@ -470,11 +470,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     }
 
     private fun recordResult(iWon: Boolean) {
+        Session.recordResult(iWon, getName())
         if (iWon) {
-            Session.wins++
             triggerWinSneakCelebration()
         } else {
-            Session.losses++
             cancelWinSneak()
         }
     }

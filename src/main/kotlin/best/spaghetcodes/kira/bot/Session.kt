@@ -1,13 +1,17 @@
 package best.spaghetcodes.kira.bot
 
+import best.spaghetcodes.kira.stats.StatsManager
 import net.minecraft.util.EnumChatFormatting
 import java.math.RoundingMode
 import java.text.DecimalFormat
 
 object Session {
 
-    var wins = 0
-    var losses = 0
+    val wins: Int
+        get() = StatsManager.getSessionStats(StatsManager.GLOBAL_CATEGORY).wins
+
+    val losses: Int
+        get() = StatsManager.getSessionStats(StatsManager.GLOBAL_CATEGORY).losses
 
     private var activityWindowStartedAt: Long = -1
     private var accumulatedActivityMs: Long = 0
@@ -20,6 +24,10 @@ object Session {
         df.roundingMode = RoundingMode.DOWN
         val ratio = df.format(wins.toFloat() / (if (losses == 0) 1F else losses.toFloat()))
         return "Session: ${EnumChatFormatting.GREEN}Wins: $wins${EnumChatFormatting.RESET} - ${EnumChatFormatting.RED}Losses: $losses${EnumChatFormatting.RESET} - W/L: ${EnumChatFormatting.LIGHT_PURPLE}${ratio}${EnumChatFormatting.RESET}"
+    }
+
+    fun recordResult(win: Boolean, category: String) {
+        StatsManager.recordResult(win, category)
     }
 
     fun updateBotEnabled(enabled: Boolean, now: Long = System.currentTimeMillis()) {
