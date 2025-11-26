@@ -69,6 +69,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         if (!newState) {
             cancelWinSneak()
         }
+        autoDisconnectScheduled = false
         toggled = newState
         Session.updateBotEnabled(toggled)
         ModeRotationManager.onBotToggle(toggled)
@@ -86,6 +87,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private val winSneakTimers = mutableListOf<Timer>()
     private var winSneakCleanupTimer: Timer? = null
     private var winSneakActiveUntil = 0L
+
+    private var autoDisconnectScheduled = false
 
     protected var combo = 0
     protected var opponentCombo = 0
@@ -480,6 +483,39 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         } else {
             cancelWinSneak()
         }
+        maybeAutoDisconnect()
+    }
+
+    private fun maybeAutoDisconnect() {
+        if (autoDisconnectScheduled) return
+
+        val cfg = kira.config ?: return
+        val gamesThreshold = cfg.disconnectAfterGames
+        val minutesThreshold = cfg.disconnectAfterMinutes
+
+        if (gamesThreshold > 0 && Session.wins + Session.losses >= gamesThreshold) {
+            scheduleAutoDisconnect("Played $gamesThreshold games, disconnecting...")
+            return
+        }
+
+        if (minutesThreshold > 0) {
+            val activeDuration = Session.getActiveDurationMs()
+            if (activeDuration >= minutesThreshold.toLong() * 60_000) {
+                scheduleAutoDisconnect("Played for $minutesThreshold minutes, disconnecting...")
+            }
+        }
+    }
+
+    private fun scheduleAutoDisconnect(message: String) {
+        autoDisconnectScheduled = true
+        ChatUtils.info(message)
+        TimeUtils.setTimeout({
+            ChatUtils.sendAsPlayer("/l duels")
+            TimeUtils.setTimeout({
+                toggle()
+                disconnect()
+            }, RandomUtils.randomIntInRange(2300, 5000))
+        }, RandomUtils.randomIntInRange(900, 1700))
     }
 
     private val duelDurationRegex = Regex("(?i)\\bduel\\b\\s*-\\s*\\d{2}:\\d{2}\\b")
@@ -531,46 +567,15 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 val unformatted = packet.message.unformattedText.lowercase()
                                 if (!resultCounted && unformatted.contains("won the duel!") && mc.thePlayer != null) {
                                     val me = mc.thePlayer.displayNameString
-                                    val p = ChatUtils.removeFormatting(packet.message.unformattedText).split("won")[0].trim()
 
-                                    val (_, _, iWon) =
-                                        if (unformatted.contains(me.lowercase())) {
-                                            recordResult(true)
-                                            Triple(me, lastOpponentName, true)
-                                        } else {
-                                            recordResult(false)
-                                            Triple(p, me, false)
-                                        }
+                                    if (unformatted.contains(me.lowercase())) {
+                                        recordResult(true)
+                                    } else {
+                                        recordResult(false)
+                                    }
 
                                     resultCounted = true
                                     ChatUtils.info(Session.getSession())
-
-                                    if ((kira.config?.disconnectAfterGames ?: 0) > 0) {
-                                        if (Session.wins + Session.losses >= kira.config?.disconnectAfterGames!!) {
-                                            ChatUtils.info("Played ${kira.config?.disconnectAfterGames} games, disconnecting...")
-                                            TimeUtils.setTimeout({
-                                                ChatUtils.sendAsPlayer("/l duels")
-                                                TimeUtils.setTimeout({
-                                                    toggle()
-                                                    disconnect()
-                                                }, RandomUtils.randomIntInRange(2300, 5000))
-                                            }, RandomUtils.randomIntInRange(900, 1700))
-                                        }
-                                    }
-
-                                    if ((kira.config?.disconnectAfterMinutes ?: 0) > 0) {
-                                        val activeDuration = Session.getActiveDurationMs()
-                                        if (activeDuration >= kira.config?.disconnectAfterMinutes!! * 60 * 1000) {
-                                            ChatUtils.info("Played for ${kira.config?.disconnectAfterMinutes} minutes, disconnecting...")
-                                            TimeUtils.setTimeout({
-                                                ChatUtils.sendAsPlayer("/l duels")
-                                                TimeUtils.setTimeout({
-                                                    toggle()
-                                                    disconnect()
-                                                }, RandomUtils.randomIntInRange(2300, 5000))
-                                            }, RandomUtils.randomIntInRange(900, 1700))
-                                        }
-                                    }
 
                                 }
                             }
