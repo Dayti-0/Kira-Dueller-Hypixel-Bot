@@ -190,7 +190,12 @@ class CustomConfigGUI : GuiScreen() {
         // Draw shadows/outlines
         drawString(fontRendererObj, "<", leftArrowX + 1, yPos + 1, Color.BLACK.rgb)
         drawString(fontRendererObj, arrowChar, rightArrowX + 1, yPos + 1, Color.BLACK.rgb)
-        val valueShadowColor = if (enabled) Color(primaryColor).darker().darker().rgb else darkGrayColor
+        val isDisabledOption = value.equals("None", ignoreCase = true)
+        val valueShadowColor = if (enabled && !isDisabledOption) {
+            Color(primaryColor).darker().darker().rgb
+        } else {
+            darkGrayColor
+        }
         drawString(fontRendererObj, value, textX + 1, yPos + 1, valueShadowColor)
 
         // Draw main text and arrows
@@ -208,7 +213,7 @@ class CustomConfigGUI : GuiScreen() {
             rightHover -> highlightColor
             else -> grayColor
         }
-        val valueColor = if (enabled) primaryColor else darkGrayColor
+        val valueColor = if (enabled && !isDisabledOption) primaryColor else darkGrayColor
         drawString(fontRendererObj, "<", leftArrowX, yPos, leftColor)
         drawString(fontRendererObj, value, textX, yPos, valueColor)
         drawString(fontRendererObj, arrowChar, rightArrowX, yPos, rightColor)
