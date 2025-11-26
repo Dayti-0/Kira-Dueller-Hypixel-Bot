@@ -1,7 +1,8 @@
 package best.spaghetcodes.kira.gui
 
-import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.Session
+import best.spaghetcodes.kira.kira
+import best.spaghetcodes.kira.stats.StatsManager
 import best.spaghetcodes.kira.utils.ChatUtils
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.ScaledResolution
@@ -19,6 +20,7 @@ class CustomConfigGUI : GuiScreen() {
 
     private var currentTab = 0
     private val tabNames = listOf("General", "Combat", "Stats")
+    private var selectedStatsCategoryIndex = 0
 
     private var fadeIn = 0f
     private var scroll = 0
@@ -676,7 +678,20 @@ class CustomConfigGUI : GuiScreen() {
     private fun drawStatsTab(x: Int, yStart: Int): Int {
         var y = yStart
         val width = 500
-        y = drawSectionHeader("Session Statistics", x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Statistics", x, y, width); y += SECTION_SPACING
+
+        val categories = StatsManager.DISPLAY_CATEGORIES
+        val selectedCategory = categories.getOrElse(selectedStatsCategoryIndex) { StatsManager.GLOBAL_CATEGORY }
+
+        selector(
+            "Category",
+            x,
+            y,
+            width,
+            { selectedStatsCategoryIndex },
+            { selectedStatsCategoryIndex = it.coerceIn(0, categories.lastIndex) },
+            categories
+        ); y += ROW_HEIGHT + 6
 
         kira.config?.let { config ->
             toggle("Show Stats Overlay", x, y, width, { config.showStatsOverlay }, { config.showStatsOverlay = it })
@@ -684,12 +699,17 @@ class CustomConfigGUI : GuiScreen() {
         }
 
         val controlEdgeX = x + width
-        val wins = Session.wins
-        val losses = Session.losses
+        val stats = StatsManager.getStatsForDisplay(selectedCategory)
+        val wins = stats.wins
+        val losses = stats.losses
         val total = wins + losses
         val wlr = if (losses == 0) wins.toFloat() else wins.toFloat() / losses
         val winrate = if (total == 0) 0f else (wins.toFloat() / total) * 100f
-        val minutes = (Session.getActiveDurationMs() / 1000 / 60).coerceAtLeast(0L)
+        val minutes = if (selectedCategory == StatsManager.SESSION_CATEGORY) {
+            (Session.getActiveDurationMs() / 1000 / 60).coerceAtLeast(0L)
+        } else {
+            null
+        }
 
         fun drawStat(label: String, value: String, valueColor: Int) {
             val yPos = y - scroll
@@ -704,8 +724,11 @@ class CustomConfigGUI : GuiScreen() {
         y += 6
         drawStat("W/L Ratio", String.format("%.2f", wlr), primaryColor)
         drawStat("Win Rate", String.format("%.1f%%", winrate), primaryColor)
-        y += 6
-        drawStat("Session Time", "${minutes}m", highlightColor)
+
+        minutes?.let {
+            y += 6
+            drawStat("Session Time", "${it}m", highlightColor)
+        }
 
         return y
     }
