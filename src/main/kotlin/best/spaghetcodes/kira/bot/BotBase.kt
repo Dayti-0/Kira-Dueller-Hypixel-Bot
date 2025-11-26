@@ -523,16 +523,18 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
         if (KeyBindings.toggleBotKeyBinding.isPressed) {
             toggle()
+            val activeBot = kira.bot ?: this
+            val isToggled = activeBot.toggled()
             ChatUtils.info(
-                "Kira has been toggled ${if (toggled()) "${EnumChatFormatting.GREEN}on" else "${EnumChatFormatting.RED}off"}",
+                "Kira has been toggled ${if (isToggled) "${EnumChatFormatting.GREEN}on" else "${EnumChatFormatting.RED}off"}",
                 force = true
             )
-            if (toggled()) {
+            if (isToggled) {
                 ChatUtils.info(
-                    "Current selected bot: ${EnumChatFormatting.GREEN}${getName()}",
+                    "Current selected bot: ${EnumChatFormatting.GREEN}${activeBot.getName()}",
                     force = true
                 )
-                joinGame()
+                activeBot.queueNextGame()
                 resultCounted = false
             }
         }
