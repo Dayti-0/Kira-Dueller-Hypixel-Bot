@@ -168,7 +168,8 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         Movement.startSprinting()
         Movement.startForward()
         if (kira.config?.boxingFish == true) {
-            TimeUtils.setTimeout(this::fishFunc, RandomUtils.randomIntInRange(10000, 20000))
+            Inventory.setInvItem("sword")
+            fishTimer = TimeUtils.setTimeout(this::fishFunc, RandomUtils.randomIntInRange(50000, 80000))
         }
         Mouse.startTracking()
         if (kira.config?.kiraHit == true) Mouse.startLeftAC() else Mouse.stopLeftAC()
@@ -220,10 +221,9 @@ class Boxing : BotBase("/play duels_boxing_duel"), MovePriority {
         pingAvg = getPingSafely() ?: 80
     }
 
-    private fun fishFunc(fish: Boolean = true) {
+    private fun fishFunc() {
         if (StateManager.state == StateManager.States.PLAYING) {
-            if (fish) Inventory.setInvItem("fish") else Inventory.setInvItem("sword")
-            fishTimer = TimeUtils.setTimeout({ fishFunc(!fish) }, RandomUtils.randomIntInRange(10000, 20000))
+            Inventory.setInvItem("fish")
         }
     }
 
