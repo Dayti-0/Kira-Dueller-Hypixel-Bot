@@ -10,6 +10,7 @@ import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
 import best.spaghetcodes.kira.bot.tuning.ClassicV2Tuner
+import best.spaghetcodes.kira.bot.tuning.MistakeSummary
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import net.minecraft.init.Blocks
@@ -360,7 +361,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             Session.losses > Session.wins -> false
             else -> false
         }
-        val mistakes = if (kira.isTunerEnabled) ClassicV2Tuner.takeAndResetMistakes(rodHits, rodMisses, shotsFired) else ClassicV2Tuner.MistakeSummary.ZERO
+        val mistakes = if (kira.isTunerEnabled) ClassicV2Tuner.takeAndResetMistakes(rodHits, rodMisses, shotsFired) else MistakeSummary.ZERO
         if (kira.isTunerEnabled) {
             ClassicV2Tuner.report(win, mistakes)
         }

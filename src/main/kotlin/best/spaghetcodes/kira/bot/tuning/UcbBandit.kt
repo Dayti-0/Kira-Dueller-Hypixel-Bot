@@ -1,5 +1,6 @@
 package best.spaghetcodes.kira.bot.tuning
 
+import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -78,6 +79,31 @@ class UcbBandit(
         updatedRewards[arm] += reward
 
         return UcbBandit(armCount, totalPlays + 1, updatedPlays, updatedRewards, minReward, maxReward, strategy)
+    }
+
+    /**
+     * Applies exponential decay to past statistics so that recent samples weigh more without fully resetting history.
+     */
+    fun decay(factor: Double): UcbBandit {
+        require(factor in 0.0..1.0 && factor > 0.0) { "factor must be in (0, 1]" }
+
+        val decayedPlays = LongArray(armCount)
+        var decayedTotal = 0L
+        for (i in 0 until armCount) {
+            val originalPlays = plays[i]
+            if (originalPlays == 0L) {
+                decayedPlays[i] = 0
+                continue
+            }
+            val scaled = floor(originalPlays * factor).toLong()
+            val ensured = max(1L, scaled)
+            decayedPlays[i] = ensured
+            decayedTotal += ensured
+        }
+
+        val decayedRewards = DoubleArray(armCount) { rewards[it] * factor }
+
+        return UcbBandit(armCount, decayedTotal, decayedPlays, decayedRewards, minReward, maxReward, strategy)
     }
 
     fun normalizeReward(reward: Double): Double {
