@@ -7,6 +7,7 @@ import best.spaghetcodes.kira.bot.player.Combat
 import best.spaghetcodes.kira.bot.player.Inventory
 import best.spaghetcodes.kira.bot.player.Mouse
 import best.spaghetcodes.kira.bot.player.Movement
+import best.spaghetcodes.kira.bot.tuning.MistakeSummary
 import best.spaghetcodes.kira.bot.tuning.OPTuner
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
@@ -281,6 +282,20 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
 
     private fun castRodNow(distanceNow: Float) {
         val nowClick = System.currentTimeMillis()
+        if (kira.isTunerEnabled) {
+            val distanceMargin = 0.2f
+            if (distanceNow < rodBanMeleeDist - distanceMargin || distanceNow > rodMaxRangeHard + distanceMargin) {
+                OPTuner.noteRodMistake()
+            }
+
+            val cdClose = (rodCdCloseMsBase * rodCdBias).toLong()
+            val cdFar = (rodCdFarMsBase * rodCdBias).toLong()
+            val requiredCd = if (distanceNow <= rodCloseMax) cdClose else cdFar
+            val cdReady = (nowClick - lastRodUse) >= requiredCd || nowClick < reentryRodGraceUntil
+            if (!cdReady) {
+                OPTuner.noteRodMistake()
+            }
+        }
         Mouse.setUsingProjectile(true)
         if (Mouse.rClickDown) Mouse.rClickUp()
         Inventory.setInvItem("rod")
@@ -807,6 +822,9 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
         val player = mc.thePlayer ?: return
         val opp = opponent() ?: return
         if (!player.canEntityBeSeen(opp)) return
+        if (kira.isTunerEnabled && player.getDistanceToEntity(opp) < 6.5f) {
+            OPTuner.noteBowMistake()
+        }
 
         Mouse.stopLeftAC()
         Mouse.setUsingProjectile(true)
@@ -925,8 +943,9 @@ class OP : BotBase("/play duels_op_duel"), Bow, Rod, MovePriority, Potion, Gap, 
             Session.losses > Session.wins -> false
             else -> false
         }
+        val mistakes = if (kira.isTunerEnabled) OPTuner.takeAndResetMistakes(rodHits, rodMisses, shotsFired) else MistakeSummary.ZERO
         if (kira.isTunerEnabled) {
-            OPTuner.report(win, 0)
+            OPTuner.report(win, mistakes)
         }
         stopPreGapBackwardLock()
         shotsFired = 0
