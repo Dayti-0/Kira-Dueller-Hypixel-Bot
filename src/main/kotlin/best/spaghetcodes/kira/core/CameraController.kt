@@ -3,6 +3,7 @@ package best.spaghetcodes.kira.core
 import best.spaghetcodes.kira.kira
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.EntityRenderer
+import net.minecraftforge.client.event.RenderGameOverlayEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import net.minecraftforge.fml.relauncher.ReflectionHelper
@@ -18,8 +19,7 @@ object CameraController {
     private var storedDistances: DistanceSnapshot? = null
 
     private const val CINEMATIC_DISTANCE = 12f
-    private const val PITCH_OFFSET = 12f
-    private const val YAW_OFFSET = 90f
+    private const val TOP_DOWN_PITCH = 90f
     private const val VERTICAL_OFFSET = 0.6f
 
     private data class DistanceSnapshot(
@@ -63,20 +63,20 @@ object CameraController {
 
     fun adjustRotation(angle: Float, axisX: Float, axisY: Float, axisZ: Float): Float {
         if (!isActive() || mc.gameSettings.thirdPersonView <= 0) return angle
-        if (axisX == 1.0f && axisY == 0.0f && axisZ == 0.0f) {
-            return angle - PITCH_OFFSET
-        }
-
-        if (axisX == 0.0f && axisY == 1.0f && axisZ == 0.0f) {
-            return angle + YAW_OFFSET
-        }
-
-        return angle
+        return if (axisX == 1.0f && axisY == 0.0f && axisZ == 0.0f) TOP_DOWN_PITCH else angle
     }
 
     fun verticalOffset(): Float = if (isActive()) VERTICAL_OFFSET else 0f
 
     fun isActive(): Boolean = kira.config?.cinematicCamera == true
+
+    @SubscribeEvent
+    fun onRenderOverlay(event: RenderGameOverlayEvent.Pre) {
+        if (!isActive()) return
+        if (event.type == RenderGameOverlayEvent.ElementType.CROSSHAIRS || event.type == RenderGameOverlayEvent.ElementType.HOTBAR) {
+            event.isCanceled = true
+        }
+    }
 
     private object DistanceAccess {
         private val distanceField = resolve("thirdPersonDistance", "field_78490_B", "q")
