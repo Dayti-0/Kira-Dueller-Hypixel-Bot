@@ -100,7 +100,6 @@ object OPTuner {
 
     // Schéma aligné sur ClassicV2 (version 3)
     private const val CURRENT_VERSION = 3
-    private const val MISTAKE_PENALTY = 0.25
     private const val EXPLOITATION_THRESHOLD = 25     // Après 25 parties, favoriser l'exploitation
     private const val EXPLOITATION_FACTOR = 0.4       // Réduire l'exploration de 60%
     private const val CONVERGENCE_RATIO = 1.5         // Si best > second * 1.5, converger
@@ -108,6 +107,11 @@ object OPTuner {
     private const val MAX_VALUES_PER_PARAM = 20       // Maximum de valeurs distinctes par paramètre
     private const val HIGH_REWARD_THRESHOLD = 50.0    // Reward > 50 = très bon
     private const val ELITE_REWARD_THRESHOLD = 90.0   // Reward > 90 = élite
+    private const val BANDIT_DECAY_FACTOR = 0.999
+
+    private var mistakesJump: Int = 0
+    private var mistakesRod: Int = 0
+    private var mistakesBow: Int = 0
 
     private fun specI(key: String, min: Double, max: Double, step: Double, def: Double, optimal: Double? = null) =
         ParamSpec(key, min, max, step, def, ParamType.INT, optimal)
@@ -171,14 +175,33 @@ object OPTuner {
 
         return build(values)
     }
-    
+
     fun defaults(): OPParams = build(defaultValues())
 
-    fun report(win: Boolean, mistakes: Int = 0) {
+    fun noteJumpMistake() {
+        mistakesJump += 1
+    }
+
+    fun noteRodMistake() {
+        mistakesRod += 1
+    }
+
+    fun noteBowMistake() {
+        mistakesBow += 1
+    }
+
+    fun takeAndResetMistakes(rodHits: Int, rodMisses: Int, bowShots: Int): MistakeSummary {
+        val summary = MistakeSummary(mistakesJump, mistakesRod, mistakesBow, rodHits, rodMisses, bowShots)
+        mistakesJump = 0
+        mistakesRod = 0
+        mistakesBow = 0
+        return summary
+    }
+
+    fun report(win: Boolean, mistakes: MistakeSummary) {
         ensureLoaded()
 
-        val baseReward = if (win) 1.0 else 0.0
-        val reward = (baseReward - mistakes * MISTAKE_PENALTY).coerceAtLeast(0.0)
+        val reward = computeReward(win, mistakes)
 
         // Mise à jour des paramètres
         var changed = false
@@ -186,7 +209,8 @@ object OPTuner {
             if (ps.values.isEmpty()) continue
             val bandit = resizeBandit(banditFor(ps), ps.values.size)
             val arm = ps.lastArm.coerceIn(0, ps.values.lastIndex)
-            val updated = bandit.update(arm, reward)
+            val decayed = bandit.decay(BANDIT_DECAY_FACTOR)
+            val updated = decayed.update(arm, reward)
             ps.bandit = updated.toState()
             ps.lastArm = arm
             ps.lastValue = ps.values[arm]
