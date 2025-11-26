@@ -646,7 +646,7 @@ class CustomConfigGUI : GuiScreen() {
             20,
             1
         ); y += ROW_HEIGHT
-        slider(
+        decimal(
             "H&B Trade Distance",
             x,
             y,

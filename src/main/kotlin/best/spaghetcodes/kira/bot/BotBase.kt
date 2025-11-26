@@ -487,6 +487,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
+            val now = System.currentTimeMillis()
             when (packet) {
                 is S19PacketEntityStatus -> {
                     if (packet.opCode.toInt() == 2) {
