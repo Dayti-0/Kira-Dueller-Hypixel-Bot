@@ -635,17 +635,6 @@ class CustomConfigGUI : GuiScreen() {
             10,
             1
         ); y += ROW_HEIGHT
-        number(
-            "H&B Combo Ticks",
-            x,
-            y,
-            width,
-            { cfg.hitBlockComboTicks },
-            { cfg.hitBlockComboTicks = it },
-            1,
-            20,
-            1
-        ); y += ROW_HEIGHT
         decimal(
             "H&B Trade Distance",
             x,
@@ -668,28 +657,7 @@ class CustomConfigGUI : GuiScreen() {
             10,
             1
         ); y += ROW_HEIGHT
-        number(
-            "H&B Recent Self Hit (ticks)",
-            x,
-            y,
-            width,
-            { cfg.recentHitSelfTicks },
-            { cfg.recentHitSelfTicks = it },
-            1,
-            20,
-            1
-        ); y += ROW_HEIGHT
-        number(
-            "H&B Recent Target Hit (ticks)",
-            x,
-            y,
-            width,
-            { cfg.recentHitTargetTicks },
-            { cfg.recentHitTargetTicks = it },
-            1,
-            20,
-            1
-        ); y += ROW_HEIGHT + SECTION_SPACING
+        y += SECTION_SPACING
 
         y = drawToggleSection(
             "Misc",

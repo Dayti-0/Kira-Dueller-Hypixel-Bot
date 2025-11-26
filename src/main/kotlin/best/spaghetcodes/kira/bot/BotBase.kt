@@ -426,6 +426,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         val cfg = kira.config ?: return false
         val ticksToMs = 50L
 
+        if (cfg.hitBlockChance <= 0) {
+            return false
+        }
+
         if (self.distanceToTarget >= cfg.hitBlockTradeDistance) {
             return false
         }
@@ -448,7 +452,11 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         val tightRange = self.distanceToTarget <= (cfg.hitBlockTradeDistance - 0.3f)
         val likelyTrade = closeEnough && (targetHitRecently || tightRange || target.facingPlayer)
 
-        return likelyTrade
+        if (!likelyTrade) {
+            return false
+        }
+
+        return RandomUtils.randomIntInRange(1, 100) <= cfg.hitBlockChance
     }
 
     private fun isFacingPlayer(target: EntityPlayer, player: EntityPlayer): Boolean {
