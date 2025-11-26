@@ -600,7 +600,7 @@ class CustomConfigGUI : GuiScreen() {
             width,
             { cfg.hitBlockMode },
             { cfg.hitBlockMode = it },
-            listOf("Chance", "Cooldown Hits")
+            listOf("Chance", "Cooldown Hits", "Prediction")
         ); y += ROW_HEIGHT
         number(
             "H&B Chance (%)",
@@ -634,7 +634,30 @@ class CustomConfigGUI : GuiScreen() {
             1,
             10,
             1
-        ); y += ROW_HEIGHT + SECTION_SPACING
+        ); y += ROW_HEIGHT
+        decimal(
+            "H&B Trade Distance",
+            x,
+            y,
+            width,
+            { cfg.hitBlockTradeDistance },
+            { cfg.hitBlockTradeDistance = it },
+            2.5f,
+            5f,
+            0.05f
+        ); y += ROW_HEIGHT
+        number(
+            "H&B Block Duration (ticks)",
+            x,
+            y,
+            width,
+            { cfg.hitBlockDurationTicks },
+            { cfg.hitBlockDurationTicks = it },
+            1,
+            10,
+            1
+        ); y += ROW_HEIGHT
+        y += SECTION_SPACING
 
         y = drawToggleSection(
             "Misc",

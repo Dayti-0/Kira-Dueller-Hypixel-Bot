@@ -17,6 +17,7 @@ import net.minecraft.network.Packet
 import net.minecraft.network.play.server.S19PacketEntityStatus
 import net.minecraft.network.play.server.S45PacketTitle
 import net.minecraft.util.EnumChatFormatting
+import net.minecraft.util.Vec3
 import net.minecraft.item.ItemBow
 import net.minecraft.item.ItemSword
 import net.minecraftforge.client.event.ClientChatReceivedEvent
@@ -29,6 +30,32 @@ import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToSe
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent
 import java.util.Timer
 import kotlin.math.max
+import kotlin.math.sqrt
+
+enum class BlockHitMode {
+    PERCENTAGE,
+    COOLDOWN_HIT,
+    PREDICTION;
+
+    companion object {
+        fun fromIndex(index: Int): BlockHitMode {
+            return values().getOrElse(index) { PERCENTAGE }
+        }
+    }
+}
+
+data class PlayerState(
+    val now: Long,
+    val distanceToTarget: Float,
+    val previousDistanceToTarget: Float,
+    val lastHitLandedAt: Long,
+    val lastTimeHitByTarget: Long
+)
+
+data class TargetState(
+    val horizontalSpeed: Double,
+    val facingPlayer: Boolean
+)
 
 open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
@@ -62,6 +89,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     protected var combo = 0
     protected var opponentCombo = 0
     protected var ticksSinceHit = 0
+
+    private var lastSelfHitAt = 0L
+    private var lastGotHitAt = 0L
+    private var lastDistanceToOpponent = 0f
 
     // Hit & Block state
     private var hbNextAllowedAt = 0L
@@ -163,12 +194,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     // ----------------------------------------------------
 
-    private fun performHitBlock(now: Long) {
-        val dur = RandomUtils.randomIntInRange(40, 80)
-        val delay = RandomUtils.randomIntInRange(0, 20)
-        hbActiveUntil = now + delay + dur
-        TimeUtils.setTimeout({ Mouse.rClick(dur) }, delay)
-        hbNextAllowedAt = now
+    private fun performHitBlock(now: Long, durationMs: Int = RandomUtils.randomIntInRange(40, 80), delayMs: Int = RandomUtils.randomIntInRange(0, 20)) {
+        hbActiveUntil = now + delayMs + durationMs
+        TimeUtils.setTimeout({ Mouse.rClick(durationMs) }, delayMs)
+        hbNextAllowedAt = hbActiveUntil
     }
 
     private fun resetAntiDetection() {
@@ -342,13 +371,13 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         val now = System.currentTimeMillis()
         val allowed = now >= hbNextAllowedAt
 
-        when (cfg.hitBlockMode) {
-            0 -> { // Chance
+        when (BlockHitMode.fromIndex(cfg.hitBlockMode)) {
+            BlockHitMode.PERCENTAGE -> {
                 if (allowed && cfg.hitBlockChance > 0 && RandomUtils.randomIntInRange(1, 100) <= cfg.hitBlockChance) {
                     performHitBlock(now)
                 }
             }
-            1 -> { // Cooldown hits
+            BlockHitMode.COOLDOWN_HIT -> {
                 if (now - hbLastHitAt > 2000) {
                     hbHitsSince = 0
                     hbTargetHits = 0
@@ -365,8 +394,79 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                     }
                 }
             }
+            BlockHitMode.PREDICTION -> {
+                if (!allowed) {
+                    hbLastHitAt = now
+                    return
+                }
+                val playerState = PlayerState(
+                    now = now,
+                    distanceToTarget = EntityUtils.getDistanceNoY(player, opp),
+                    previousDistanceToTarget = lastDistanceToOpponent,
+                    lastHitLandedAt = lastSelfHitAt,
+                    lastTimeHitByTarget = lastGotHitAt
+                )
+                val targetState = TargetState(
+                    horizontalSpeed = sqrt(
+                        (opp.posX - opp.lastTickPosX) * (opp.posX - opp.lastTickPosX) +
+                            (opp.posZ - opp.lastTickPosZ) * (opp.posZ - opp.lastTickPosZ)
+                    ),
+                    facingPlayer = isFacingPlayer(opp, player)
+                )
+                if (shouldBlockPrediction(playerState, targetState)) {
+                    val durationMs = (cfg.hitBlockDurationTicks * 50).coerceAtLeast(10)
+                    performHitBlock(now, durationMs, 0)
+                }
+            }
         }
         hbLastHitAt = now
+    }
+
+    private fun shouldBlockPrediction(self: PlayerState, target: TargetState): Boolean {
+        val cfg = kira.config ?: return false
+        val ticksToMs = 50L
+
+        if (cfg.hitBlockChance <= 0) {
+            return false
+        }
+
+        if (self.distanceToTarget >= cfg.hitBlockTradeDistance) {
+            return false
+        }
+
+        val hasRecentOwnHit = self.lastHitLandedAt > 0 && (self.now - self.lastHitLandedAt) <= cfg.recentHitTargetTicks * ticksToMs
+        if (!hasRecentOwnHit) {
+            return false
+        }
+
+        val distanceGrowing = self.previousDistanceToTarget > 0f && (self.distanceToTarget - self.previousDistanceToTarget) > 0.05f
+        val targetTakingKb = distanceGrowing || target.horizontalSpeed > 0.35
+        val tradedBack = self.lastTimeHitByTarget > self.lastHitLandedAt
+        val inComboWindow = (self.now - self.lastHitLandedAt) <= cfg.hitBlockComboTicks * ticksToMs
+        if (inComboWindow && targetTakingKb && !tradedBack) {
+            return false
+        }
+
+        val targetHitRecently = self.lastTimeHitByTarget > 0 && (self.now - self.lastTimeHitByTarget) <= cfg.recentHitSelfTicks * ticksToMs
+        val closeEnough = self.distanceToTarget <= cfg.hitBlockTradeDistance
+        val tightRange = self.distanceToTarget <= (cfg.hitBlockTradeDistance - 0.3f)
+        val likelyTrade = closeEnough && (targetHitRecently || tightRange || target.facingPlayer)
+
+        if (!likelyTrade) {
+            return false
+        }
+
+        return RandomUtils.randomIntInRange(1, 100) <= cfg.hitBlockChance
+    }
+
+    private fun isFacingPlayer(target: EntityPlayer, player: EntityPlayer): Boolean {
+        val look = Vec3(target.lookVec.xCoord, 0.0, target.lookVec.zCoord).normalize()
+        val toPlayer = Vec3(player.posX - target.posX, 0.0, player.posZ - target.posZ).normalize()
+        if (look.lengthVector() < 0.01 || toPlayer.lengthVector() < 0.01) {
+            return false
+        }
+        val dot = look.dotProduct(toPlayer)
+        return dot > 0.7
     }
 
     private fun recordResult(iWon: Boolean) {
@@ -395,6 +495,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     fun onPacket(packet: Packet<*>) {
         if (toggled) {
+            val now = System.currentTimeMillis()
             when (packet) {
                 is S19PacketEntityStatus -> {
                     if (packet.opCode.toInt() == 2) {
@@ -402,6 +503,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                         if (entity != null) {
                             if (entity.entityId == attackedID) {
                                 attackedID = -1
+                                lastSelfHitAt = now
                                 onAttack()
                                 combo++
                                 opponentCombo = 0
@@ -411,6 +513,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                                 maybeHitBlock()
                             } else if (mc.thePlayer != null && entity.entityId == mc.thePlayer.entityId) {
                                 onAttacked()
+                                lastGotHitAt = now
                                 combo = 0
                                 opponentCombo++
                                 hasCombatContact = true
@@ -518,6 +621,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                     opponentCombo = 0
                     ChatUtils.info("combo reset")
                 }
+                lastDistanceToOpponent = distance
             }
         }
 
@@ -648,6 +752,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         combo = 0
         opponentCombo = 0
         ticksSinceHit = 0
+        lastSelfHitAt = 0L
+        lastGotHitAt = 0L
+        lastDistanceToOpponent = 0f
         ticksSinceGameStart = 0
         resultCounted = false
         lastDuelDurationSeenAt = 0L
