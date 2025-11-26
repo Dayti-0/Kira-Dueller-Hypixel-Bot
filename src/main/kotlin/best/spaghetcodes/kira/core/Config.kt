@@ -1,10 +1,11 @@
 package best.spaghetcodes.kira.core
 
 import best.spaghetcodes.kira.bot.BotBase
-import best.spaghetcodes.kira.bot.bots.*
 import best.spaghetcodes.kira.bot.ModeRotationManager
-import best.spaghetcodes.kira.kira
+import best.spaghetcodes.kira.bot.bots.*
+import best.spaghetcodes.kira.core.RequeueMode
 import best.spaghetcodes.kira.gui.CustomConfigGUI
+import best.spaghetcodes.kira.kira
 import gg.essential.vigilance.Vigilant
 import gg.essential.vigilance.data.Property
 import gg.essential.vigilance.data.PropertyType
@@ -203,11 +204,13 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     @Property(type = PropertyType.NUMBER, name = "Requeue After No Game", description = "How long to wait before re-queueing if no game starts", category = "Auto Requeue", min = 15, max = 60, increment = 5)
     var rqNoGame = 30
 
-    @Property(type = PropertyType.SWITCH, name = "Paper Requeue", description = "Use the paper to requeue", category = "Auto Requeue")
-    var paperRequeue = true
-
-    @Property(type = PropertyType.SWITCH, name = "Fast Requeue", description = "Faster Requeue (no rewards)", category = "Auto Requeue")
-    var fastRequeue = true
+    @Property(
+        type = PropertyType.TEXT,
+        name = "Requeue Mode",
+        description = "Choose between fast command requeue or paper requeue.",
+        category = "Auto Requeue"
+    )
+    var requeueMode = RequeueMode.FAST.name
 
     @Property(type = PropertyType.SWITCH, name = "Enable Queue Dodging", description = "Whether or not the bot should dodge people based on stats", category = "Queue Dodging")
     var enableDodging = false
@@ -298,6 +301,14 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
     }
 
     fun getCustomGui(): GuiScreen = CustomConfigGUI()
+
+    fun getRequeueMode(): RequeueMode {
+        return RequeueMode.fromConfig(requeueMode)
+    }
+
+    fun setRequeueMode(mode: RequeueMode) {
+        requeueMode = mode.name
+    }
 
     enum class LobbyMovementType {
         FAST_FORWARD,

@@ -1,9 +1,10 @@
 package best.spaghetcodes.kira.bot
 
-import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.player.*
-import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.bot.bots.*
+import best.spaghetcodes.kira.core.KeyBindings
+import best.spaghetcodes.kira.core.RequeueMode
+import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.SimpleChannelInboundHandler
@@ -113,6 +114,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
+
+    private var lastGameWon: Boolean? = null
 
     private var antiDetectionStage = 0
     private var antiDetectionSequenceFinished = false
@@ -470,6 +473,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     }
 
     private fun recordResult(iWon: Boolean) {
+        lastGameWon = iWon
         Session.recordResult(iWon, getName())
         if (iWon) {
             triggerWinSneakCelebration()
@@ -540,10 +544,6 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
                                     resultCounted = true
                                     ChatUtils.info(Session.getSession())
-
-                                    if (!iWon) {
-                                        TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(1000, 2000))
-                                    }
 
                                     if ((kira.config?.disconnectAfterGames ?: 0) > 0) {
                                         if (Session.wins + Session.losses >= kira.config?.disconnectAfterGames!!) {
@@ -776,6 +776,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 opponentTimer = TimeUtils.setInterval(this::bakery, 0, 500)
             }, quickRefresh)
             resultCounted = false
+            lastGameWon = null
             ModeRotationManager.onOpponentFound()
             onGameStart()
         }
@@ -794,15 +795,15 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
             val rotationDecision = ModeRotationManager.onGameCompleted(this)
             val targetBot = rotationDecision?.botToQueue ?: this
-            val forceCommand = rotationDecision?.forceQueueCommand ?: false
             val celebrationDelay = winSneakDelayRemaining()
-            if (kira.config?.fastRequeue == true) {
-                val baseDelay = RandomUtils.randomIntInRange(300, 500)
-                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, max(baseDelay, celebrationDelay))
-            } else {
-                val baseDelay = kira.config?.autoRqDelay ?: 2000
-                TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, max(baseDelay, celebrationDelay))
-            }
+            val requeueMode = kira.config?.getRequeueMode() ?: RequeueMode.FAST
+            val isRotationSwitch = rotationDecision != null
+            val defeatDelay = if (!isRotationSwitch && lastGameWon == false) 5000 else 0
+            val delay = if (isRotationSwitch) celebrationDelay else max(defeatDelay, celebrationDelay)
+            val forceCommand = rotationDecision?.forceQueueCommand == true || requeueMode == RequeueMode.FAST
+
+            TimeUtils.setTimeout({ targetBot.queueNextGame(forceCommand) }, delay)
+            lastGameWon = null
         }
     }
 
@@ -830,8 +831,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private fun joinGame(second: Boolean = false, forceCommand: Boolean = false) {
         cancelWinSneak()
         if (toggled() && StateManager.state != StateManager.States.PLAYING && !StateManager.gameFull) {
+            val requeueMode = kira.config?.getRequeueMode() ?: RequeueMode.FAST
             if (StateManager.state == StateManager.States.GAME) {
-                val paper = !forceCommand && kira.config?.paperRequeue == true && Inventory.setInvItem("paper")
+                val paper = !forceCommand && requeueMode == RequeueMode.PAPER && Inventory.setInvItem("paper")
                 if (paper) {
                     TimeUtils.setTimeout({
                         Mouse.rClick(RandomUtils.randomIntInRange(30, 70))
