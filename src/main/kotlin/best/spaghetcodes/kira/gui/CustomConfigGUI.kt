@@ -8,7 +8,6 @@ import best.spaghetcodes.kira.utils.ChatUtils
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.ScaledResolution
 import net.minecraft.client.renderer.GlStateManager
-import net.minecraft.client.resources.I18n
 import org.lwjgl.input.Keyboard
 import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.GL11
@@ -21,22 +20,7 @@ import kotlin.math.cos
 class CustomConfigGUI : GuiScreen() {
 
     private var currentTab = 0
-    private val tabKeys = listOf("kira.gui.tab.general", "kira.gui.tab.combat", "kira.gui.tab.stats")
-    private val botNameKeys = mapOf(
-        "Classic" to "kira.gui.bot.classic",
-        "ClassicV2" to "kira.gui.bot.classicv2",
-        "OP" to "kira.gui.bot.op",
-        "Combo" to "kira.gui.bot.combo",
-        "Sumo" to "kira.gui.bot.sumo",
-        "Boxing" to "kira.gui.bot.boxing",
-        "Bow" to "kira.gui.bot.bow",
-        "Blitz" to "kira.gui.bot.blitz"
-    )
-    private val hitBlockModeKeys = listOf(
-        "kira.gui.option.hitBlockMode.chance",
-        "kira.gui.option.hitBlockMode.cooldown",
-        "kira.gui.option.hitBlockMode.prediction"
-    )
+    private val tabNames = listOf("General", "Combat", "Stats")
     private var selectedStatsCategoryIndex = 0
 
     private var fadeIn = 0f
@@ -65,20 +49,6 @@ class CustomConfigGUI : GuiScreen() {
     )
 
     private val hotspots = mutableListOf<Rect>()
-
-    private fun tr(key: String, vararg args: Any): String = I18n.format(key, *args)
-
-    private fun botLabels(names: List<String>): List<String> {
-        return names.map { name -> botNameKeys[name]?.let { key -> tr(key) } ?: name }
-    }
-
-    private fun translateCategory(category: String): String {
-        return when (category) {
-            StatsManager.GLOBAL_CATEGORY -> tr("kira.gui.stats.category.global")
-            StatsManager.SESSION_CATEGORY -> tr("kira.gui.stats.category.session")
-            else -> botNameKeys[category]?.let { tr(it) } ?: category
-        }
-    }
 
     override fun initGui() {
         super.initGui()
@@ -117,9 +87,8 @@ class CustomConfigGUI : GuiScreen() {
         val startY = 80
         val endY = height - 60
 
-        drawCenteredString(fontRendererObj, tr("kira.gui.title"), width / 2, 40, highlightColor)
-        val tabNames = tabKeys.map { tr(it) }
-        drawTabs(startX, 60, contentWidth, tabNames)
+        drawCenteredString(fontRendererObj, "KIRA CONFIG", width / 2, 40, highlightColor)
+        drawTabs(startX, 60, contentWidth)
 
         scissor(0, startY - 10, width, endY - startY + 20) {
             val finalY = when (currentTab) {
@@ -131,10 +100,10 @@ class CustomConfigGUI : GuiScreen() {
         }
 
         val footerY = height - 40
-        val status = if (kira.bot?.toggled() == true) tr("kira.gui.status.online") else tr("kira.gui.status.offline")
+        val status = if (kira.bot?.toggled() == true) "Status: §aONLINE" else "Status: §cOFFLINE"
         drawString(fontRendererObj, status, 20, footerY + 4, -1)
 
-        val saveLabel = tr("kira.gui.action.saveAndClose")
+        val saveLabel = "Save & Close"
         val saveW = fontRendererObj.getStringWidth(saveLabel)
         val saveX = width - saveW - 20
         val isSaveHovered = isHovered(saveX, footerY, saveW, 12)
@@ -150,7 +119,7 @@ class CustomConfigGUI : GuiScreen() {
         hotspots += Rect(x, y, x + w, y + h, onClick)
     }
 
-    private fun drawTabs(x: Int, y: Int, containerWidth: Int, tabNames: List<String>) {
+    private fun drawTabs(x: Int, y: Int, containerWidth: Int) {
         val totalTabsWidth = tabNames.sumOf { fontRendererObj.getStringWidth(it) }
         val tabSpacing = 40
         var currentX = x + (containerWidth - (totalTabsWidth + tabSpacing * (tabNames.size - 1))) / 2
@@ -198,7 +167,7 @@ class CustomConfigGUI : GuiScreen() {
         val yPos = y - scroll
         val controlEdgeX = x + width
         val cur = min(max(0, get()), options.lastIndex)
-        val value = options.getOrElse(cur) { tr("kira.gui.common.na") }
+        val value = options.getOrElse(cur) { "N/A" }
         val labelColor = if (enabled) highlightColor else grayColor
         drawString(fontRendererObj, label, x, yPos, labelColor)
 
@@ -221,8 +190,7 @@ class CustomConfigGUI : GuiScreen() {
         // Draw shadows/outlines
         drawString(fontRendererObj, "<", leftArrowX + 1, yPos + 1, Color.BLACK.rgb)
         drawString(fontRendererObj, arrowChar, rightArrowX + 1, yPos + 1, Color.BLACK.rgb)
-        val noneLabel = tr("kira.gui.common.none")
-        val isDisabledOption = value.equals(noneLabel, ignoreCase = true)
+        val isDisabledOption = value.equals("None", ignoreCase = true)
         val valueShadowColor = if (enabled && !isDisabledOption) {
             Color(primaryColor).darker().darker().rgb
         } else {
@@ -386,16 +354,13 @@ class CustomConfigGUI : GuiScreen() {
         val cfg = kira.config ?: return y
         val width = 500
 
-        val botNamesRaw = listOf("Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz")
-        val botNames = botLabels(botNamesRaw)
-        val noneLabel = tr("kira.gui.common.none")
-        val rotationBotNames = botNames + noneLabel
-
-        y = drawSectionHeader(tr("kira.gui.section.botBehavior"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Bot Behavior", x, y, width); y += SECTION_SPACING
+        val botNames = listOf("Classic", "ClassicV2", "OP", "Combo", "Sumo", "Boxing", "Bow", "Blitz")
+        val rotationBotNames = botNames + "None"
         val currentBotLabel = if (cfg.enableModeRotation) {
-            tr("kira.gui.option.currentBot.disabled")
+            "Current Bot (disabled in rotation mode)"
         } else {
-            tr("kira.gui.option.currentBot.enabled")
+            "Current Bot"
         }
         selector(
             currentBotLabel,
@@ -407,19 +372,19 @@ class CustomConfigGUI : GuiScreen() {
             botNames,
             enabled = !cfg.enableModeRotation
         ); y += ROW_HEIGHT
-        toggle(tr("kira.gui.option.lobbyMovement"), x, y, width, { cfg.lobbyMovement }, { cfg.lobbyMovement = it }); y += ROW_HEIGHT
+        toggle("Lobby Movement", x, y, width, { cfg.lobbyMovement }, { cfg.lobbyMovement = it }); y += ROW_HEIGHT
         val requeueModes = RequeueMode.values()
         selector(
-            tr("kira.gui.option.requeueMode"),
+            "Requeue Mode",
             x,
             y,
             width,
             { requeueModes.indexOf(cfg.getRequeueMode()) },
             { idx -> cfg.setRequeueMode(requeueModes.getOrElse(idx) { RequeueMode.FAST }) },
-            requeueModes.map { tr(it.displayNameKey) }
+            requeueModes.map { it.displayName }
         ); y += ROW_HEIGHT
         toggle(
-            tr("kira.gui.option.tuner"),
+            "Tuner",
             x,
             y,
             width,
@@ -427,23 +392,23 @@ class CustomConfigGUI : GuiScreen() {
             { cfg.enableTuner = it }
         ); y += ROW_HEIGHT
         toggle(
-            tr("kira.gui.option.disableChatMessages"),
+            "Disable Chat Messages",
             x,
             y,
             width,
             { cfg.disableChatMessages },
             { cfg.disableChatMessages = it }); y += ROW_HEIGHT
         toggle(
-            tr("kira.gui.option.cinematicCamera"),
+            "Mode Camera",
             x,
             y,
             width,
             { cfg.cinematicCamera },
             { cfg.cinematicCamera = it }); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.modeRotation"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Mode Rotation", x, y, width); y += SECTION_SPACING
         toggle(
-            tr("kira.gui.option.modeRotation"),
+            "Mode Rotation",
             x,
             y,
             width,
@@ -451,7 +416,7 @@ class CustomConfigGUI : GuiScreen() {
             { cfg.enableModeRotation = it }
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.gamesPerMode"),
+            "Games Per Mode",
             x,
             y,
             width,
@@ -462,7 +427,7 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT
         selector(
-            tr("kira.gui.option.rotationMode1"),
+            "Rotation Mode 1",
             x,
             y,
             width,
@@ -471,7 +436,7 @@ class CustomConfigGUI : GuiScreen() {
             botNames
         ); y += ROW_HEIGHT
         selector(
-            tr("kira.gui.option.rotationMode2"),
+            "Rotation Mode 2",
             x,
             y,
             width,
@@ -480,7 +445,7 @@ class CustomConfigGUI : GuiScreen() {
             botNames
         ); y += ROW_HEIGHT
         selector(
-            tr("kira.gui.option.rotationMode3"),
+            "Rotation Mode 3",
             x,
             y,
             width,
@@ -489,9 +454,9 @@ class CustomConfigGUI : GuiScreen() {
             rotationBotNames
         ); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.autoDisconnect"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Auto Disconnect", x, y, width); y += SECTION_SPACING
         number(
-            tr("kira.gui.option.afterXGames"),
+            "After X Games",
             x,
             y,
             width,
@@ -502,7 +467,7 @@ class CustomConfigGUI : GuiScreen() {
             10
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.afterXMinutes"),
+            "After X Minutes",
             x,
             y,
             width,
@@ -513,9 +478,9 @@ class CustomConfigGUI : GuiScreen() {
             5
         ); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.requeueTimings"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Requeue Timings", x, y, width); y += SECTION_SPACING
         number(
-            tr("kira.gui.option.autoRequeueDelay"),
+            "Auto Requeue Delay (ms)",
             x,
             y,
             width,
@@ -526,7 +491,7 @@ class CustomConfigGUI : GuiScreen() {
             50
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.requeueAfterNoGame"),
+            "Requeue After No Game (s)",
             x,
             y,
             width,
@@ -537,16 +502,16 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.chatMacros"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Chat Macros", x, y, width); y += SECTION_SPACING
         toggle(
-            tr("kira.gui.option.gameStartMessage"),
+            "Game Start Message",
             x,
             y,
             width,
             { cfg.sendStartMessage },
             { cfg.sendStartMessage = it }); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.startMessageDelay"),
+            "Start Message Delay (ms)",
             x,
             y,
             width,
@@ -556,8 +521,8 @@ class CustomConfigGUI : GuiScreen() {
             1000,
             50
         ); y += ROW_HEIGHT
-        toggle(tr("kira.gui.option.enableAutoGG"), x, y, width, { cfg.sendAutoGG }, { cfg.sendAutoGG = it }); y += ROW_HEIGHT
-        number(tr("kira.gui.option.autoGGDelay"), x, y, width, { cfg.ggDelay }, { cfg.ggDelay = it }, 50, 1000, 50); y += ROW_HEIGHT
+        toggle("Enable AutoGG", x, y, width, { cfg.sendAutoGG }, { cfg.sendAutoGG = it }); y += ROW_HEIGHT
+        number("AutoGG Delay (ms)", x, y, width, { cfg.ggDelay }, { cfg.ggDelay = it }, 50, 1000, 50); y += ROW_HEIGHT
 
         return y
     }
@@ -567,10 +532,10 @@ class CustomConfigGUI : GuiScreen() {
         val cfg = kira.config ?: return y
         val width = 500
 
-        y = drawSectionHeader(tr("kira.gui.section.clicker"), x, y, width); y += SECTION_SPACING
-        number(tr("kira.gui.option.minCps"), x, y, width, { cfg.minCPS }, { cfg.minCPS = it }, 15, 25, 1); y += ROW_HEIGHT
+        y = drawSectionHeader("Clicker", x, y, width); y += SECTION_SPACING
+        number("Min CPS", x, y, width, { cfg.minCPS }, { cfg.minCPS = it }, 15, 25, 1); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.maxCps"),
+            "Max CPS",
             x,
             y,
             width,
@@ -581,9 +546,9 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.aim"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Aim", x, y, width); y += SECTION_SPACING
         number(
-            tr("kira.gui.option.horizontalLookSpeed"),
+            "Horizontal Look Speed",
             x,
             y,
             width,
@@ -594,7 +559,7 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.verticalLookSpeed"),
+            "Vertical Look Speed",
             x,
             y,
             width,
@@ -605,7 +570,7 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT
         decimal(
-            tr("kira.gui.option.lookRandomization"),
+            "Look Randomization",
             x,
             y,
             width,
@@ -616,9 +581,9 @@ class CustomConfigGUI : GuiScreen() {
             0.05f
         ); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.reachTarget"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Reach & Targeting", x, y, width); y += SECTION_SPACING
         number(
-            tr("kira.gui.option.maxLookDistance"),
+            "Max Look Distance",
             x,
             y,
             width,
@@ -629,7 +594,7 @@ class CustomConfigGUI : GuiScreen() {
             5
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.maxAttackDistance"),
+            "Max Attack Distance",
             x,
             y,
             width,
@@ -639,22 +604,21 @@ class CustomConfigGUI : GuiScreen() {
             6,
             1
         ); y += ROW_HEIGHT
-        toggle(tr("kira.gui.option.kiraHit"), x, y, width, { cfg.kiraHit }, { cfg.kiraHit = it }); y += ROW_HEIGHT + SECTION_SPACING
+        toggle("Kira Hit", x, y, width, { cfg.kiraHit }, { cfg.kiraHit = it }); y += ROW_HEIGHT + SECTION_SPACING
 
-        y = drawSectionHeader(tr("kira.gui.section.hitBlock"), x, y, width); y += SECTION_SPACING
-        toggle(tr("kira.gui.option.hitBlock"), x, y, width, { cfg.hitBlock }, { cfg.hitBlock = it }); y += ROW_HEIGHT
-        val hitBlockModes = hitBlockModeKeys.map { tr(it) }
+        y = drawSectionHeader("Hit & Block", x, y, width); y += SECTION_SPACING
+        toggle("Hit & Block", x, y, width, { cfg.hitBlock }, { cfg.hitBlock = it }); y += ROW_HEIGHT
         selector(
-            tr("kira.gui.option.hitBlockMode"),
+            "H&B Mode",
             x,
             y,
             width,
             { cfg.hitBlockMode },
             { cfg.hitBlockMode = it },
-            hitBlockModes
+            listOf("Chance", "Cooldown Hits", "Prediction")
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.hitBlockChance"),
+            "H&B Chance (%)",
             x,
             y,
             width,
@@ -665,7 +629,7 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.hitBlockMinHits"),
+            "H&B Min Hits",
             x,
             y,
             width,
@@ -676,7 +640,7 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.hitBlockMaxHits"),
+            "H&B Max Hits",
             x,
             y,
             width,
@@ -687,7 +651,7 @@ class CustomConfigGUI : GuiScreen() {
             1
         ); y += ROW_HEIGHT
         decimal(
-            tr("kira.gui.option.hitBlockTradeDistance"),
+            "H&B Trade Distance",
             x,
             y,
             width,
@@ -698,7 +662,7 @@ class CustomConfigGUI : GuiScreen() {
             0.05f
         ); y += ROW_HEIGHT
         number(
-            tr("kira.gui.option.hitBlockBlockDuration"),
+            "H&B Block Duration (ticks)",
             x,
             y,
             width,
@@ -711,14 +675,14 @@ class CustomConfigGUI : GuiScreen() {
         y += SECTION_SPACING
 
         y = drawToggleSection(
-            tr("kira.gui.section.misc"),
+            "Misc",
             x,
             y,
             width,
             listOf(
-                ToggleSpec(tr("kira.gui.option.boxingFish"), { cfg.boxingFish }, { cfg.boxingFish = it }),
-                ToggleSpec(tr("kira.gui.option.antiDetection"), { cfg.antiDetection }, { cfg.antiDetection = it }),
-                ToggleSpec(tr("kira.gui.option.winSneak"), { cfg.winSneak }, { cfg.winSneak = it })
+                ToggleSpec("Boxing: Use Fish", { cfg.boxingFish }, { cfg.boxingFish = it }),
+                ToggleSpec("Anti Detection", { cfg.antiDetection }, { cfg.antiDetection = it }),
+                ToggleSpec("Win Sneak", { cfg.winSneak }, { cfg.winSneak = it })
             )
         )
 
@@ -728,24 +692,23 @@ class CustomConfigGUI : GuiScreen() {
     private fun drawStatsTab(x: Int, yStart: Int): Int {
         var y = yStart
         val width = 500
-        y = drawSectionHeader(tr("kira.gui.section.statistics"), x, y, width); y += SECTION_SPACING
+        y = drawSectionHeader("Statistics", x, y, width); y += SECTION_SPACING
 
         val categories = StatsManager.DISPLAY_CATEGORIES
         val selectedCategory = categories.getOrElse(selectedStatsCategoryIndex) { StatsManager.GLOBAL_CATEGORY }
-        val categoryLabels = categories.map { translateCategory(it) }
 
         selector(
-            tr("kira.gui.option.category"),
+            "Category",
             x,
             y,
             width,
             { selectedStatsCategoryIndex },
             { selectedStatsCategoryIndex = it.coerceIn(0, categories.lastIndex) },
-            categoryLabels
+            categories
         ); y += ROW_HEIGHT + 6
 
         kira.config?.let { config ->
-            toggle(tr("kira.gui.option.showStatsOverlay"), x, y, width, { config.showStatsOverlay }, { config.showStatsOverlay = it })
+            toggle("Show Stats Overlay", x, y, width, { config.showStatsOverlay }, { config.showStatsOverlay = it })
             y += ROW_HEIGHT + SECTION_SPACING
         }
 
@@ -769,16 +732,16 @@ class CustomConfigGUI : GuiScreen() {
             y += ROW_HEIGHT
         }
 
-        drawStat(tr("kira.gui.stats.wins"), wins.toString(), successColor)
-        drawStat(tr("kira.gui.stats.losses"), losses.toString(), failureColor)
-        drawStat(tr("kira.gui.stats.gamesPlayed"), total.toString(), highlightColor)
+        drawStat("Wins", wins.toString(), successColor)
+        drawStat("Losses", losses.toString(), failureColor)
+        drawStat("Games Played", total.toString(), highlightColor)
         y += 6
-        drawStat(tr("kira.gui.stats.wlr"), String.format("%.2f", wlr), primaryColor)
-        drawStat(tr("kira.gui.stats.winRate"), String.format("%.1f%%", winrate), primaryColor)
+        drawStat("W/L Ratio", String.format("%.2f", wlr), primaryColor)
+        drawStat("Win Rate", String.format("%.1f%%", winrate), primaryColor)
 
         minutes?.let {
             y += 6
-            drawStat(tr("kira.gui.stats.sessionTime"), tr("kira.gui.stats.sessionTimeValue", it), highlightColor)
+            drawStat("Session Time", "${it}m", highlightColor)
         }
 
         return y
@@ -802,7 +765,7 @@ class CustomConfigGUI : GuiScreen() {
     private fun saveConfig() {
         kira.config?.markDirty()
         kira.config?.writeData()
-        ChatUtils.info(tr("kira.gui.info.saved"))
+        ChatUtils.info("Configuration saved!")
     }
 
     override fun doesGuiPauseGame(): Boolean = false
