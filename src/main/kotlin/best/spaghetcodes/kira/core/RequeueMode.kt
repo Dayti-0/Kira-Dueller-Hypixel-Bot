@@ -1,8 +1,8 @@
 package best.spaghetcodes.kira.core
 
-enum class RequeueMode(val displayName: String) {
-    FAST("Fast"),
-    PAPER("Paper");
+enum class RequeueMode(val displayNameKey: String) {
+    FAST("kira.gui.requeue.fast"),
+    PAPER("kira.gui.requeue.paper");
 
     companion object {
         fun fromConfig(value: String?): RequeueMode {
