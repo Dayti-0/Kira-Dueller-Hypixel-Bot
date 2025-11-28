@@ -1,9 +1,9 @@
 package best.spaghetcodes.kira.bot.tuning
 
-import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 /**
@@ -95,7 +95,7 @@ class UcbBandit(
                 decayedPlays[i] = 0
                 continue
             }
-            val scaled = floor(originalPlays * factor).toLong()
+            val scaled = (originalPlays * factor).roundToLong()
             val ensured = max(1L, scaled)
             decayedPlays[i] = ensured
             decayedTotal += ensured
