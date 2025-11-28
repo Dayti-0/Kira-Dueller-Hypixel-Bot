@@ -21,6 +21,7 @@ object ClassicV2Tuner {
         val bowCancelCloseDist: Float,
         val bowMinUseDist: Float,
         val bowAimPitchBias: Float,
+        val bowDrawParryEnabled: Int,
         val openVolleyMax: Int,
         val openSpacingMin: Long,
         val openSpacingMax: Long,
@@ -135,7 +136,8 @@ object ClassicV2Tuner {
         specF("bowCancelCloseDist", 6.0, 8.0, 0.1, 6.8),          // 8.0→6.8 ⭐ HIGH conf
         specF("bowMinUseDist", 7.0, 10.0, 0.1, 8.9),              // 10.5→8.9 (215% gain)
         specF("bowAimPitchBias", -0.3, 0.1, 0.05, -0.1),          // 0.0→-0.1 ⭐ HIGH conf, plage resserrée
-        
+        specI("bowDrawParryEnabled", 0.0, 1.0, 1.0, 1.0),         // bascule heuristique parade arc
+
         specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),                // verrouillé (prouvé)
         
         specL("openSpacingMin", 650.0, 850.0, 10.0, 750.0),       // 450→750 (données)
@@ -462,6 +464,7 @@ object ClassicV2Tuner {
         bowCancelCloseDist = map.float("bowCancelCloseDist"),
         bowMinUseDist = map.float("bowMinUseDist"),
         bowAimPitchBias = map.float("bowAimPitchBias"),
+        bowDrawParryEnabled = map.int("bowDrawParryEnabled"),
         openVolleyMax = map.int("openVolleyMax"),
         openSpacingMin = map.long("openSpacingMin"),
         openSpacingMax = map.long("openSpacingMax"),

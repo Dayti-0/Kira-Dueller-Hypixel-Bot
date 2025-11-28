@@ -40,6 +40,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var bowCancelCloseDist = 8.0f
     private var bowMinUseDist = 9.0f
     private var bowAimPitchBias = 0.0f
+    private var bowDrawParryEnabled = true
 
     private var openVolleyMax = 1
     private var openVolleyFired = 0
@@ -468,6 +469,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         continuousJumpMinIntervalMs = p.continuousJumpMinIntervalMs
 
         bowAimPitchBias = p.bowAimPitchBias
+        bowDrawParryEnabled = p.bowDrawParryEnabled > 0
         Mouse.setBowPitchBias(bowAimPitchBias)
     }
 
@@ -773,7 +775,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         val isStillNow = stillFrames >= stillFramesNeeded
         val oppHasBowNow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
         val oppBowDrawn = oppHasBowNow && isUsingItemSafe(opp)
-        val bowLikely = oppBowDrawn || (oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))
+        val bowLikely = (bowDrawParryEnabled && oppBowDrawn) || (oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))
 
         if (Mouse.rClickDown && distance < parryCloseCancelDist && !hbActive) {
             Mouse.rClickUp()
