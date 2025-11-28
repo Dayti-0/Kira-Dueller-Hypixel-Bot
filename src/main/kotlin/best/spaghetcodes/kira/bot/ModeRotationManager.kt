@@ -12,6 +12,7 @@ object ModeRotationManager {
     private var gamesInCurrentMode = 0
     private var lastKnownBotIndex = -1
     private var queueWaitTicks = 0
+    private var rotationSwitchPending = false
 
     enum class Trigger {
         GAME_LIMIT,
@@ -60,6 +61,7 @@ object ModeRotationManager {
 
     fun onOpponentFound() {
         queueWaitTicks = 0
+        rotationSwitchPending = false
     }
 
     fun onBotToggle(enabled: Boolean) {
@@ -180,6 +182,7 @@ object ModeRotationManager {
         gamesInCurrentMode = 0
         queueWaitTicks = 0
         lastKnownBotIndex = nextBotIndex
+        rotationSwitchPending = true
 
         val message = when (trigger) {
             Trigger.GAME_LIMIT -> "Rotation: changement vers ${newBot.getName()} après ${max(1, cfg.modeRotationGames)} parties."
@@ -188,6 +191,12 @@ object ModeRotationManager {
         ChatUtils.info(message)
 
         return RotationDecision(newBot, trigger, true)
+    }
+
+    fun consumeRotationSwitchPending(): Boolean {
+        val wasPending = rotationSwitchPending
+        rotationSwitchPending = false
+        return wasPending
     }
 
     private fun syncState(cfg: Config) {
@@ -213,5 +222,6 @@ object ModeRotationManager {
         gamesInCurrentMode = 0
         queueWaitTicks = 0
         lastKnownBotIndex = -1
+        rotationSwitchPending = false
     }
 }
