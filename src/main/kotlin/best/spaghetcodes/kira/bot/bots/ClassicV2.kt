@@ -775,9 +775,10 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         val isStillNow = stillFrames >= stillFramesNeeded
         val oppHasBowNow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
         val oppBowDrawn = oppHasBowNow && isUsingItemSafe(opp)
-        val bowLikely = (bowDrawParryEnabled && oppBowDrawn) || (oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))
+        val bowDrawnThreat = bowDrawParryEnabled && oppBowDrawn
+        val bowLikely = bowDrawnThreat || (oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))
 
-        if (Mouse.rClickDown && distance < parryCloseCancelDist && !hbActive) {
+        if (Mouse.rClickDown && distance < parryCloseCancelDist && !hbActive && !parryFromBow) {
             Mouse.rClickUp()
             parryFromBow = false
             parryExtendedUntil = 0L
@@ -787,7 +788,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         if (holdingSword) {
             if (!Mouse.rClickDown) {
                 val closeRange = distance < parryCloseCancelDist
-                if (!closeRange &&
+                if ((!closeRange || bowDrawnThreat) &&
                     !startupJumping &&
                     now >= allowParryAfter &&
                     bowLikely &&
