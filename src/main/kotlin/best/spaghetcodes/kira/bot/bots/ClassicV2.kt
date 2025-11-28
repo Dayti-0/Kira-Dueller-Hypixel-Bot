@@ -13,6 +13,7 @@ import best.spaghetcodes.kira.bot.tuning.ClassicV2Tuner
 import best.spaghetcodes.kira.bot.tuning.MistakeSummary
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
+import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import kotlin.math.abs
@@ -154,6 +155,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var parryJumpCd = 580L
     private var allowParryDelayMs = 2800L
     private var allowParryAfter = 0L
+
+    // ========= UTILITAIRES =========
+    private fun isUsingItemSafe(p: EntityPlayer?): Boolean {
+        return p?.let { it.isUsingItem || it.itemInUseCount > 0 } == true
+    }
 
     // ==================  MOUVEMENT  ===================
     private var strafeDir = 1
@@ -766,7 +772,8 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         val holdingSword = p.heldItem != null && p.heldItem.unlocalizedName.lowercase().contains("sword")
         val isStillNow = stillFrames >= stillFramesNeeded
         val oppHasBowNow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
-        val bowLikely = oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded)
+        val oppBowDrawn = oppHasBowNow && isUsingItemSafe(opp)
+        val bowLikely = oppBowDrawn || (oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))
 
         if (Mouse.rClickDown && distance < parryCloseCancelDist && !hbActive) {
             Mouse.rClickUp()
@@ -856,7 +863,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         val oppHasBow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
-        val bowLikelyNowClose = oppHasBow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded) && distance <= 10.0f
+        val bowLikelyNowClose = (oppBowDrawn || (oppHasBow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))) && distance <= 10.0f
         val oppRodRecently = (now - lastOppRodSeenAt) <= 2500L
         val allowByAntiSpam = now >= rodAntiSpamUntil || now < reentryRodGraceUntil || oppRodRecently
 
@@ -966,7 +973,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             }
 
             val oppHasBowReact = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
-            val bowLikelyReact = oppHasBowReact && (stillFrames >= stillFramesNeeded || bowSlowFrames >= bowSlowFramesNeeded)
+            val bowLikelyReact = (oppBowDrawn || (oppHasBowReact && (stillFrames >= stillFramesNeeded || bowSlowFrames >= bowSlowFramesNeeded)))
             if (!denyBowCloseByImmobilen &&
                 !denyBowMidByStill &&
                 shotsFired < maxArrows &&
