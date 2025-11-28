@@ -13,6 +13,7 @@ import best.spaghetcodes.kira.bot.tuning.ClassicV2Tuner
 import best.spaghetcodes.kira.bot.tuning.MistakeSummary
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.utils.*
+import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.init.Blocks
 import net.minecraft.util.Vec3
 import kotlin.math.abs
@@ -39,6 +40,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var bowCancelCloseDist = 8.0f
     private var bowMinUseDist = 9.0f
     private var bowAimPitchBias = 0.0f
+    private var bowDrawParryEnabled = true
 
     private var openVolleyMax = 1
     private var openVolleyFired = 0
@@ -154,6 +156,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
     private var parryJumpCd = 580L
     private var allowParryDelayMs = 2800L
     private var allowParryAfter = 0L
+
+    // ========= UTILITAIRES =========
+    private fun isUsingItemSafe(p: EntityPlayer?): Boolean {
+        return p?.let { it.isUsingItem || it.itemInUseCount > 0 } == true
+    }
 
     // ==================  MOUVEMENT  ===================
     private var strafeDir = 1
@@ -462,6 +469,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         continuousJumpMinIntervalMs = p.continuousJumpMinIntervalMs
 
         bowAimPitchBias = p.bowAimPitchBias
+        bowDrawParryEnabled = p.bowDrawParryEnabled > 0
         Mouse.setBowPitchBias(bowAimPitchBias)
     }
 
@@ -766,9 +774,11 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         val holdingSword = p.heldItem != null && p.heldItem.unlocalizedName.lowercase().contains("sword")
         val isStillNow = stillFrames >= stillFramesNeeded
         val oppHasBowNow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
-        val bowLikely = oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded)
+        val oppBowDrawn = oppHasBowNow && isUsingItemSafe(opp)
+        val bowDrawnThreat = bowDrawParryEnabled && oppBowDrawn
+        val bowLikely = bowDrawnThreat || (oppHasBowNow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))
 
-        if (Mouse.rClickDown && distance < parryCloseCancelDist && !hbActive) {
+        if (Mouse.rClickDown && distance < parryCloseCancelDist && !hbActive && !parryFromBow) {
             Mouse.rClickUp()
             parryFromBow = false
             parryExtendedUntil = 0L
@@ -778,7 +788,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         if (holdingSword) {
             if (!Mouse.rClickDown) {
                 val closeRange = distance < parryCloseCancelDist
-                if (!closeRange &&
+                if ((!closeRange || bowDrawnThreat) &&
                     !startupJumping &&
                     now >= allowParryAfter &&
                     bowLikely &&
@@ -856,7 +866,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
         }
 
         val oppHasBow = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
-        val bowLikelyNowClose = oppHasBow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded) && distance <= 10.0f
+        val bowLikelyNowClose = (oppBowDrawn || (oppHasBow && (isStillNow || bowSlowFrames >= bowSlowFramesNeeded))) && distance <= 10.0f
         val oppRodRecently = (now - lastOppRodSeenAt) <= 2500L
         val allowByAntiSpam = now >= rodAntiSpamUntil || now < reentryRodGraceUntil || oppRodRecently
 
@@ -966,7 +976,7 @@ class ClassicV2 : BotBase("/play duels_classic_duel"), Bow, Rod, MovePriority {
             }
 
             val oppHasBowReact = opp.heldItem != null && opp.heldItem.unlocalizedName.lowercase().contains("bow")
-            val bowLikelyReact = oppHasBowReact && (stillFrames >= stillFramesNeeded || bowSlowFrames >= bowSlowFramesNeeded)
+            val bowLikelyReact = (oppBowDrawn || (oppHasBowReact && (stillFrames >= stillFramesNeeded || bowSlowFrames >= bowSlowFramesNeeded)))
             if (!denyBowCloseByImmobilen &&
                 !denyBowMidByStill &&
                 shotsFired < maxArrows &&
