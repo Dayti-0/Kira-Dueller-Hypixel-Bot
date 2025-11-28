@@ -118,6 +118,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
 
+    private var proxyReconnectScheduled = false
+    private var forcedReconnectTarget: String? = null
+
     private var lastGameWon: Boolean? = null
 
     private var antiDetectionStage = 0
@@ -651,6 +654,19 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     @SubscribeEvent
     fun onChat(ev: ClientChatReceivedEvent) {
         val unformatted = ev.message.unformattedText
+        val lowerMessage = unformatted.lowercase()
+        val proxyRestartFrench = lowerMessage.contains("ce proxy redémarre bientôt") ||
+            lowerMessage.contains("veuillez vous reconnecter à mc.hypixel.net")
+        val proxyRestartEnglish = lowerMessage.contains("this proxy is restarting soon") ||
+            lowerMessage.contains("please reconnect to mc.hypixel.net")
+
+        if (toggled() && mc.theWorld != null && (proxyRestartFrench || proxyRestartEnglish)) {
+            if (!proxyReconnectScheduled) {
+                proxyReconnectScheduled = true
+                forcedReconnectTarget = if (proxyRestartFrench) "eu.hypixel.net" else "mc.hypixel.net"
+                disconnect()
+            }
+        }
         if (toggled() && mc.thePlayer != null) {
             updateDuelDurationMarker(unformatted)
             maybeRespondToSuspicion(unformatted)
@@ -742,6 +758,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun onConnect(event: ClientConnectedToServerEvent) {
         if (toggled()) {
             println("Reconnect successful!")
+            proxyReconnectScheduled = false
+            forcedReconnectTarget = null
             reconnectTimer?.cancel()
             TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
         }
@@ -752,9 +770,18 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun onDisconnect(event: ClientDisconnectionFromServerEvent) {
         if (toggled()) {
             println("Disconnected from server, reconnecting...")
+            val target = forcedReconnectTarget
+            val reconnectAction = if (target != null) {
+                { reconnectTo(target) }
+            } else {
+                this::reconnect
+            }
+            val initialDelay = target?.let { RandomUtils.randomIntInRange(400, 800) }
+                ?: RandomUtils.randomIntInRange(5000, 7000)
+
             TimeUtils.setTimeout({
-                reconnectTimer = TimeUtils.setInterval(this::reconnect, 0, 30000)
-            }, RandomUtils.randomIntInRange(5000, 7000))
+                reconnectTimer = TimeUtils.setInterval(reconnectAction, 0, 30000)
+            }, initialDelay)
         }
     }
 
@@ -881,19 +908,24 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     }
 
     private fun reconnect() {
+        reconnectTo("mc.hypixel.net")
+    }
+
+    private fun reconnectTo(serverAddress: String) {
         if (mc.theWorld == null) {
             if (mc.currentScreen is GuiMultiplayer) {
                 mc.addScheduledTask({
                     println("Reconnecting...")
                     FMLClientHandler.instance().setupServerList()
-                    FMLClientHandler.instance().connectToServer(mc.currentScreen, ServerData("hypixel", "mc.hypixel.net", false))
+                    FMLClientHandler.instance()
+                        .connectToServer(mc.currentScreen, ServerData("hypixel", serverAddress, false))
                 })
             } else {
                 if (mc.theWorld == null && mc.currentScreen !is GuiConnecting) {
                     mc.addScheduledTask({
                         println("Attempting to show new multiplayer screen...")
                         mc.displayGuiScreen(GuiMultiplayer(GuiMainMenu()))
-                        reconnect()
+                        reconnectTo(serverAddress)
                     })
                 }
             }
