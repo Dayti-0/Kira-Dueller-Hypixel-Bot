@@ -697,8 +697,17 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }
             }
 
-            if (unformatted.lowercase().contains("something went wrong trying") || unformatted.lowercase().contains("please don't spam the command")) {
-                TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
+            if (unformatted.lowercase().contains("something went wrong trying") ||
+                unformatted.lowercase().contains("please don't spam the command") ||
+                unformatted.lowercase().contains("une erreur s'est produite en essayant de vous envoyer sur ce serveur") ||
+                unformatted.lowercase().contains("veuillez ne pas spammer la commande")
+            ) {
+                if (ModeRotationManager.consumeRotationSwitchPending()) {
+                    ChatUtils.sendAsPlayer("/hub")
+                    TimeUtils.setTimeout({ ChatUtils.sendAsPlayer(queueCommand) }, 10000)
+                } else {
+                    TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
+                }
             } else if (unformatted.contains("A disconnect occurred in your connection, so you were put")) {
                 Movement.clearAll()
                 Mouse.stopLeftAC()
