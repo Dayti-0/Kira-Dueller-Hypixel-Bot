@@ -655,10 +655,10 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     fun onChat(ev: ClientChatReceivedEvent) {
         val unformatted = ev.message.unformattedText
         val lowerMessage = unformatted.lowercase()
-        val proxyRestartFrench = lowerMessage.contains("mm ce proxy redémarre bientôt") ||
-            lowerMessage.contains("mm veuillez vous reconnecter à mc.hypixel.net")
-        val proxyRestartEnglish = lowerMessage.contains("mm this proxy is restarting soon") ||
-            lowerMessage.contains("mm please reconnect to mc.hypixel.net")
+        val proxyRestartFrench = lowerMessage.contains("ce proxy redémarre bientôt") ||
+            lowerMessage.contains("veuillez vous reconnecter à mc.hypixel.net")
+        val proxyRestartEnglish = lowerMessage.contains("this proxy is restarting soon") ||
+            lowerMessage.contains("please reconnect to mc.hypixel.net")
 
         if (toggled() && mc.theWorld != null && (proxyRestartFrench || proxyRestartEnglish)) {
             if (!proxyReconnectScheduled) {
