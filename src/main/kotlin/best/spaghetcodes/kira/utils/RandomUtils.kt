@@ -12,18 +12,7 @@ object RandomUtils {
      * @return int
      */
     fun randomIntInRange(min: Int, max: Int): Int {
-        val low = kotlin.math.min(min, max)
-        val high = kotlin.math.max(min, max)
-
-        val boundExclusive = if (high == Int.MAX_VALUE) {
-            high.toLong() + 1
-        } else {
-            (high + 1).toLong()
-        }
-
-        return ThreadLocalRandom.current()
-            .nextLong(low.toLong(), boundExclusive)
-            .toInt()
+        return ThreadLocalRandom.current().nextInt(min, max + 1)
     }
 
     /**

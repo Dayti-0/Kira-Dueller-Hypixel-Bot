@@ -14,23 +14,18 @@ class UcbBandit(
     val totalPlays: Long,
     plays: LongArray,
     rewards: DoubleArray,
-    minReward: Double = 0.0,
-    maxReward: Double = 1.0,
+    val minReward: Double = 0.0,
+    val maxReward: Double = 1.0,
     val strategy: Strategy = Strategy.UCB1,
 ) {
-    val minReward: Double
-    val maxReward: Double
     private val plays: LongArray = plays.copyOf()
     private val rewards: DoubleArray = rewards.copyOf()
 
     init {
-        val (normalizedMinReward, normalizedMaxReward) = normalizeRewards(minReward, maxReward)
-        this.minReward = normalizedMinReward
-        this.maxReward = normalizedMaxReward
-
         require(armCount > 0) { "armCount must be positive" }
         require(this.plays.size == armCount) { "plays size must match armCount" }
         require(this.rewards.size == armCount) { "rewards size must match armCount" }
+        require(maxReward > minReward) { "maxReward must be greater than minReward" }
     }
 
     /**
@@ -152,6 +147,7 @@ class UcbBandit(
     companion object {
         fun withArms(armCount: Int, minReward: Double = 0.0, maxReward: Double = 1.0): UcbBandit {
             require(armCount > 0) { "armCount must be positive" }
+            require(maxReward > minReward) { "maxReward must be greater than minReward" }
 
             return UcbBandit(armCount, 0, LongArray(armCount), DoubleArray(armCount), minReward, maxReward)
         }
@@ -177,13 +173,6 @@ class UcbBandit(
                 dto.maxReward,
                 dto.strategy,
             )
-
-        private fun normalizeRewards(minReward: Double, maxReward: Double): Pair<Double, Double> {
-            val safeMin = if (minReward.isFinite()) minReward else 0.0
-            val safeMax = if (maxReward.isFinite()) maxReward else safeMin + 1.0
-            if (safeMax > safeMin) return safeMin to safeMax
-            return safeMin to safeMin + 1.0
-        }
     }
 
     enum class Strategy {
