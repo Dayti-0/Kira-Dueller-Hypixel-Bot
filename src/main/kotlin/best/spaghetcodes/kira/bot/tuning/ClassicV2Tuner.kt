@@ -141,8 +141,8 @@ object ClassicV2Tuner {
         specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),                // verrouillé (prouvé)
         
         specL("openSpacingMin", 650.0, 850.0, 10.0, 750.0),       // 450→750 (données)
-        specL("openSpacingMax", 850.0, 920.0, 10.0, 880.0),       // 810→880
-        specF("openShotMinDist", 9.5, 11.0, 0.1, 10.1),           // 11.5→10.1
+        specL("openSpacingMax", 750.0, 900.0, 10.0, 810.0),       // 870→810 ⭐ HIGH conf
+        specF("openShotMinDist", 10.0, 12.5, 0.1, 11.5),          // inchangé, confirmé bon
         specL("reactiveCdMs", 550.0, 700.0, 10.0, 610.0),         // 670→610 (218% gain)
 
         // Détection mouvement - ajustements
@@ -153,14 +153,14 @@ object ClassicV2Tuner {
 
         // Réserves - ajustements
         specL("reserveTightMs", 11000.0, 13000.0, 100.0, 12300.0), // 10000→12300 ⭐ HIGH
-        specI("earlyReserve", 2.0, 4.0, 1.0, 3.0),                 // 4→3
+        specI("earlyReserve", 3.0, 5.0, 1.0, 4.0),                 // 3→4 (léger ajustement)
         specI("midReserve", 2.0, 4.0, 1.0, 3.0),                   // 2→3 (+45%)
 
         // ROD - Cooldowns plus conservateurs
         specL("rodCdCloseMsBase", 320.0, 400.0, 10.0, 340.0),      // 310→340 ⭐ HIGH
         specL("rodCdFarMsBase", 480.0, 580.0, 10.0, 520.0),        // 480→520 ⭐ HIGH
         specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),              // inchangé
-        specF("rodBanMeleeDist", 4.2, 5.0, 0.05, 4.5),             // 4.0→4.5
+        specF("rodBanMeleeDist", 3.0, 5.0, 0.05, 4.0),             // inchangé
         specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),                 // inchangé
         specF("rodCloseMax", 2.6, 4.0, 0.05, 3.4),                 // inchangé
         specF("rodMainMin", 3.2, 3.8, 0.05, 3.55),                 // 2.8→3.55 ⭐ HIGH, plage resserrée
@@ -175,18 +175,18 @@ object ClassicV2Tuner {
 
         specI("rodHoldCloseMinMs", 90.0, 160.0, 5.0, 118.0),       // inchangé
         specI("rodHoldCloseMaxMs", 110.0, 190.0, 5.0, 142.0),      // inchangé
-        specI("rodHoldMidMinMs", 180.0, 220.0, 5.0, 190.0),        // 208→190
+        specI("rodHoldMidMinMs", 160.0, 260.0, 5.0, 208.0),        // inchangé
         specI("rodHoldMidMaxMs", 180.0, 300.0, 5.0, 232.0),        // inchangé
 
         // Rod anti-spam - Plages larges, defaults ajustés
-        specI("rodAntiSpamClosePassiveMin", 340.0, 400.0, 10.0, 360.0),
+        specI("rodAntiSpamClosePassiveMin", 260.0, 420.0, 10.0, 340.0),
         specI("rodAntiSpamClosePassiveMax", 340.0, 520.0, 10.0, 420.0),
         specI("rodAntiSpamMidPassiveMin", 400.0, 640.0, 10.0, 420.0),    // default 520→420 (données)
         specI("rodAntiSpamMidPassiveMax", 520.0, 820.0, 10.0, 680.0),
         specI("rodAntiSpamFarPassiveMin", 400.0, 640.0, 10.0, 520.0),
         specI("rodAntiSpamFarPassiveMax", 540.0, 860.0, 10.0, 700.0),
 
-        specI("rodAntiSpamCloseActiveMin", 270.0, 320.0, 10.0, 290.0),   // 200→290
+        specI("rodAntiSpamCloseActiveMin", 200.0, 360.0, 10.0, 200.0),   // default 260→200 (données)
         specI("rodAntiSpamCloseActiveMax", 260.0, 420.0, 10.0, 320.0),
         specI("rodAntiSpamMidActiveMin", 280.0, 480.0, 10.0, 380.0),
         specI("rodAntiSpamMidActiveMax", 400.0, 640.0, 10.0, 520.0),
@@ -209,18 +209,18 @@ object ClassicV2Tuner {
         specI("closeBurstFlipMinMs", 40.0, 100.0, 5.0, 60.0),
         specI("closeBurstFlipMaxMs", 80.0, 160.0, 5.0, 110.0),
         specI("closeHoldWindowMinMs", 160.0, 300.0, 10.0, 200.0),        // default 220→200 (données)
-        specI("closeHoldWindowMaxMs", 240.0, 300.0, 10.0, 260.0),        // 300→260
+        specI("closeHoldWindowMaxMs", 260.0, 420.0, 10.0, 300.0),        // default 340→300 (données)
 
         // POST-HIT - Plages larges, defaults ajustés
         specI("forwardStickMinMs", 160.0, 300.0, 10.0, 170.0),           // default 220→170 (données)
         specI("forwardStickMaxMs", 250.0, 310.0, 10.0, 270.0),           // default 280→330→270 (découverte 95.6% WR!)
-        specI("meleeFocusMinMs", 320.0, 360.0, 10.0, 340.0),             // 370→340
+        specI("meleeFocusMinMs", 220.0, 380.0, 10.0, 370.0),             // default 300→370 (données)
         specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),             // default 340→390 (données)
 
         // JUMP
         specF("antiJumpZoneDist", 8.0, 8.2, 0.05, 8.05),                 // 8.2→8.05 (légère réduction)
         specI("startupJumpDelayMs", 255.0, 270.0, 5.0, 260.0),           // 265→260
-        specI("continuousJumpMinIntervalMs", 180.0, 210.0, 5.0, 190.0)   // 195→190
+        specI("continuousJumpMinIntervalMs", 190.0, 230.0, 5.0, 195.0)   // 215→195
     )
 
     private val specByKey = specs.associateBy { it.key }
