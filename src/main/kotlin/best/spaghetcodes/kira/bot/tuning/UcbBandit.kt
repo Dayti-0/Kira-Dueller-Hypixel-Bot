@@ -14,13 +14,10 @@ class UcbBandit(
     val totalPlays: Long,
     plays: LongArray,
     rewards: DoubleArray,
-    private val providedMinReward: Double = 0.0,
-    private val providedMaxReward: Double = 1.0,
+    val minReward: Double = 0.0,
+    val maxReward: Double = 1.0,
     val strategy: Strategy = Strategy.UCB1,
 ) {
-    val minReward: Double
-    val maxReward: Double
-
     private val plays: LongArray = plays.copyOf()
     private val rewards: DoubleArray = rewards.copyOf()
 
@@ -28,10 +25,7 @@ class UcbBandit(
         require(armCount > 0) { "armCount must be positive" }
         require(this.plays.size == armCount) { "plays size must match armCount" }
         require(this.rewards.size == armCount) { "rewards size must match armCount" }
-
-        val (validatedMin, validatedMax) = validateRewardRange(providedMinReward, providedMaxReward)
-        minReward = validatedMin
-        maxReward = validatedMax
+        require(maxReward > minReward) { "maxReward must be greater than minReward" }
     }
 
     /**
@@ -153,6 +147,7 @@ class UcbBandit(
     companion object {
         fun withArms(armCount: Int, minReward: Double = 0.0, maxReward: Double = 1.0): UcbBandit {
             require(armCount > 0) { "armCount must be positive" }
+            require(maxReward > minReward) { "maxReward must be greater than minReward" }
 
             return UcbBandit(armCount, 0, LongArray(armCount), DoubleArray(armCount), minReward, maxReward)
         }
@@ -178,15 +173,6 @@ class UcbBandit(
                 dto.maxReward,
                 dto.strategy,
             )
-    }
-
-    private fun validateRewardRange(minValue: Double, maxValue: Double): Pair<Double, Double> {
-        val lower = min(minValue, maxValue)
-        val upper = max(minValue, maxValue)
-        if (upper > lower) return lower to upper
-
-        val correctedUpper = lower + 1.0
-        return lower to correctedUpper
     }
 
     enum class Strategy {
