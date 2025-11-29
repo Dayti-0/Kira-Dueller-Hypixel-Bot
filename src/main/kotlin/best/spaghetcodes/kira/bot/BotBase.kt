@@ -119,6 +119,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
     private var resultCounted = false
 
     private var proxyReconnectScheduled = false
+    private var proxyReconnectAfterGame = false
     private var forcedReconnectTarget: String? = null
 
     private var lastGameWon: Boolean? = null
@@ -664,7 +665,12 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             if (!proxyReconnectScheduled) {
                 proxyReconnectScheduled = true
                 forcedReconnectTarget = if (proxyRestartFrench) "eu.hypixel.net" else "mc.hypixel.net"
-                disconnect()
+
+                if (StateManager.state == StateManager.States.PLAYING) {
+                    proxyReconnectAfterGame = true
+                } else {
+                    disconnect()
+                }
             }
         }
         if (toggled() && mc.thePlayer != null) {
@@ -759,6 +765,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         if (toggled()) {
             println("Reconnect successful!")
             proxyReconnectScheduled = false
+            proxyReconnectAfterGame = false
             forcedReconnectTarget = null
             reconnectTimer?.cancel()
             TimeUtils.setTimeout({ joinGame() }, RandomUtils.randomIntInRange(6000, 8000))
@@ -827,6 +834,12 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         if (toggled()) {
             onGameEnd()
             resetVars()
+
+            if (proxyReconnectScheduled && proxyReconnectAfterGame) {
+                proxyReconnectAfterGame = false
+                disconnect()
+                return
+            }
 
             if (kira.config?.sendAutoGG == true) {
                 TimeUtils.setTimeout({
