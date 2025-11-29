@@ -48,6 +48,16 @@ class UcbBanditTest {
     }
 
     @Test
+    fun `reward range is normalized when max is not greater than min`() {
+        val bandit = UcbBandit.withArms(armCount = 2, minReward = 5.0, maxReward = 5.0)
+
+        assertEquals(5.0, bandit.minReward)
+        assertEquals(6.0, bandit.maxReward)
+        assertEquals(0.0, bandit.normalizeReward(5.0), 1e-9)
+        assertEquals(1.0, bandit.normalizeReward(6.0), 1e-9)
+    }
+
+    @Test
     fun `dto round trip preserves state`() {
         var bandit = UcbBandit.withArms(armCount = 2, minReward = -0.5, maxReward = 2.0)
 
