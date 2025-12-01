@@ -12,7 +12,16 @@ object RandomUtils {
      * @return int
      */
     fun randomIntInRange(min: Int, max: Int): Int {
-        return ThreadLocalRandom.current().nextInt(min, max + 1)
+        if (min == max) return min
+
+        val low = min.coerceAtMost(max)
+        val highExclusive = min.coerceAtLeast(max).toLong() + 1
+
+        return if (highExclusive > Int.MAX_VALUE) {
+            ThreadLocalRandom.current().nextLong(low.toLong(), highExclusive).toInt()
+        } else {
+            ThreadLocalRandom.current().nextInt(low, highExclusive.toInt())
+        }
     }
 
     /**
