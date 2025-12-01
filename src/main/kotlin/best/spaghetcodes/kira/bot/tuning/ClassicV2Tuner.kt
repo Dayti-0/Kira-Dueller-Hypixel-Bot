@@ -132,7 +132,7 @@ object ClassicV2Tuner {
     private val specs = listOf(
         // BOW - V5 basé sur nouvelle session
         specI("fullDrawMsMin", 770.0, 810.0, 10.0, 780.0),        // 800→780 (64% gain)
-        specI("fullDrawMsMax", 1070.0, 1110.0, 10.0, 1080.0),     // 1100→1080 (91% gain, LOW conf)
+        specI("fullDrawMsMax", 1070.0, 1110.0, 10.0, 1090.0),     // 1100→1090 (91% gain, LOW conf)
         specF("bowCancelCloseDist", 6.0, 8.0, 0.1, 6.8),          // 8.0→6.8 ⭐ HIGH conf
         specF("bowMinUseDist", 7.0, 10.0, 0.1, 8.9),              // 10.5→8.9 (215% gain)
         specF("bowAimPitchBias", -0.3, 0.1, 0.05, -0.1),          // 0.0→-0.1 ⭐ HIGH conf, plage resserrée
@@ -153,7 +153,7 @@ object ClassicV2Tuner {
 
         // Réserves - ajustements
         specL("reserveTightMs", 11000.0, 13000.0, 100.0, 12300.0), // 10000→12300 ⭐ HIGH
-        specI("earlyReserve", 2.0, 4.0, 1.0, 3.0),                 // 4→3
+        specI("earlyReserve", 2.0, 4.0, 1.0, 2.0),                 // 4→2
         specI("midReserve", 2.0, 4.0, 1.0, 3.0),                   // 2→3 (+45%)
 
         // ROD - Cooldowns plus conservateurs
@@ -162,7 +162,7 @@ object ClassicV2Tuner {
         specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),              // inchangé
         specF("rodBanMeleeDist", 4.2, 5.0, 0.05, 4.85),            // 4.8→4.85
         specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),                 // inchangé
-        specF("rodCloseMax", 2.6, 4.0, 0.05, 3.4),                 // inchangé
+        specF("rodCloseMax", 2.6, 4.0, 0.05, 2.7),                 // ajusté pour resserrer le proche
         specF("rodMainMin", 3.2, 3.8, 0.05, 3.55),                 // 2.8→3.55 ⭐ HIGH, plage resserrée
         specF("rodMainMax", 6.0, 7.0, 0.05, 6.5),                  // 7.0→6.5 ⭐ HIGH
         specF("rodInterceptMin", 4.8, 6.4, 0.05, 5.8),             // inchangé
@@ -189,7 +189,7 @@ object ClassicV2Tuner {
         specI("rodAntiSpamCloseActiveMin", 270.0, 320.0, 10.0, 290.0),   // 200→290
         specI("rodAntiSpamCloseActiveMax", 260.0, 420.0, 10.0, 320.0),
         specI("rodAntiSpamMidActiveMin", 280.0, 480.0, 10.0, 380.0),
-        specI("rodAntiSpamMidActiveMax", 400.0, 640.0, 10.0, 520.0),
+        specI("rodAntiSpamMidActiveMax", 400.0, 640.0, 10.0, 430.0),    // défaut réduit
         specI("rodAntiSpamFarActiveMin", 320.0, 520.0, 10.0, 400.0),
         specI("rodAntiSpamFarActiveMax", 420.0, 700.0, 10.0, 560.0),
 
