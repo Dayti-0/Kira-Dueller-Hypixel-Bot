@@ -141,7 +141,7 @@ object ClassicV2Tuner {
         specI("openVolleyMax", 1.0, 1.0, 1.0, 1.0),                // verrouillé (prouvé)
         
         specL("openSpacingMin", 650.0, 850.0, 10.0, 750.0),       // 450→750 (données)
-        specL("openSpacingMax", 850.0, 920.0, 10.0, 880.0),       // 810→880
+        specL("openSpacingMax", 850.0, 920.0, 10.0, 900.0),
         specF("openShotMinDist", 9.5, 11.0, 0.1, 10.1),           // 11.5→10.1
         specL("reactiveCdMs", 550.0, 700.0, 10.0, 610.0),         // 670→610 (218% gain)
 
@@ -149,7 +149,7 @@ object ClassicV2Tuner {
         specD("stillFrameThreshold", 0.015, 0.022, 0.0005, 0.0195), // 0.0125→0.0195 ⭐ HIGH
         specI("stillFramesNeeded", 6.0, 16.0, 1.0, 10.0),          // inchangé
         specD("bowSlowThreshold", 0.04, 0.07, 0.002, 0.05),        // 0.06→0.05 ⭐ HIGH conf
-        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 3.0),          // confirmé
+        specI("bowSlowFramesNeeded", 2.0, 6.0, 1.0, 2.0),  // était 3.0
 
         // Réserves - ajustements
         specL("reserveTightMs", 11000.0, 13000.0, 100.0, 12300.0), // 10000→12300 ⭐ HIGH
@@ -160,7 +160,7 @@ object ClassicV2Tuner {
         specL("rodCdCloseMsBase", 320.0, 400.0, 10.0, 340.0),      // 310→340 ⭐ HIGH
         specL("rodCdFarMsBase", 480.0, 580.0, 10.0, 520.0),        // 480→520 ⭐ HIGH
         specF("rodCdBiasMax", 1.05, 1.5, 0.01, 1.25),              // inchangé
-        specF("rodBanMeleeDist", 4.2, 5.0, 0.05, 4.5),             // 4.0→4.5
+        specF("rodBanMeleeDist", 4.2, 5.0, 0.05, 4.85),  // était 4.5
         specF("rodCloseMin", 1.6, 2.6, 0.05, 2.0),                 // inchangé
         specF("rodCloseMax", 2.6, 4.0, 0.05, 3.4),                 // inchangé
         specF("rodMainMin", 3.2, 3.8, 0.05, 3.55),                 // 2.8→3.55 ⭐ HIGH, plage resserrée
@@ -179,8 +179,8 @@ object ClassicV2Tuner {
         specI("rodHoldMidMaxMs", 180.0, 300.0, 5.0, 232.0),        // inchangé
 
         // Rod anti-spam - Plages larges, defaults ajustés
-        specI("rodAntiSpamClosePassiveMin", 340.0, 400.0, 10.0, 360.0),
-        specI("rodAntiSpamClosePassiveMax", 340.0, 520.0, 10.0, 420.0),
+        specI("rodAntiSpamClosePassiveMin", 340.0, 400.0, 10.0, 350.0),
+        specI("rodAntiSpamClosePassiveMax", 340.0, 520.0, 10.0, 340.0),
         specI("rodAntiSpamMidPassiveMin", 400.0, 640.0, 10.0, 420.0),    // default 520→420 (données)
         specI("rodAntiSpamMidPassiveMax", 520.0, 820.0, 10.0, 680.0),
         specI("rodAntiSpamFarPassiveMin", 400.0, 640.0, 10.0, 520.0),
@@ -204,7 +204,7 @@ object ClassicV2Tuner {
         specL("allowParryDelayMs", 2000.0, 3600.0, 50.0, 2800.0),
 
         // STRAFE PROCHE - Plages larges, defaults ajustés
-        specI("closeBurstWindowMinMs", 200.0, 360.0, 10.0, 200.0),       // default 280→200 (données)
+        specI("closeBurstWindowMinMs", 200.0, 360.0, 10.0, 210.0),       // default 280→200 (données)
         specI("closeBurstWindowMaxMs", 320.0, 520.0, 10.0, 300.0),       // default 420→300 (données)
         specI("closeBurstFlipMinMs", 40.0, 100.0, 5.0, 60.0),
         specI("closeBurstFlipMaxMs", 80.0, 160.0, 5.0, 110.0),
@@ -218,7 +218,7 @@ object ClassicV2Tuner {
         specI("meleeFocusMaxMs", 260.0, 420.0, 10.0, 390.0),             // default 340→390 (données)
 
         // JUMP
-        specF("antiJumpZoneDist", 8.0, 8.2, 0.05, 8.05),                 // 8.2→8.05 (légère réduction)
+        specF("antiJumpZoneDist", 8.0, 8.4, 0.05, 8.15),  // était 8.25
         specI("startupJumpDelayMs", 255.0, 270.0, 5.0, 260.0),           // 265→260
         specI("continuousJumpMinIntervalMs", 180.0, 210.0, 5.0, 190.0)   // 195→190
     )
