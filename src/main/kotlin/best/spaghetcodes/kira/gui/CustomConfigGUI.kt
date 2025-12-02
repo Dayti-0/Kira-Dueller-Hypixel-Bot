@@ -434,6 +434,13 @@ class CustomConfigGUI : GuiScreen() {
             { cfg.disableChatMessages },
             { cfg.disableChatMessages = it }); y += ROW_HEIGHT
         toggle(
+            tr("kira.gui.option.remoteMonitoring"),
+            x,
+            y,
+            width,
+            { cfg.remoteMonitoringEnabled },
+            { cfg.remoteMonitoringEnabled = it }); y += ROW_HEIGHT
+        toggle(
             tr("kira.gui.option.cinematicCamera"),
             x,
             y,
