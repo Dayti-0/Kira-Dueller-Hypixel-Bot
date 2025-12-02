@@ -43,14 +43,6 @@ class Config : Vigilant(File(kira.configLocation), sortingBehavior = ConfigSorte
 
     @Property(
         type = PropertyType.SWITCH,
-        name = "Remote Monitoring",
-        description = "Write the current bot status to a JSON file for external scripts.",
-        category = "General"
-    )
-    var remoteMonitoringEnabled = false
-
-    @Property(
-        type = PropertyType.SWITCH,
         name = "Mode Camera",
         description = "Automatically switch to a wide third-person camera with a cinematic angle.",
         category = "General"

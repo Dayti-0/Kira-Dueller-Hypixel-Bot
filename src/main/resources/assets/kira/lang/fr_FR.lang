@@ -26,7 +26,6 @@ kira.gui.option.requeueMode=Mode de requeue
 kira.gui.requeue.fast=Rapide
 kira.gui.requeue.paper=Papier
 kira.gui.option.tuner=Tuner
-kira.gui.option.remoteMonitoring=Monitoring à distance
 kira.gui.option.disableChatMessages=Désactiver les messages du chat
 kira.gui.option.cinematicCamera=Caméra cinématique
 kira.gui.section.modeRotation=Rotation de mode

@@ -1,7 +1,6 @@
 package best.spaghetcodes.kira.bot
 
 import best.spaghetcodes.kira.stats.StatsManager
-import best.spaghetcodes.kira.monitor.RemoteMonitor
 import net.minecraft.util.EnumChatFormatting
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -29,7 +28,6 @@ object Session {
 
     fun recordResult(win: Boolean, category: String) {
         StatsManager.recordResult(win, category)
-        RemoteMonitor.markDirty()
     }
 
     fun updateBotEnabled(enabled: Boolean, now: Long = System.currentTimeMillis()) {
@@ -42,7 +40,6 @@ object Session {
 
         botEnabled = enabled
         refreshActivity(now)
-        RemoteMonitor.markDirty()
     }
 
     fun updateBotState(state: StateManager.States, now: Long = System.currentTimeMillis()) {
@@ -55,7 +52,6 @@ object Session {
 
         botState = state
         refreshActivity(now)
-        RemoteMonitor.markDirty()
     }
 
     private fun refreshActivity(now: Long) {
