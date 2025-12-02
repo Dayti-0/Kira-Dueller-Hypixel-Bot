@@ -37,6 +37,7 @@ kira.gui.option.rotationMode3=Mode de rotation 3
 kira.gui.section.autoDisconnect=Déconnexion automatique
 kira.gui.option.afterXGames=Après X parties
 kira.gui.option.afterXMinutes=Après X minutes
+kira.gui.option.antiBug=Anti Bug
 kira.gui.section.requeueTimings=Delais de requeue
 kira.gui.option.autoRequeueDelay=Délai d'auto-requeue (ms)
 kira.gui.option.requeueAfterNoGame=Relancer après aucune partie (s)

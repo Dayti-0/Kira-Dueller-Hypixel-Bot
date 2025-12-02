@@ -511,6 +511,14 @@ class CustomConfigGUI : GuiScreen() {
             0,
             500,
             5
+        ); y += ROW_HEIGHT
+        toggle(
+            tr("kira.gui.option.antiBug"),
+            x,
+            y,
+            width,
+            { cfg.antiBug },
+            { cfg.antiBug = it }
         ); y += ROW_HEIGHT + SECTION_SPACING
 
         y = drawSectionHeader(tr("kira.gui.section.requeueTimings"), x, y, width); y += SECTION_SPACING
