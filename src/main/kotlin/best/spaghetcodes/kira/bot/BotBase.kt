@@ -162,6 +162,17 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     fun opponent() = opponent
 
+    fun opponentName(): String? {
+        val currentName = opponent?.gameProfile?.name
+        if (!currentName.isNullOrBlank()) {
+            return currentName
+        }
+        if (lastOpponentName.isNotBlank()) {
+            return lastOpponentName
+        }
+        return null
+    }
+
     open fun getName(): String = "Base"
     protected open fun onAttack() {}
     protected open fun onAttacked() {}
