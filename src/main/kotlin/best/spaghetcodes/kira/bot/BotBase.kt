@@ -74,6 +74,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         Session.updateBotEnabled(toggled)
         ModeRotationManager.onBotToggle(toggled)
         if (!toggled) {
+            resetLossStreak()
             resetAntiDetection()
         }
     }
@@ -117,6 +118,9 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     // évite les doubles comptages (titre + chat)
     private var resultCounted = false
+
+    private var consecutiveLosses = 0
+    private var antiBugShutdownTriggered = false
 
     private var proxyReconnectScheduled = false
     private var proxyReconnectAfterGame = false
@@ -483,11 +487,19 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         lastGameWon = iWon
         Session.recordResult(iWon, getName())
         if (iWon) {
+            resetLossStreak()
             triggerWinSneakCelebration()
         } else {
+            consecutiveLosses++
             cancelWinSneak()
+            maybeTriggerAntiBugShutdown()
         }
         maybeAutoDisconnect()
+    }
+
+    private fun resetLossStreak() {
+        consecutiveLosses = 0
+        antiBugShutdownTriggered = false
     }
 
     private fun maybeAutoDisconnect() {
@@ -507,6 +519,24 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
             if (activeDuration >= minutesThreshold.toLong() * 60_000) {
                 scheduleAutoDisconnect("Played for $minutesThreshold minutes, disconnecting...")
             }
+        }
+    }
+
+    private fun maybeTriggerAntiBugShutdown() {
+        val cfg = kira.config ?: return
+        if (!cfg.antiBug) return
+        if (antiBugShutdownTriggered) return
+        if (!toggled()) return
+
+        if (consecutiveLosses >= 15) {
+            antiBugShutdownTriggered = true
+            ChatUtils.info("Anti Bug: 15 consecutive defeats detected. Disabling bot and disconnecting.")
+            TimeUtils.setTimeout({
+                if (toggled()) {
+                    toggle()
+                }
+                disconnect()
+            }, RandomUtils.randomIntInRange(900, 1700))
         }
     }
 
