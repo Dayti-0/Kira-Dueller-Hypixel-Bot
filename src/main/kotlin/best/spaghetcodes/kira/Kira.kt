@@ -11,6 +11,7 @@ import best.spaghetcodes.kira.core.Config
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.gui.StatsOverlay
 import best.spaghetcodes.kira.events.packet.PacketListener
+import best.spaghetcodes.kira.monitor.RemoteMonitor
 import com.google.gson.Gson
 import net.minecraft.client.Minecraft
 import net.minecraftforge.common.MinecraftForge
@@ -46,6 +47,7 @@ class kira {
             if (bot != null) MinecraftForge.EVENT_BUS.unregister(bot)
             bot = b
             MinecraftForge.EVENT_BUS.register(bot)
+            RemoteMonitor.markDirty()
         }
     }
 
@@ -68,6 +70,7 @@ class kira {
         MinecraftForge.EVENT_BUS.register(KeyBindings)
         MinecraftForge.EVENT_BUS.register(CameraController)
         MinecraftForge.EVENT_BUS.register(StatsOverlay())
+        RemoteMonitor.init()
 
         // Utilise l’accès typé -> aucun Any ici.
         val idx = config?.currentBot ?: 0
