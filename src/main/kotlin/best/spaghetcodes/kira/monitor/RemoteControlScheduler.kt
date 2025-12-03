@@ -14,7 +14,8 @@ object RemoteControlScheduler {
 
     private var lastReadAt = 0L
 
-    private var autoQueuePaused = false
+    private var manualQueuePaused = false
+    private var planQueuePaused = false
     private var delayedStartAt: Long? = null
     private var stopAfterGamesRemaining: Int? = null
     private var stopAfterDeadline: Long? = null
@@ -48,13 +49,18 @@ object RemoteControlScheduler {
         lastReadAt = now
 
         val payload = RemoteMonitor.readExistingPayload() ?: return
-        val commands = payload.commands ?: return
+        val commands = payload.commands
+
+        if (commands == null) {
+            clearPlanIfNeeded()
+            return
+        }
 
         lastCommands = commands
 
         commands.pauseAutoQueue?.let { newValue ->
-            if (autoQueuePaused != newValue) {
-                autoQueuePaused = newValue
+            if (manualQueuePaused != newValue) {
+                manualQueuePaused = newValue
                 RemoteMonitor.markDirty()
             }
         }
@@ -87,37 +93,45 @@ object RemoteControlScheduler {
             RemoteMonitor.markDirty()
         }
 
-        commands.plan?.let { handlePlanCommand(it, now) }
+        if (commands.plan == null) {
+            clearPlanIfNeeded()
+        } else {
+            handlePlanCommand(commands.plan, now)
+        }
     }
 
     private fun handlePlanCommand(plan: RemotePlanCommand, now: Long) {
         if (plan.active == false) {
             if (activePlan != null) {
                 activePlan = null
+                planQueuePaused = false
                 RemoteMonitor.markDirty()
             }
             return
         }
 
+        if (activePlan != null) return
+
         val steps = plan.steps?.mapNotNull { buildStep(it) } ?: emptyList()
-        if (steps.isEmpty()) return
+        if (steps.isEmpty()) {
+            clearPlanIfNeeded()
+            return
+        }
 
         val newPlan = ActivePlan(
             id = plan.id ?: "remote-plan",
             loop = plan.loop == true,
-            steps = steps.toList()
+            steps = steps.toList(),
+            totalPlanTargetGames = steps.sumOf { (it as? ExecutablePlanStep.Play)?.games ?: 0 }
         )
 
         val startDelay = plan.startAfterSeconds ?: 0
         if (startDelay > 0) {
             newPlan.blockedUntil = now + (startDelay * 1000)
+            newPlan.waitingForStart = true
         }
 
-        if (newPlan.blockedUntil == null) {
-            (newPlan.currentStep() as? ExecutablePlanStep.Pause)?.let { pause ->
-                newPlan.blockedUntil = now + pause.durationMs
-            }
-        }
+        initializeStep(newPlan, now)
 
         activePlan = newPlan
         RemoteMonitor.markDirty()
@@ -150,9 +164,12 @@ object RemoteControlScheduler {
         plan.blockedUntil?.let { blockedUntil ->
             if (now < blockedUntil) {
                 enforceBotToggle(false, disconnect = false)
+                refreshPauseCountdown(plan, blockedUntil, now)
                 return
             }
             plan.blockedUntil = null
+            plan.waitingForStart = false
+            planQueuePaused = false
             RemoteMonitor.markDirty()
         }
 
@@ -160,15 +177,28 @@ object RemoteControlScheduler {
             is ExecutablePlanStep.Play -> {
                 enforceBotToggle(true, disconnect = false)
                 switchMode(step.mode)
+                planQueuePaused = false
             }
 
             is ExecutablePlanStep.Pause -> {
                 enforceBotToggle(false, disconnect = false)
+                planQueuePaused = true
                 if (plan.blockedUntil == null) {
-                    advancePlan(now)
+                    plan.blockedUntil = now + step.durationMs
+                    plan.lastReportedRemainingSeconds = step.durationMs / 1000
+                    RemoteMonitor.markDirty()
                 }
+                refreshPauseCountdown(plan, plan.blockedUntil!!, now)
                 return
             }
+        }
+    }
+
+    private fun refreshPauseCountdown(plan: ActivePlan, blockedUntil: Long, now: Long) {
+        val remaining = max(0, (blockedUntil - now) / 1000)
+        if (plan.lastReportedRemainingSeconds != remaining) {
+            plan.lastReportedRemainingSeconds = remaining
+            RemoteMonitor.markDirty()
         }
     }
 
@@ -181,8 +211,8 @@ object RemoteControlScheduler {
 
         delayedStartAt = null
         enforceBotToggle(true, disconnect = false)
-        if (autoQueuePaused) {
-            autoQueuePaused = false
+        if (manualQueuePaused) {
+            manualQueuePaused = false
         }
         RemoteMonitor.markDirty()
     }
@@ -204,10 +234,11 @@ object RemoteControlScheduler {
     private fun triggerStop() {
         if (stopTriggered) return
         stopTriggered = true
-        autoQueuePaused = true
+        manualQueuePaused = true
         delayedStartAt = null
         requestDisable(disconnect = true)
         activePlan = null
+        planQueuePaused = false
         RemoteMonitor.markDirty()
     }
 
@@ -218,11 +249,13 @@ object RemoteControlScheduler {
 
         activePlan?.let { plan ->
             val step = plan.currentStep()
-            if (step is ExecutablePlanStep.Play) {
+            if (step is ExecutablePlanStep.Play && step.mode.equals(mode, ignoreCase = true)) {
                 plan.gamesInCurrentStep++
                 plan.totalGamesPlayed++
                 if (plan.gamesInCurrentStep >= step.games) {
                     advancePlan(System.currentTimeMillis())
+                } else {
+                    RemoteMonitor.markDirty()
                 }
             }
         }
@@ -241,17 +274,14 @@ object RemoteControlScheduler {
                 plan.currentIndex = 0
             } else {
                 activePlan = null
+                planQueuePaused = false
                 RemoteMonitor.markDirty()
                 return
             }
         }
 
         val nextStep = plan.currentStep()
-        if (nextStep is ExecutablePlanStep.Pause) {
-            plan.blockedUntil = now + nextStep.durationMs
-        } else {
-            plan.blockedUntil = null
-        }
+        initializeStep(plan, now, nextStep)
         RemoteMonitor.markDirty()
     }
 
@@ -269,7 +299,7 @@ object RemoteControlScheduler {
 
         if (plan?.currentStep() is ExecutablePlanStep.Pause) return false
 
-        if (autoQueuePaused && !forceCommand) return false
+        if ((manualQueuePaused || planQueuePaused) && !forceCommand) return false
         return true
     }
 
@@ -289,7 +319,7 @@ object RemoteControlScheduler {
 
         val delayedStartPending = delayedStartAt?.let { it > now } == true
         val planPauseActive = plan?.blockedUntil?.let { it > now } == true || (step is ExecutablePlanStep.Pause)
-        val effectiveQueuePause = autoQueuePaused || stopTriggered || delayedStartPending || planPauseActive || pendingDisable != null
+        val effectiveQueuePause = manualQueuePaused || planQueuePaused || stopTriggered || delayedStartPending || planPauseActive || pendingDisable != null
 
         return SchedulerStatus(
             planActive = plan != null,
@@ -302,7 +332,7 @@ object RemoteControlScheduler {
             currentStepCompletedGames = plan?.gamesInCurrentStep,
             currentStepTargetDuration = (step as? ExecutablePlanStep.Pause)?.durationMs?.div(1000),
             currentStepRemainingDuration = remainingPlanPause,
-            totalPlanGames = plan?.totalGamesPlayed ?: 0,
+            totalPlanGames = plan?.totalPlanTargetGames ?: 0,
             stopAfterGamesRemaining = stopAfterGamesRemaining?.takeIf { it > 0 },
             stopAfterSecondsRemaining = remainingStopSeconds,
             autoQueuePaused = effectiveQueuePause,
@@ -327,8 +357,8 @@ object RemoteControlScheduler {
         if (enabled) {
             pendingDisable = null
             stopTriggered = false
-            if (autoQueuePaused && lastCommands?.pauseAutoQueue != true) {
-                autoQueuePaused = false
+            if (manualQueuePaused && lastCommands?.pauseAutoQueue != true) {
+                manualQueuePaused = false
             }
             if (!bot.toggled()) {
                 bot.toggle()
@@ -342,7 +372,7 @@ object RemoteControlScheduler {
 
     private fun requestDisable(disconnect: Boolean) {
         val bot = kira.bot
-        autoQueuePaused = true
+        manualQueuePaused = true
         pendingDisable = PendingDisable(disconnect)
         tryExecutePendingDisable(bot)
         RemoteMonitor.markDirty()
@@ -394,6 +424,43 @@ object RemoteControlScheduler {
         return steps.getOrNull(currentIndex)
     }
 
+    private fun clearPlanIfNeeded() {
+        if (activePlan != null) {
+            activePlan = null
+            planQueuePaused = false
+            RemoteMonitor.markDirty()
+        }
+    }
+
+    private fun initializeStep(plan: ActivePlan, now: Long, step: ExecutablePlanStep? = plan.currentStep()) {
+        plan.gamesInCurrentStep = 0
+        plan.lastReportedRemainingSeconds = null
+
+        when (step) {
+            is ExecutablePlanStep.Play -> {
+                if (!plan.waitingForStart) {
+                    plan.blockedUntil = null
+                }
+                planQueuePaused = false
+                switchMode(step.mode)
+            }
+
+            is ExecutablePlanStep.Pause -> {
+                planQueuePaused = true
+                if (!plan.waitingForStart) {
+                    plan.blockedUntil = now + step.durationMs
+                    plan.lastReportedRemainingSeconds = step.durationMs / 1000
+                }
+            }
+
+            else -> {
+                if (!plan.waitingForStart) {
+                    plan.blockedUntil = null
+                }
+            }
+        }
+    }
+
     private data class ActivePlan(
         val id: String,
         val loop: Boolean,
@@ -401,7 +468,10 @@ object RemoteControlScheduler {
         var currentIndex: Int = 0,
         var gamesInCurrentStep: Int = 0,
         var totalGamesPlayed: Int = 0,
-        var blockedUntil: Long? = null
+        var blockedUntil: Long? = null,
+        var waitingForStart: Boolean = false,
+        val totalPlanTargetGames: Int = 0,
+        var lastReportedRemainingSeconds: Long? = null
     )
 
     private data class PendingDisable(val disconnect: Boolean)
