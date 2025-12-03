@@ -22,6 +22,8 @@ object RemoteControlScheduler {
     private var stopTriggered = false
     private var pendingDisable: PendingDisable? = null
 
+    private var manualOverridePending = false
+
     private var activePlan: ActivePlan? = null
 
     private var lastCommands: RemoteCommands? = null
@@ -49,7 +51,18 @@ object RemoteControlScheduler {
         lastReadAt = now
 
         val payload = RemoteMonitor.readExistingPayload() ?: return
-        val commands = payload.commands
+        var commands = payload.commands
+
+        if (manualOverridePending && lastCommands?.botEnabled != null) {
+            commands = when {
+                commands == null -> lastCommands
+                commands.botEnabled != lastCommands?.botEnabled -> commands.copy(botEnabled = lastCommands?.botEnabled)
+                else -> commands
+            }
+            if (commands?.botEnabled == lastCommands?.botEnabled) {
+                manualOverridePending = false
+            }
+        }
 
         if (commands == null) {
             clearPlanIfNeeded()
@@ -65,7 +78,13 @@ object RemoteControlScheduler {
             }
         }
 
-        commands.botEnabled?.let { enforceBotToggle(it, disconnect = true) }
+        commands.botEnabled?.let {
+            enforceBotToggle(it, disconnect = true)
+            if (!it) {
+                activePlan = null
+                planQueuePaused = false
+            }
+        }
 
         commands.switchMode?.let { switchMode(it) }
 
@@ -160,6 +179,10 @@ object RemoteControlScheduler {
     private fun tickPlan(now: Long) {
         val plan = activePlan ?: return
         val step = plan.currentStep() ?: return
+
+        if (lastCommands?.botEnabled == false || stopTriggered || pendingDisable?.disconnect == true) {
+            return
+        }
 
         plan.blockedUntil?.let { blockedUntil ->
             if (now < blockedUntil) {
@@ -349,6 +372,7 @@ object RemoteControlScheduler {
         val updated = (lastCommands ?: RemoteCommands()).copy(botEnabled = enabled)
         lastCommands = updated
         lastReadAt = System.currentTimeMillis()
+        manualOverridePending = true
         RemoteMonitor.markDirty()
     }
 
