@@ -112,10 +112,11 @@ object RemoteControlScheduler {
             RemoteMonitor.markDirty()
         }
 
-        if (commands.plan == null) {
+        val planCommand = commands.plan
+        if (planCommand == null) {
             clearPlanIfNeeded()
         } else {
-            handlePlanCommand(commands.plan, now)
+            handlePlanCommand(planCommand, now)
         }
     }
 
