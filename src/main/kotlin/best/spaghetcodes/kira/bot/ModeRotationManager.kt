@@ -71,6 +71,11 @@ object ModeRotationManager {
         }
 
         val cfg = kira.config ?: return
+        if (cfg.remoteMonitoringEnabled) {
+            reset()
+            lastKnownBotIndex = cfg.currentBot
+            return
+        }
         if (!isRotationActive(cfg)) {
             syncState(cfg)
             return
@@ -115,6 +120,12 @@ object ModeRotationManager {
         val cfg = kira.config
         if (cfg == null) {
             reset()
+            return
+        }
+
+        if (cfg.remoteMonitoringEnabled) {
+            reset()
+            lastKnownBotIndex = cfg.currentBot
             return
         }
 
@@ -208,6 +219,7 @@ object ModeRotationManager {
     }
 
     private fun isRotationActive(cfg: Config): Boolean {
+        if (cfg.remoteMonitoringEnabled) return false
         return cfg.enableModeRotation && getRotationSequence(cfg).isNotEmpty()
     }
 
