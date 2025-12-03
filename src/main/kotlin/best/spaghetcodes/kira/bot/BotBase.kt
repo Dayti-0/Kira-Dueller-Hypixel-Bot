@@ -5,6 +5,7 @@ import best.spaghetcodes.kira.bot.bots.*
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.core.RequeueMode
 import best.spaghetcodes.kira.kira
+import best.spaghetcodes.kira.monitor.RemoteControlScheduler
 import best.spaghetcodes.kira.utils.*
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.SimpleChannelInboundHandler
@@ -925,6 +926,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private fun joinGame(second: Boolean = false, forceCommand: Boolean = false) {
         cancelWinSneak()
+        if (!RemoteControlScheduler.canAutoQueue(forceCommand)) return
         if (toggled() && StateManager.state != StateManager.States.PLAYING && !StateManager.gameFull) {
             val requeueMode = kira.config?.getRequeueMode() ?: RequeueMode.FAST
             if (StateManager.state == StateManager.States.GAME) {
