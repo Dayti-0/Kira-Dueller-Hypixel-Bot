@@ -378,10 +378,15 @@ object RemoteControlScheduler {
         RemoteMonitor.markDirty()
     }
 
-    private fun tryExecutePendingDisable(bot: BotBase? = kira.bot) {
+    fun onGameFinished() {
+        if (pendingDisable == null) return
+        tryExecutePendingDisable(kira.bot, bypassPlayingCheck = true)
+    }
+
+    private fun tryExecutePendingDisable(bot: BotBase? = kira.bot, bypassPlayingCheck: Boolean = false) {
         val pending = pendingDisable ?: return
         val state = StateManager.state
-        if (state == StateManager.States.PLAYING) {
+        if (!bypassPlayingCheck && state == StateManager.States.PLAYING) {
             return
         }
 

@@ -890,6 +890,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }, kira.config?.ggDelay ?: 100)
             }
 
+            RemoteControlScheduler.onGameFinished()
+
             val rotationDecision = ModeRotationManager.onGameCompleted(this)
             val targetBot = rotationDecision?.botToQueue ?: this
             val celebrationDelay = winSneakDelayRemaining()
