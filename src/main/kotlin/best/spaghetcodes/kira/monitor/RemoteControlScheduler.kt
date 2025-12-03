@@ -1,6 +1,8 @@
 package best.spaghetcodes.kira.monitor
 
 import best.spaghetcodes.kira.kira
+import best.spaghetcodes.kira.bot.BotBase
+import best.spaghetcodes.kira.bot.StateManager
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
@@ -17,6 +19,7 @@ object RemoteControlScheduler {
     private var stopAfterGamesRemaining: Int? = null
     private var stopAfterDeadline: Long? = null
     private var stopTriggered = false
+    private var pendingDisable: PendingDisable? = null
 
     private var activePlan: ActivePlan? = null
 
@@ -37,6 +40,7 @@ object RemoteControlScheduler {
         updateDelayedStart(now)
         updateStopTimers(now)
         tickPlan(now)
+        tryExecutePendingDisable()
     }
 
     private fun readCommands(now: Long) {
@@ -55,12 +59,15 @@ object RemoteControlScheduler {
             }
         }
 
-        commands.botEnabled?.let { enforceBotToggle(it) }
+        commands.botEnabled?.let { enforceBotToggle(it, disconnect = true) }
 
         commands.switchMode?.let { switchMode(it) }
 
         commands.startAfterSeconds?.let { seconds ->
             delayedStartAt = if (seconds > 0) now + (seconds * 1000) else null
+            if (seconds > 0) {
+                requestDisable(disconnect = false)
+            }
             RemoteMonitor.markDirty()
         }
 
@@ -142,7 +149,7 @@ object RemoteControlScheduler {
 
         plan.blockedUntil?.let { blockedUntil ->
             if (now < blockedUntil) {
-                enforceBotToggle(false)
+                enforceBotToggle(false, disconnect = false)
                 return
             }
             plan.blockedUntil = null
@@ -151,12 +158,12 @@ object RemoteControlScheduler {
 
         when (step) {
             is ExecutablePlanStep.Play -> {
-                enforceBotToggle(true)
+                enforceBotToggle(true, disconnect = false)
                 switchMode(step.mode)
             }
 
             is ExecutablePlanStep.Pause -> {
-                enforceBotToggle(false)
+                enforceBotToggle(false, disconnect = false)
                 if (plan.blockedUntil == null) {
                     advancePlan(now)
                 }
@@ -168,12 +175,12 @@ object RemoteControlScheduler {
     private fun updateDelayedStart(now: Long) {
         val startAt = delayedStartAt ?: return
         if (now < startAt) {
-            enforceBotToggle(false)
+            enforceBotToggle(false, disconnect = false)
             return
         }
 
         delayedStartAt = null
-        enforceBotToggle(true)
+        enforceBotToggle(true, disconnect = false)
         if (autoQueuePaused) {
             autoQueuePaused = false
         }
@@ -199,7 +206,7 @@ object RemoteControlScheduler {
         stopTriggered = true
         autoQueuePaused = true
         delayedStartAt = null
-        enforceBotToggle(false)
+        requestDisable(disconnect = true)
         activePlan = null
         RemoteMonitor.markDirty()
     }
@@ -220,6 +227,7 @@ object RemoteControlScheduler {
             }
         }
 
+        tryExecutePendingDisable()
         updateStopTimers(System.currentTimeMillis())
         RemoteMonitor.markDirty()
     }
@@ -251,7 +259,7 @@ object RemoteControlScheduler {
         if (kira.config?.remoteMonitoringEnabled != true) return true
         val now = System.currentTimeMillis()
 
-        if (stopTriggered) return false
+        if (stopTriggered || pendingDisable != null) return false
         delayedStartAt?.let { if (now < it) return false }
 
         val plan = activePlan
@@ -281,7 +289,7 @@ object RemoteControlScheduler {
 
         val delayedStartPending = delayedStartAt?.let { it > now } == true
         val planPauseActive = plan?.blockedUntil?.let { it > now } == true || (step is ExecutablePlanStep.Pause)
-        val effectiveQueuePause = autoQueuePaused || stopTriggered || delayedStartPending || planPauseActive
+        val effectiveQueuePause = autoQueuePaused || stopTriggered || delayedStartPending || planPauseActive || pendingDisable != null
 
         return SchedulerStatus(
             planActive = plan != null,
@@ -306,10 +314,56 @@ object RemoteControlScheduler {
         return lastCommands ?: fallback
     }
 
-    private fun enforceBotToggle(enabled: Boolean) {
+    fun onManualToggle(enabled: Boolean) {
+        if (kira.config?.remoteMonitoringEnabled != true) return
+        val updated = (lastCommands ?: RemoteCommands()).copy(botEnabled = enabled)
+        lastCommands = updated
+        lastReadAt = System.currentTimeMillis()
+        RemoteMonitor.markDirty()
+    }
+
+    private fun enforceBotToggle(enabled: Boolean, disconnect: Boolean) {
         val bot = kira.bot ?: return
-        if (bot.toggled() != enabled) {
-            bot.toggle()
+        if (enabled) {
+            pendingDisable = null
+            stopTriggered = false
+            if (autoQueuePaused && lastCommands?.pauseAutoQueue != true) {
+                autoQueuePaused = false
+            }
+            if (!bot.toggled()) {
+                bot.toggle()
+            }
+            bot.ensureConnectedToHypixel()
+            return
+        }
+
+        requestDisable(disconnect)
+    }
+
+    private fun requestDisable(disconnect: Boolean) {
+        val bot = kira.bot
+        autoQueuePaused = true
+        pendingDisable = PendingDisable(disconnect)
+        tryExecutePendingDisable(bot)
+        RemoteMonitor.markDirty()
+    }
+
+    private fun tryExecutePendingDisable(bot: BotBase? = kira.bot) {
+        val pending = pendingDisable ?: return
+        val state = StateManager.state
+        if (state == StateManager.States.PLAYING) {
+            return
+        }
+
+        pendingDisable = null
+        stopTriggered = stopTriggered || pending.disconnect
+        val activeBot = bot ?: return
+        if (pending.disconnect) {
+            activeBot.remoteShutdownToLobbyAndDisconnect()
+        } else {
+            if (activeBot.toggled()) {
+                activeBot.toggle()
+            }
         }
     }
 
@@ -332,6 +386,8 @@ object RemoteControlScheduler {
         if (newBot != null && newBot.toggled() != wasToggled) {
             newBot.toggle()
         }
+
+        RemoteMonitor.markDirty()
     }
 
     private fun ActivePlan.currentStep(): ExecutablePlanStep? {
@@ -347,6 +403,8 @@ object RemoteControlScheduler {
         var totalGamesPlayed: Int = 0,
         var blockedUntil: Long? = null
     )
+
+    private data class PendingDisable(val disconnect: Boolean)
 
     private enum class StepType {
         PLAY,

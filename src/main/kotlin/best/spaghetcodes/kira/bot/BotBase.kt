@@ -73,6 +73,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         autoDisconnectScheduled = false
         toggled = newState
         Session.updateBotEnabled(toggled)
+        RemoteControlScheduler.onManualToggle(toggled)
         ModeRotationManager.onBotToggle(toggled)
         if (!toggled) {
             resetLossStreak()
@@ -963,7 +964,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
-    private fun reconnect() {
+    fun reconnect() {
         reconnectTo("mc.hypixel.net")
     }
 
@@ -986,6 +987,26 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }
             }
         }
+    }
+
+    fun ensureConnectedToHypixel() {
+        if (mc.theWorld == null) {
+            reconnect()
+        }
+    }
+
+    fun remoteShutdownToLobbyAndDisconnect() {
+        val shouldSendHub = mc.theWorld != null && mc.thePlayer != null
+        if (shouldSendHub) {
+            TimeUtils.setTimeout({ ChatUtils.sendAsPlayer("/hub") }, RandomUtils.randomIntInRange(100, 250))
+        }
+
+        val shouldToggle = toggled()
+        if (shouldToggle) {
+            toggle()
+        }
+
+        TimeUtils.setTimeout({ disconnect() }, RandomUtils.randomIntInRange(400, 900))
     }
 
     class PacketReader(private val container: BotBase) : SimpleChannelInboundHandler<Packet<*>>(false) {
