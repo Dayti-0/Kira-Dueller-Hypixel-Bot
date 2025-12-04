@@ -3,6 +3,7 @@ package best.spaghetcodes.kira.monitor
 import best.spaghetcodes.kira.kira
 import best.spaghetcodes.kira.bot.BotBase
 import best.spaghetcodes.kira.bot.StateManager
+import best.spaghetcodes.kira.monitor.GameHistory
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
@@ -199,6 +200,9 @@ object RemoteControlScheduler {
 
         when (step) {
             is ExecutablePlanStep.Play -> {
+                if (syncPlanProgressFromHistory(plan, step, now)) {
+                    return
+                }
                 enforceBotToggle(true, disconnect = false)
                 switchMode(step.mode)
                 planQueuePaused = false
@@ -273,12 +277,14 @@ object RemoteControlScheduler {
 
         activePlan?.let { plan ->
             val step = plan.currentStep()
-            if (step is ExecutablePlanStep.Play && step.mode.equals(mode, ignoreCase = true)) {
-                plan.gamesInCurrentStep++
-                plan.totalGamesPlayed++
-                if (plan.gamesInCurrentStep >= step.games) {
-                    advancePlan(System.currentTimeMillis())
-                } else {
+            if (step is ExecutablePlanStep.Play) {
+                if (step.mode.equals(mode, ignoreCase = true)) {
+                    plan.gamesInCurrentStep++
+                    plan.totalGamesPlayed++
+                }
+
+                val nowTs = System.currentTimeMillis()
+                if (!syncPlanProgressFromHistory(plan, step, nowTs)) {
                     RemoteMonitor.markDirty()
                 }
             }
@@ -307,6 +313,25 @@ object RemoteControlScheduler {
         val nextStep = plan.currentStep()
         initializeStep(plan, now, nextStep)
         RemoteMonitor.markDirty()
+    }
+
+    private fun syncPlanProgressFromHistory(plan: ActivePlan, step: ExecutablePlanStep.Play, now: Long): Boolean {
+        val observedGames = GameHistory.totalsForMode(step.mode).games
+        val baseline = plan.stepBaselineGames
+        val completed = max(0, observedGames - baseline)
+        var advanced = false
+
+        if (completed != plan.gamesInCurrentStep) {
+            plan.gamesInCurrentStep = completed
+            RemoteMonitor.markDirty()
+        }
+
+        if (plan.gamesInCurrentStep >= step.games) {
+            advancePlan(now)
+            advanced = true
+        }
+
+        return advanced
     }
 
     fun canAutoQueue(forceCommand: Boolean): Boolean {
@@ -471,6 +496,7 @@ object RemoteControlScheduler {
                 if (!plan.waitingForStart) {
                     plan.blockedUntil = null
                 }
+                plan.stepBaselineGames = GameHistory.totalsForMode(step.mode).games
                 planQueuePaused = false
                 switchMode(step.mode)
             }
@@ -498,6 +524,7 @@ object RemoteControlScheduler {
         var currentIndex: Int = 0,
         var gamesInCurrentStep: Int = 0,
         var totalGamesPlayed: Int = 0,
+        var stepBaselineGames: Int = 0,
         var blockedUntil: Long? = null,
         var waitingForStart: Boolean = false,
         val totalPlanTargetGames: Int = 0,

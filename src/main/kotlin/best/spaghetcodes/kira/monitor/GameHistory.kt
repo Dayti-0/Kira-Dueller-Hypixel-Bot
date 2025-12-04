@@ -33,5 +33,14 @@ object GameHistory {
 
         return HistorySnapshot(copy, perMode)
     }
+
+    fun totalsForMode(mode: String): ModeTotals {
+        val copy = synchronized(entries) { entries.toList() }
+        val totals = copy.filter { it.mode.equals(mode, ignoreCase = true) }
+            .fold(ModeTotals()) { acc, entry ->
+                if (entry.win) acc.copy(wins = acc.wins + 1) else acc.copy(losses = acc.losses + 1)
+            }
+        return totals
+    }
 }
 
