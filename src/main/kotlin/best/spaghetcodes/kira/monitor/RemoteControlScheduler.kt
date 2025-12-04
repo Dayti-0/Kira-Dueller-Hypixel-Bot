@@ -278,12 +278,18 @@ object RemoteControlScheduler {
         activePlan?.let { plan ->
             val step = plan.currentStep()
             if (step is ExecutablePlanStep.Play) {
+                val nowTs = System.currentTimeMillis()
                 if (step.mode.equals(mode, ignoreCase = true)) {
                     plan.gamesInCurrentStep++
                     plan.totalGamesPlayed++
+
+                    if (plan.gamesInCurrentStep >= step.games) {
+                        advancePlan(nowTs)
+                        RemoteMonitor.markDirty()
+                        return
+                    }
                 }
 
-                val nowTs = System.currentTimeMillis()
                 if (!syncPlanProgressFromHistory(plan, step, nowTs)) {
                     RemoteMonitor.markDirty()
                 }
