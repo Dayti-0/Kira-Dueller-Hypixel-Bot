@@ -5,6 +5,7 @@ import best.spaghetcodes.kira.bot.bots.*
 import best.spaghetcodes.kira.core.KeyBindings
 import best.spaghetcodes.kira.core.RequeueMode
 import best.spaghetcodes.kira.kira
+import best.spaghetcodes.kira.monitor.RemoteControlScheduler
 import best.spaghetcodes.kira.utils.*
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.SimpleChannelInboundHandler
@@ -72,6 +73,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         autoDisconnectScheduled = false
         toggled = newState
         Session.updateBotEnabled(toggled)
+        RemoteControlScheduler.onManualToggle(toggled)
         ModeRotationManager.onBotToggle(toggled)
         if (!toggled) {
             resetLossStreak()
@@ -888,6 +890,8 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }, kira.config?.ggDelay ?: 100)
             }
 
+            RemoteControlScheduler.onGameFinished()
+
             val rotationDecision = ModeRotationManager.onGameCompleted(this)
             val targetBot = rotationDecision?.botToQueue ?: this
             val celebrationDelay = winSneakDelayRemaining()
@@ -925,6 +929,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
 
     private fun joinGame(second: Boolean = false, forceCommand: Boolean = false) {
         cancelWinSneak()
+        if (!RemoteControlScheduler.canAutoQueue(forceCommand)) return
         if (toggled() && StateManager.state != StateManager.States.PLAYING && !StateManager.gameFull) {
             val requeueMode = kira.config?.getRequeueMode() ?: RequeueMode.FAST
             if (StateManager.state == StateManager.States.GAME) {
@@ -961,7 +966,7 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
         }
     }
 
-    private fun reconnect() {
+    fun reconnect() {
         reconnectTo("mc.hypixel.net")
     }
 
@@ -984,6 +989,26 @@ open class BotBase(val queueCommand: String, val quickRefresh: Int = 10000) {
                 }
             }
         }
+    }
+
+    fun ensureConnectedToHypixel() {
+        if (mc.theWorld == null) {
+            reconnect()
+        }
+    }
+
+    fun remoteShutdownToLobbyAndDisconnect() {
+        val shouldSendHub = mc.theWorld != null && mc.thePlayer != null
+        if (shouldSendHub) {
+            TimeUtils.setTimeout({ ChatUtils.sendAsPlayer("/hub") }, RandomUtils.randomIntInRange(100, 250))
+        }
+
+        val shouldToggle = toggled()
+        if (shouldToggle) {
+            toggle()
+        }
+
+        TimeUtils.setTimeout({ disconnect() }, RandomUtils.randomIntInRange(400, 900))
     }
 
     class PacketReader(private val container: BotBase) : SimpleChannelInboundHandler<Packet<*>>(false) {

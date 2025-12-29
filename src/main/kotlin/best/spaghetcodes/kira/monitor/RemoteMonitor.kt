@@ -4,9 +4,9 @@ import best.spaghetcodes.kira.bot.Session
 import best.spaghetcodes.kira.bot.StateManager
 import best.spaghetcodes.kira.kira
 import com.google.gson.annotations.SerializedName
+import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
-import net.minecraftforge.common.MinecraftForge
 import org.apache.logging.log4j.LogManager
 import java.io.File
 
@@ -20,12 +20,14 @@ object RemoteMonitor {
     private val tempFile = File(monitorDir, "kira_status.tmp")
 
     private var lastWriteAt = 0L
+    private var dirty = false
 
     fun init() {
         MinecraftForge.EVENT_BUS.register(this)
     }
 
     fun markDirty() {
+        dirty = true
     }
 
     @SubscribeEvent
@@ -34,16 +36,18 @@ object RemoteMonitor {
         if (kira.config?.remoteMonitoringEnabled != true) return
 
         val now = System.currentTimeMillis()
-        if (now - lastWriteAt < WRITE_INTERVAL_MS) return
+        if (!dirty && now - lastWriteAt < WRITE_INTERVAL_MS) return
 
         val status = buildStatus(now)
         val json = kira.gson.toJson(status)
 
         writeStatus(json)
         lastWriteAt = now
+        dirty = false
     }
 
     private fun buildStatus(now: Long): RemoteStatus {
+        val existing = readExistingPayload()
         val bot = kira.bot
         val opponent = bot?.opponent()
         val opponentName = opponent?.gameProfile?.name ?: bot?.opponentName()
@@ -58,8 +62,23 @@ object RemoteMonitor {
                 wlr = null
             ),
             wins = Session.wins,
-            losses = Session.losses
+            losses = Session.losses,
+            scheduler = RemoteControlScheduler.getSchedulerStatus(now),
+            commands = RemoteControlScheduler.currentCommands(existing?.commands) ?: existing?.commands,
+            history = GameHistory.snapshot()
         )
+    }
+
+    internal fun readExistingPayload(): RemoteStatus? {
+        return try {
+            if (!statusFile.exists()) return null
+            statusFile.reader().use { reader ->
+                kira.gson.fromJson(reader, RemoteStatus::class.java)
+            }
+        } catch (e: Exception) {
+            logger.debug("Failed to read existing remote status", e)
+            null
+        }
     }
 
     private fun resolvePhase(): String {
@@ -89,7 +108,10 @@ object RemoteMonitor {
         val phase: String,
         val opponent: OpponentStatus,
         val wins: Int?,
-        val losses: Int?
+        val losses: Int?,
+        val scheduler: SchedulerStatus?,
+        val commands: RemoteCommands?,
+        val history: HistorySnapshot?
     )
 
     data class OpponentStatus(

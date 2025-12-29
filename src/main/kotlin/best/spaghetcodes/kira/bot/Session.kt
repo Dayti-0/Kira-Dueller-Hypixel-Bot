@@ -1,7 +1,9 @@
 package best.spaghetcodes.kira.bot
 
-import best.spaghetcodes.kira.stats.StatsManager
+import best.spaghetcodes.kira.monitor.GameHistory
+import best.spaghetcodes.kira.monitor.RemoteControlScheduler
 import best.spaghetcodes.kira.monitor.RemoteMonitor
+import best.spaghetcodes.kira.stats.StatsManager
 import net.minecraft.util.EnumChatFormatting
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -29,6 +31,8 @@ object Session {
 
     fun recordResult(win: Boolean, category: String) {
         StatsManager.recordResult(win, category)
+        GameHistory.recordGame(category, win)
+        RemoteControlScheduler.onGameFinished(category, win)
         RemoteMonitor.markDirty()
     }
 
